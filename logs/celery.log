@@ -1,0 +1,37 @@
+ 
+ -------------- celery@Evans-MacBook-Air.local v5.3.4 (emerald-rush)
+--- ***** ----- 
+-- ******* ---- macOS-13.2.1-arm64-arm-64bit 2025-06-28 18:27:31
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         fintellic:0x10398bcd0
+- ** ---------- .> transport:   redis://localhost:6379/0
+- ** ---------- .> results:     redis://localhost:6379/0
+- *** --- * --- .> concurrency: 8 (prefork)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . app.tasks.filing_tasks.process_filing_task
+  . app.tasks.filing_tasks.process_pending_filings
+  . app.tasks.filing_tasks.send_filing_notifications
+
+[2025-06-28 18:27:31,982: WARNING/MainProcess] /Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/celery/worker/consumer/consumer.py:507: CPendingDeprecationWarning: The broker_connection_retry configuration setting will no longer determine
+whether broker connection retries are made during startup in Celery 6.0 and above.
+If you wish to retain the existing behavior for retrying connections on startup,
+you should set broker_connection_retry_on_startup to True.
+  warnings.warn(
+
+[2025-06-28 18:27:31,999: INFO/MainProcess] Connected to redis://localhost:6379/0
+[2025-06-28 18:27:32,000: WARNING/MainProcess] /Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/celery/worker/consumer/consumer.py:507: CPendingDeprecationWarning: The broker_connection_retry configuration setting will no longer determine
+whether broker connection retries are made during startup in Celery 6.0 and above.
+If you wish to retain the existing behavior for retrying connections on startup,
+you should set broker_connection_retry_on_startup to True.
+  warnings.warn(
+
+[2025-06-28 18:27:32,003: INFO/MainProcess] mingle: searching for neighbors
+[2025-06-28 18:27:33,008: INFO/MainProcess] mingle: all alone
+[2025-06-28 18:27:33,016: INFO/MainProcess] celery@Evans-MacBook-Air.local ready.

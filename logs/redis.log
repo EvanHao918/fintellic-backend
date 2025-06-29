@@ -1,0 +1,13 @@
+33969:C 28 Jun 2025 18:27:28.780 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+33969:C 28 Jun 2025 18:27:28.780 * Redis version=8.0.2, bits=64, commit=00000000, modified=1, pid=33969, just started
+33969:C 28 Jun 2025 18:27:28.780 # Warning: no config file specified, using the default config. In order to specify a config file use redis-server /path/to/redis.conf
+33969:M 28 Jun 2025 18:27:28.780 * monotonic clock: POSIX clock_gettime
+33969:M 28 Jun 2025 18:27:28.780 * Running mode=standalone, port=6379.
+33969:M 28 Jun 2025 18:27:28.780 # WARNING: The TCP backlog setting of 511 cannot be enforced because kern.ipc.somaxconn is set to the lower value of 128.
+33969:M 28 Jun 2025 18:27:28.781 * Server initialized
+33969:M 28 Jun 2025 18:27:28.781 * Loading RDB produced by version 8.0.2
+33969:M 28 Jun 2025 18:27:28.781 * RDB age 44 seconds
+33969:M 28 Jun 2025 18:27:28.781 * RDB memory usage when created 0.76 Mb
+33969:M 28 Jun 2025 18:27:28.781 * Done loading RDB, keys loaded: 0, keys expired: 0.
+33969:M 28 Jun 2025 18:27:28.781 * DB loaded from disk: 0.000 seconds
+33969:M 28 Jun 2025 18:27:28.781 * Ready to accept connections tcp

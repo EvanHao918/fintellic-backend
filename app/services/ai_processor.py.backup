@@ -1,0 +1,301 @@
+# app/services/ai_processor.py
+"""
+AI Processor Service
+Uses OpenAI to generate summaries and analysis of SEC filings
+"""
+import os
+import json
+from typing import Dict, List, Optional
+from datetime import datetime
+import logging
+from pathlib import Path
+
+from openai import OpenAI
+from sqlalchemy.orm import Session
+
+from app.models.filing import Filing, ProcessingStatus, ManagementTone
+from app.core.config import settings
+from app.services.text_extractor import text_extractor
+
+logger = logging.getLogger(__name__)
+
+# Initialize OpenAI client
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+
+class AIProcessor:
+    """
+    Process filings using OpenAI to generate summaries and analysis
+    """
+    
+    def __init__(self):
+        self.model = "gpt-4o-mini"  # Updated to latest efficient model
+        self.max_tokens = 16000  # Much larger context window
+        
+    async def process_filing(self, db: Session, filing: Filing) -> bool:
+        """
+        Process a filing using AI to generate summary and analysis
+        
+        Args:
+            db: Database session
+            filing: Filing to process
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Update status
+            filing.status = ProcessingStatus.AI_PROCESSING
+            filing.processing_started_at = datetime.utcnow()
+            db.commit()
+            
+            logger.info(f"Starting AI processing for {filing.company.ticker} {filing.filing_type.value}")
+            
+            # Get filing directory
+            filing_dir = Path(f"data/filings/{filing.company.cik}/{filing.accession_number.replace('-', '')}")
+            
+            # Extract text
+            sections = text_extractor.extract_from_filing(filing_dir)
+            
+            if 'error' in sections:
+                raise Exception(f"Text extraction failed: {sections['error']}")
+            
+            primary_content = sections.get('primary_content', '')
+            
+            if not primary_content or len(primary_content) < 100:
+                raise Exception("Insufficient text content extracted")
+            
+            # Truncate content if too long
+            if len(primary_content) > self.max_tokens * 3:  # Rough estimate: 1 token ≈ 3 chars
+                primary_content = primary_content[:self.max_tokens * 3]
+                logger.info(f"Truncated content from {len(sections.get('primary_content', ''))} to {len(primary_content)} chars")
+            
+            # Generate 5-minute summary
+            logger.info("Generating AI summary...")
+            summary = await self._generate_summary(
+                filing.company.name,
+                filing.filing_type.value,
+                primary_content
+            )
+            
+            # Analyze management tone
+            logger.info("Analyzing management tone...")
+            tone_analysis = await self._analyze_tone(primary_content)
+            
+            # Generate key questions
+            logger.info("Generating key questions...")
+            questions = await self._generate_questions(
+                filing.company.name,
+                filing.filing_type.value,
+                primary_content
+            )
+            
+            # Extract key tags
+            tags = self._extract_tags(summary)
+            
+            # Update filing with AI results
+            filing.ai_summary = summary
+            filing.management_tone = tone_analysis['tone']
+            filing.tone_explanation = tone_analysis['explanation']
+            filing.key_questions = questions
+            filing.key_tags = tags
+            filing.status = ProcessingStatus.COMPLETED
+            filing.processing_completed_at = datetime.utcnow()
+            
+            db.commit()
+            
+            logger.info(f"✅ AI processing completed for {filing.accession_number}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in AI processing: {e}")
+            filing.status = ProcessingStatus.FAILED
+            filing.error_message = str(e)
+            db.commit()
+            return False
+    
+    async def _generate_summary(self, company_name: str, filing_type: str, content: str) -> str:
+        """
+        Generate a 5-minute summary of the filing
+        """
+        prompt = f"""You are a financial analyst. Create a concise summary of this {filing_type} filing from {company_name} that can be read in 5 minutes.
+
+Focus on:
+1. Key business updates or events
+2. Financial performance highlights
+3. Management's outlook
+4. Important risks or concerns
+5. Strategic initiatives
+
+Content:
+{content}
+
+Write a clear, professional summary (300-500 words) that helps investors quickly understand the most important information."""
+
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a professional financial analyst. Provide clear, concise responses without using emojis or emoticons."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.3
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            logger.error(f"OpenAI API error: {e}")
+            return f"Summary generation failed: {str(e)}"
+    
+    async def _analyze_tone(self, content: str) -> Dict:
+        """
+        Analyze the management tone in the filing
+        """
+        prompt = f"""Analyze the tone of this SEC filing text and classify it as one of:
+- OPTIMISTIC: Positive outlook, growth emphasis
+- CONFIDENT: Steady progress, meeting targets  
+- NEUTRAL: Balanced, factual reporting
+- CAUTIOUS: Emphasizing challenges, conservative
+- CONCERNED: Significant risks, defensive language
+
+Text:
+{content[:3000]}
+
+Respond in JSON format:
+{{
+    "tone": "TONE_CLASSIFICATION",
+    "explanation": "Brief explanation (50-100 words)"
+}}"""
+
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a professional financial sentiment analyst. Provide clear analysis without using emojis or emoticons."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=200,
+                temperature=0.2
+            )
+            
+            result = response.choices[0].message.content.strip()
+            
+            # Parse JSON response
+            try:
+                # Remove markdown code block markers if present
+                if result.startswith('```json'):
+                    result = result[7:]  # Remove ```json
+                if result.startswith('```'):
+                    result = result[3:]  # Remove ```
+                if result.endswith('```'):
+                    result = result[:-3]  # Remove closing ```
+                
+                result = result.strip()
+                
+                tone_data = json.loads(result)
+                tone_map = {
+                    'OPTIMISTIC': ManagementTone.OPTIMISTIC,
+                    'CONFIDENT': ManagementTone.CONFIDENT,
+                    'NEUTRAL': ManagementTone.NEUTRAL,
+                    'CAUTIOUS': ManagementTone.CAUTIOUS,
+                    'CONCERNED': ManagementTone.CONCERNED
+                }
+                
+                return {
+                    'tone': tone_map.get(tone_data['tone'], ManagementTone.NEUTRAL),
+                    'explanation': tone_data['explanation']
+                }
+            except:
+                return {
+                    'tone': ManagementTone.NEUTRAL,
+                    'explanation': 'Unable to determine tone'
+                }
+                
+        except Exception as e:
+            logger.error(f"Tone analysis error: {e}")
+            return {
+                'tone': ManagementTone.NEUTRAL,
+                'explanation': f'Analysis failed: {str(e)}'
+            }
+    
+    async def _generate_questions(self, company_name: str, filing_type: str, content: str) -> List[Dict]:
+        """
+        Generate key questions and answers about the filing
+        """
+        prompt = f"""Based on this {filing_type} filing from {company_name}, generate 3-5 key questions an investor would want answered, along with brief answers based on the filing content.
+
+Content:
+{content[:3000]}
+
+Format as JSON array:
+[
+    {{
+        "question": "Question text",
+        "answer": "Answer based on filing (50-100 words)"
+    }}
+]"""
+
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a professional financial analyst. Generate clear Q&A without using emojis or emoticons."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=800,
+                temperature=0.3
+            )
+            
+            result = response.choices[0].message.content.strip()
+            
+            # Parse JSON response
+            try:
+                # Remove markdown code block markers if present
+                if result.startswith('```json'):
+                    result = result[7:]  # Remove ```json
+                if result.startswith('```'):
+                    result = result[3:]  # Remove ```
+                if result.endswith('```'):
+                    result = result[:-3]  # Remove closing ```
+                
+                result = result.strip()
+                
+                questions = json.loads(result)
+                return questions[:5]  # Limit to 5 questions
+            except:
+                return []
+                
+        except Exception as e:
+            logger.error(f"Question generation error: {e}")
+            return []
+    
+    def _extract_tags(self, summary: str) -> List[str]:
+        """
+        Extract key tags from the summary
+        """
+        # Simple tag extraction based on common keywords
+        tags = []
+        
+        keyword_mapping = {
+            'revenue': '#Revenue',
+            'earnings': '#Earnings',
+            'growth': '#Growth',
+            'acquisition': '#M&A',
+            'dividend': '#Dividend',
+            'buyback': '#Buyback',
+            'guidance': '#Guidance',
+            'restructuring': '#Restructuring'
+        }
+        
+        summary_lower = summary.lower()
+        for keyword, tag in keyword_mapping.items():
+            if keyword in summary_lower:
+                tags.append(tag)
+        
+        return tags[:5]  # Limit to 5 tags
+
+
+# Create singleton instance
+ai_processor = AIProcessor()

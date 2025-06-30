@@ -1,7 +1,8 @@
+# app/schemas/company.py
 """
 Company schemas for API requests and responses
 """
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -15,6 +16,7 @@ class CompanyBase(BaseModel):
 
 class CompanyBrief(CompanyBase):
     """Brief company info for embedding in other schemas"""
+    id: int
     sector: Optional[str] = None
     
     class Config:
@@ -23,12 +25,30 @@ class CompanyBrief(CompanyBase):
 
 class CompanyDetail(CompanyBase):
     """Detailed company information"""
+    id: int
     sector: Optional[str] = None
     industry: Optional[str] = None
     market_cap: Optional[float] = None
     employees: Optional[int] = None
     description: Optional[str] = None
     website: Optional[str] = None
+    
+    # New fields for Day 8
+    sic: Optional[str] = None
+    sic_description: Optional[str] = None
+    business_address: Optional[str] = None
+    mailing_address: Optional[str] = None
+    business_phone: Optional[str] = None
+    incorporated_location: Optional[str] = None
+    in_sp500: bool = True
+    
+    # Timestamps
+    created_at: datetime
+    updated_at: datetime
+    
+    # Filing statistics
+    filing_stats: Dict[str, int] = {}
+    recent_filings: List[Dict[str, Any]] = []
     
     # Additional computed fields
     total_filings: int = 0

@@ -1,5 +1,7 @@
+# app/models/company.py
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.models.base import Base
 
 
@@ -45,6 +47,10 @@ class Company(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_filing_date = Column(DateTime(timezone=True))
+    
+    # Relationships (Day 8 addition)
+    filings = relationship("Filing", back_populates="company")
+    earnings_calendar = relationship("EarningsCalendar", back_populates="company")
     
     def __repr__(self):
         return f"<Company(id={self.id}, ticker='{self.ticker}', name='{self.name}')>"

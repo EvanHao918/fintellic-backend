@@ -1,1 +1,19 @@
 data/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Logs
+logs/
+*.log
+
+# Backup files
+*.backup
+
+# Test files (optional - 如果您想保留测试文件，可以注释掉这部分)
+# tests/

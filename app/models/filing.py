@@ -83,7 +83,7 @@ class Filing(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
-    company = relationship("Company", backref="filings")
+    company = relationship("Company", back_populates="filings")
     
     def __repr__(self):
         return f"<Filing(id={self.id}, type={self.filing_type}, company_id={self.company_id})>"

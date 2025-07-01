@@ -1,9 +1,10 @@
+# app/api/api.py
 """
 Main API router that combines all endpoint routers
 """
 from fastapi import APIRouter
 
-from app.api.endpoints import auth, users, filings, companies, interactions
+from app.api.endpoints import auth, users, filings, companies, interactions, stats, earnings
 
 api_router = APIRouter()
 
@@ -21,3 +22,9 @@ api_router.include_router(companies.router, prefix="/companies", tags=["companie
 
 # Interaction endpoints (votes, comments, watchlist)
 api_router.include_router(interactions.router, prefix="", tags=["interactions"])
+
+# Statistics endpoints (Day 8 addition)
+api_router.include_router(stats.router, prefix="/stats", tags=["statistics"])
+
+# Earnings calendar endpoints (Day 8 addition)
+api_router.include_router(earnings.router, prefix="/earnings", tags=["earnings"])

@@ -43,6 +43,9 @@ class Company(Base):
     is_sp500 = Column(Boolean, default=False, nullable=False)
     is_nasdaq100 = Column(Boolean, default=False, nullable=False)
     
+    # Index membership (e.g., "S&P 500,NASDAQ 100")
+    indices = Column(String(255), nullable=True)
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -54,3 +57,19 @@ class Company(Base):
     
     def __repr__(self):
         return f"<Company(id={self.id}, ticker='{self.ticker}', name='{self.name}')>"
+    
+    @property
+    def index_list(self):
+        """Return indices as a list"""
+        if not self.indices:
+            return []
+        return [idx.strip() for idx in self.indices.split(',')]
+    
+    def update_indices(self):
+        """Update indices field based on boolean flags"""
+        indices = []
+        if self.is_sp500:
+            indices.append("S&P 500")
+        if self.is_nasdaq100:
+            indices.append("NASDAQ 100")
+        self.indices = ",".join(indices) if indices else None

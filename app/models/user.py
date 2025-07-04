@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
 from app.models.base import Base
@@ -39,6 +40,10 @@ class User(Base):
     # Daily limits for free users
     daily_reports_count = Column(Integer, default=0)
     daily_reports_reset_at = Column(DateTime(timezone=True))
+    
+    # Relationships
+    comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
+    votes = relationship("UserVote", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', tier={self.tier})>"

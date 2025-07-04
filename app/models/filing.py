@@ -82,8 +82,14 @@ class Filing(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
+    # New columns added in Day 10.5
+    event_type = Column(String(100), nullable=True)  # For 8-K event types
+    comment_count = Column(Integer, default=0, nullable=False)
+    
     # Relationships
     company = relationship("Company", back_populates="filings")
+    comments = relationship("Comment", back_populates="filing", cascade="all, delete-orphan")
+    user_votes = relationship("UserVote", back_populates="filing", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Filing(id={self.id}, type={self.filing_type}, company_id={self.company_id})>"

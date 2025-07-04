@@ -96,6 +96,9 @@ class AIProcessor:
             filing.key_questions = result['questions']
             filing.key_tags = result['tags']
             
+            if filing.filing_type == FilingType.FORM_8K and 'event_type' in result:
+            filing.event_type = result.get('event_type')
+            
             # Add financial data if available
             if 'financial_data' in result:
                 filing.financial_highlights = result['financial_data']
@@ -321,7 +324,8 @@ Write a comprehensive IPO summary (400-500 words) that helps investors evaluate 
             'tone_explanation': tone_data['explanation'],
             'questions': questions,
             'tags': tags,
-            'financial_data': financial_data
+            'financial_data': financial_data,
+            'event_type': event_type  # 确保这一行存在
         }
     
     async def _process_generic(self, filing: Filing, primary_content: str) -> Dict:

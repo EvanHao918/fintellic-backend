@@ -35,3 +35,17 @@ you should set broker_connection_retry_on_startup to True.
 [2025-06-28 18:27:32,003: INFO/MainProcess] mingle: searching for neighbors
 [2025-06-28 18:27:33,008: INFO/MainProcess] mingle: all alone
 [2025-06-28 18:27:33,016: INFO/MainProcess] celery@Evans-MacBook-Air.local ready.
+[2025-06-30 06:07:20,023: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[38cc5ab4-a4f7-4cdc-9f43-1520c37a9b15] received
+[2025-06-30 06:07:20,057: INFO/ForkPoolWorker-8] Starting processing for filing 6
+[2025-06-30 06:07:20,166: ERROR/MainProcess] Process 'ForkPoolWorker-8' pid:33992 exited with 'signal 11 (SIGSEGV)'
+[2025-06-30 06:07:20,186: ERROR/MainProcess] Task handler raised error: WorkerLostError('Worker exited prematurely: signal 11 (SIGSEGV) Job: 0.')
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+    raise WorkerLostError(
+billiard.einfo.ExceptionWithTraceback: 
+"""
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+    raise WorkerLostError(
+billiard.exceptions.WorkerLostError: Worker exited prematurely: signal 11 (SIGSEGV) Job: 0.
+"""

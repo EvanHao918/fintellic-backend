@@ -62,7 +62,13 @@ async def get_filings(
     for filing in filings:
         # Get stats from cache
         view_count = StatsCache.get_view_count(str(filing.id))
-        votes = StatsCache.get_vote_counts(str(filing.id))
+        
+        # Get vote counts from database
+        vote_counts = {
+            "bullish": filing.bullish_votes or 0,
+            "neutral": filing.neutral_votes or 0,
+            "bearish": filing.bearish_votes or 0
+        }
         
         filing_brief = FilingBrief(
             id=filing.id,
@@ -79,12 +85,8 @@ async def get_filings(
             one_liner=filing.ai_summary[:100] + "..." if filing.ai_summary else None,
             sentiment=filing.management_tone.value if filing.management_tone else None,
             tags=filing.key_tags or [],
-            vote_counts={
-                "bullish": votes.get("bullish", 0),
-                "neutral": 0,  # Not used in our implementation
-                "bearish": votes.get("bearish", 0)
-            },
-            comment_count=0  # To be implemented later
+            vote_counts=vote_counts,
+            comment_count=filing.comment_count or 0
         )
         filing_responses.append(filing_brief)
     
@@ -129,8 +131,12 @@ async def get_filing(
     # Increment view count
     view_count = StatsCache.increment_view_count(str(filing_id))
     
-    # Get vote counts
-    votes = StatsCache.get_vote_counts(str(filing_id))
+    # Get vote counts from database
+    vote_counts = {
+        "bullish": filing.bullish_votes or 0,
+        "neutral": filing.neutral_votes or 0,
+        "bearish": filing.bearish_votes or 0
+    }
     
     # Prepare response
     filing_detail = FilingDetail(
@@ -226,7 +232,13 @@ async def get_popular_filings(
     result = []
     for item in filing_views:
         filing = item["filing"]
-        votes = StatsCache.get_vote_counts(str(filing.id))
+        
+        # Get vote counts from database
+        vote_counts = {
+            "bullish": filing.bullish_votes or 0,
+            "neutral": filing.neutral_votes or 0,
+            "bearish": filing.bearish_votes or 0
+        }
         
         result.append({
             "id": filing.id,
@@ -236,7 +248,7 @@ async def get_popular_filings(
             "filing_date": filing.filing_date.isoformat(),
             "ai_summary": filing.ai_summary[:200] + "..." if filing.ai_summary else None,
             "view_count": item["view_count"],
-            "votes": votes,
+            "votes": vote_counts,
             "created_at": filing.created_at.isoformat()
         })
     
@@ -246,38 +258,4 @@ async def get_popular_filings(
     return result
 
 
-@router.post("/{filing_id}/vote")
-async def vote_on_filing(
-    filing_id: int,
-    vote_type: str = Query(..., regex="^(bullish|bearish)$"),
-    db: Session = Depends(deps.get_db),
-    current_user = Depends(deps.get_current_user)
-):
-    """
-    Vote on a filing (bullish or bearish)
-    """
-    # Check if filing exists
-    filing = db.query(Filing).filter(Filing.id == filing_id).first()
-    if not filing:
-        raise HTTPException(status_code=404, detail="Filing not found")
-    
-    # Record vote
-    success = StatsCache.record_vote(str(filing_id), str(current_user.id), vote_type)
-    
-    if success:
-        # Invalidate filing detail cache
-        cache_key = FilingCache.get_filing_detail_key(str(filing_id))
-        cache.delete(cache_key)
-        
-        # Also invalidate filing list cache (since it shows vote counts)
-        FilingCache.invalidate_filing_list()
-        
-        # Get updated vote counts
-        votes = StatsCache.get_vote_counts(str(filing_id))
-        
-        return {
-            "message": f"Vote recorded as {vote_type}",
-            "votes": votes
-        }
-    else:
-        raise HTTPException(status_code=500, detail="Failed to record vote")
+# 删除了旧的投票端点，现在使用 interactions.py 中的投票端点

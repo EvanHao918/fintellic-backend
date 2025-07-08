@@ -29,14 +29,23 @@ class EDGARScanner:
         self.sp500_companies = self._load_sp500_companies()
         self.sp500_ciks = {company['cik'] for company in self.sp500_companies}
         
+        # NEW: Load all monitored CIKs from database (S&P 500 + NASDAQ 100)
+        self.monitored_ciks = self._load_monitored_ciks()
+        
         # Debug output
-        if self.sp500_ciks:
-            logger.info(f"✅ Loaded {len(self.sp500_ciks)} S&P 500 companies for monitoring")
-            # Show first few companies as confirmation
-            sample = list(self.sp500_ciks)[:5]
-            logger.info(f"Sample CIKs: {sample}")
+        if self.monitored_ciks:
+            logger.info(f"✅ Loaded {len(self.monitored_ciks)} companies for monitoring (S&P 500 + NASDAQ 100)")
+            # Show breakdown
+            sp500_only = len(self.sp500_ciks)
+            total = len(self.monitored_ciks)
+            logger.info(f"   - S&P 500 from JSON: {sp500_only}")
+            logger.info(f"   - Total monitored (including NASDAQ 100): {total}")
+            logger.info(f"   - Additional from database: {total - sp500_only}")
+            # Show sample CIKs
+            sample = list(self.monitored_ciks)[:5]
+            logger.info(f"Sample monitored CIKs: {sample}")
         else:
-            logger.error("❌ No S&P 500 companies loaded! Check data/sp500_companies.json")
+            logger.error("❌ No companies loaded for monitoring!")
     
     def _load_sp500_companies(self) -> list:
         """Load S&P 500 companies from JSON file"""
@@ -55,6 +64,47 @@ class EDGARScanner:
         except Exception as e:
             logger.error(f"Error loading S&P 500 companies: {e}")
             return []
+    
+    def _load_monitored_ciks(self) -> set:
+        """Load all CIKs we should monitor (S&P 500 + NASDAQ 100)"""
+        monitored = set()
+        
+        # Add S&P 500 CIKs from JSON
+        monitored.update(self.sp500_ciks)
+        
+        # Add NASDAQ 100 CIKs from database
+        db = SessionLocal()
+        try:
+            # Get all companies that are either S&P 500 or NASDAQ 100
+            companies = db.query(Company).filter(
+                (Company.is_sp500 == True) | (Company.is_nasdaq100 == True)
+            ).all()
+            
+            for company in companies:
+                if company.cik and company.cik != '0000000000' and not company.cik.startswith('N'):
+                    # Only add valid CIKs (not placeholders)
+                    monitored.add(company.cik)
+            
+            logger.info(f"Loaded {len(companies)} companies from database (S&P 500 + NASDAQ 100)")
+            
+            # Show some NASDAQ 100 examples
+            nasdaq_only = db.query(Company).filter(
+                Company.is_sp500 == False,
+                Company.is_nasdaq100 == True
+            ).limit(5).all()
+            
+            if nasdaq_only:
+                logger.info("Sample NASDAQ 100 (non-S&P 500) companies:")
+                for company in nasdaq_only:
+                    logger.info(f"   - {company.ticker}: {company.name} (CIK: {company.cik})")
+            
+        except Exception as e:
+            logger.error(f"Error loading companies from database: {e}")
+            logger.info("Falling back to S&P 500 only")
+        finally:
+            db.close()
+        
+        return monitored
         
     async def scan_for_new_filings(self) -> List[Dict]:
         """
@@ -64,46 +114,55 @@ class EDGARScanner:
             List of new filings discovered
         """
         logger.info("Starting EDGAR RSS scan...")
-        logger.info(f"DEBUG: Monitoring {len(self.sp500_ciks)} S&P 500 companies")
+        logger.info(f"DEBUG: Monitoring {len(self.monitored_ciks)} companies (S&P 500 + NASDAQ 100)")
         
         # Get recent filings from RSS (last 2 minutes to ensure overlap)
         all_rss_filings = await sec_client.get_rss_filings(
             form_type="all",
-            lookback_minutes=self.scan_interval_minutes + 1
-        )
+            lookback_minutes=60  # 或者 120，看更长时间范围
+)
         
         if not all_rss_filings:
             logger.info("No new filings found in RSS feed")
             return []
         
-        # Filter for S&P 500 companies (except S-1 filings)
-        sp500_filings = []
+        # Filter for monitored companies (S&P 500 + NASDAQ 100)
+        relevant_filings = []
         for f in all_rss_filings:
-            # S-1 filings (IPOs) are not limited to S&P 500 companies
+            # S-1 filings (IPOs) are not limited to our indices
             if f['form'] == 'S-1':
-                sp500_filings.append(f)
+                relevant_filings.append(f)
                 logger.info(f"Including S-1 filing from {f.get('company_name', 'Unknown')} (CIK: {f['cik']})")
-            elif f['cik'] in self.sp500_ciks:
-                sp500_filings.append(f)
+            # Check if CIK is in our monitored list
+            elif f['cik'] in self.monitored_ciks:
+                relevant_filings.append(f)
         
-        logger.info(f"Found {len(sp500_filings)} relevant filings out of {len(all_rss_filings)} total")
+        logger.info(f"Found {len(relevant_filings)} relevant filings out of {len(all_rss_filings)} total")
         
         # Log some examples if we found filings
-        if sp500_filings:
-            for filing in sp500_filings[:3]:  # Show first 3
+        if relevant_filings:
+            for filing in relevant_filings[:3]:  # Show first 3
                 if filing['form'] == 'S-1':
                     logger.info(f"IPO filing: {filing.get('company_name', 'Unknown')} - S-1 ({filing['filing_date']})")
                 else:
-                    company = next((c for c in self.sp500_companies if c['cik'] == filing['cik']), None)
-                    if company:
-                        logger.info(f"S&P 500 filing: {company['ticker']} - {filing['form']} ({filing['filing_date']})")
+                    # Try to find company in database for better info
+                    db = SessionLocal()
+                    try:
+                        company = db.query(Company).filter(Company.cik == filing['cik']).first()
+                        if company:
+                            indices = company.indices or "Unknown"
+                            logger.info(f"{indices} filing: {company.ticker} - {filing['form']} ({filing['filing_date']})")
+                        else:
+                            logger.info(f"Filing: {filing.get('company_name', 'Unknown')} - {filing['form']} ({filing['filing_date']})")
+                    finally:
+                        db.close()
         
         # Process each filing
         new_filings = []
         db = SessionLocal()
         
         try:
-            for rss_filing in sp500_filings:
+            for rss_filing in relevant_filings:
                 # Check if we already have this filing
                 existing = db.query(Filing).filter(
                     Filing.accession_number == rss_filing["accession_number"]
@@ -135,11 +194,12 @@ class EDGARScanner:
                     "form_type": rss_filing["form"],
                     "filing_date": rss_filing["filing_date"],
                     "accession_number": rss_filing["accession_number"],
-                    "discovery_method": "RSS"
+                    "discovery_method": "RSS",
+                    "indices": company.indices  # Include index info
                 })
                 
                 logger.info(
-                    f"New filing discovered: {company.ticker} - {rss_filing['form']} "
+                    f"New filing discovered: {company.ticker} ({company.indices}) - {rss_filing['form']} "
                     f"({rss_filing['filing_date']}) via RSS"
                 )
                 
@@ -191,7 +251,7 @@ class EDGARScanner:
         if company:
             return company
         
-        # Look up company in our S&P 500 list
+        # Look up company in our S&P 500 list first
         sp500_company = next((c for c in self.sp500_companies if c['cik'] == cik), None)
         
         if sp500_company:
@@ -202,8 +262,9 @@ class EDGARScanner:
                 "ticker": sp500_company['ticker']
             }
             is_sp500 = True
+            is_nasdaq100 = False  # Will be updated if also in NASDAQ 100
         else:
-            # Fetch from SEC API as fallback (for S-1 filings from non-S&P 500 companies)
+            # Fetch from SEC API as fallback
             company_info = await sec_client.get_company_info(cik)
             if not company_info:
                 logger.warning(f"Could not fetch info for CIK {cik}")
@@ -213,6 +274,7 @@ class EDGARScanner:
                     "ticker": f"CIK{cik}"
                 }
             is_sp500 = False
+            is_nasdaq100 = False
         
         # Create new company record
         company = Company(
@@ -223,11 +285,17 @@ class EDGARScanner:
             sic=company_info.get("sic"),
             sic_description=company_info.get("sic_description"),
             is_active=True,
-            is_sp500=is_sp500  # Only true if in our S&P 500 list
+            is_sp500=is_sp500,
+            is_nasdaq100=is_nasdaq100
         )
+        
+        # Update indices field
+        company.update_indices()
         
         db.add(company)
         db.flush()  # Get the ID without committing
+        
+        logger.info(f"Created new company: {company.ticker} - {company.name} ({company.indices})")
         
         return company
     
@@ -272,6 +340,18 @@ class EDGARScanner:
             status=ProcessingStatus.PENDING
         )
     
+    def is_monitored_company(self, cik: str) -> bool:
+        """
+        Check if CIK belongs to a monitored company (S&P 500 or NASDAQ 100)
+        
+        Args:
+            cik: Company CIK
+            
+        Returns:
+            True if monitored company
+        """
+        return cik in self.monitored_ciks
+    
     def is_sp500_company(self, cik: str) -> bool:
         """
         Check if CIK belongs to S&P 500 company
@@ -284,16 +364,31 @@ class EDGARScanner:
         """
         return cik in self.sp500_ciks
     
-    async def get_sp500_stats(self) -> Dict:
-        """Get statistics about S&P 500 monitoring"""
-        return {
-            "total_sp500_companies": len(self.sp500_companies),
-            "monitoring_ciks": len(self.sp500_ciks),
-            "sample_companies": [
-                f"{c['ticker']} ({c['name']})" 
-                for c in self.sp500_companies[:5]
-            ]
-        }
+    async def get_monitoring_stats(self) -> Dict:
+        """Get statistics about monitored companies"""
+        db = SessionLocal()
+        try:
+            sp500_count = db.query(Company).filter(Company.is_sp500 == True).count()
+            nasdaq100_count = db.query(Company).filter(Company.is_nasdaq100 == True).count()
+            both_count = db.query(Company).filter(
+                Company.is_sp500 == True,
+                Company.is_nasdaq100 == True
+            ).count()
+            
+            return {
+                "total_monitored": len(self.monitored_ciks),
+                "sp500_companies": sp500_count,
+                "nasdaq100_companies": nasdaq100_count,
+                "both_indices": both_count,
+                "sp500_only": sp500_count - both_count,
+                "nasdaq100_only": nasdaq100_count - both_count,
+                "sample_companies": [
+                    f"{c['ticker']} ({c['name']})" 
+                    for c in self.sp500_companies[:5]
+                ]
+            }
+        finally:
+            db.close()
 
 
 # Debug: Print when module is imported
@@ -302,4 +397,4 @@ logger.info("=== EDGAR Scanner module loading ===")
 # Create singleton instance
 edgar_scanner = EDGARScanner()
 
-logger.info(f"=== EDGAR Scanner initialized with {len(edgar_scanner.sp500_ciks)} S&P 500 companies ===")
+logger.info(f"=== EDGAR Scanner initialized with {len(edgar_scanner.monitored_ciks)} monitored companies ===")

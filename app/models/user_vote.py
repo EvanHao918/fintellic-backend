@@ -1,7 +1,7 @@
 """
 UserVote model for tracking user voting history
 """
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, Enum, UniqueConstraint
+from sqlalchemy import Column, Integer, ForeignKey, DateTime, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -27,8 +27,8 @@ class UserVote(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     filing_id = Column(Integer, ForeignKey("filings.id", ondelete="CASCADE"), nullable=False, index=True)
     
-    # Vote information
-    vote_type = Column(Enum(VoteType), nullable=False)
+    # Vote information - 使用字符串而不是枚举
+    vote_type = Column(String(10), nullable=False)
     
     # Timestamp
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
@@ -43,7 +43,7 @@ class UserVote(Base):
     )
     
     def __repr__(self):
-        return f"<UserVote(user_id={self.user_id}, filing_id={self.filing_id}, vote={self.vote_type.value})>"
+        return f"<UserVote(user_id={self.user_id}, filing_id={self.filing_id}, vote={self.vote_type})>"
     
     @classmethod
     def has_user_voted(cls, db_session, user_id: int, filing_id: int) -> bool:

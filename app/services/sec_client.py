@@ -138,11 +138,14 @@ class SECClient:
                     if not title:
                         continue
                     
-                    # Try multiple regex patterns
+                    # Enhanced regex patterns to handle various formats including (Filer) suffix
                     patterns = [
-                        r'^([\w\-/]+)\s*-\s*(.+?)\s*\((\d{10})\)',  # Standard pattern
-                        r'^([\w\-/]+)\s*-\s*(.+?)\s*\((\d+)\)',     # Any length CIK
-                        r'^([\w\-/]+)\s*-\s*(.+?)$'                 # No CIK
+                        # Pattern 1: Form - Company (CIK) (Filer/Subject/etc)
+                        r'^([\w\-/]+)\s*-\s*(.+?)\s*\((\d{1,10})\)(?:\s*\([^)]+\))*$',
+                        # Pattern 2: Form - Company (CIK)
+                        r'^([\w\-/]+)\s*-\s*(.+?)\s*\((\d{1,10})\)$',
+                        # Pattern 3: Form - Company without CIK
+                        r'^([\w\-/]+)\s*-\s*(.+?)$'
                     ]
                     
                     title_match = None
@@ -152,11 +155,15 @@ class SECClient:
                             break
                     
                     if not title_match:
-                        logger.debug(f"Could not parse title: {title}")
+                        # Log more details for debugging
+                        logger.warning(f"Could not parse title format: '{title}'")
                         continue
                     
                     form = title_match.group(1).strip()
                     company_name = title_match.group(2).strip()
+                    
+                    # Clean up company name - remove any trailing suffixes
+                    company_name = re.sub(r'\s*\([^)]*\)\s*$', '', company_name).strip()
                     
                     # Get CIK from match or from link
                     cik = None
@@ -170,12 +177,23 @@ class SECClient:
                             cik = cik_match.group(1).zfill(10)
                     
                     if not cik:
-                        logger.debug(f"Could not find CIK for: {title}")
-                        continue
+                        # Try one more place - the summary field
+                        summary = entry.get('summary', '')
+                        cik_match = re.search(r'CIK[:\s]+(\d+)', summary)
+                        if cik_match:
+                            cik = cik_match.group(1).zfill(10)
+                        else:
+                            logger.warning(f"Could not find CIK for: '{title}'")
+                            continue
+                    
+                    # Handle form variants (10-K/A, 8-K/A, etc.)
+                    base_form = form.split('/')[0]
                     
                     # Only process forms we care about
-                    if form not in ["10-K", "10-Q", "8-K", "S-1"]:
-                        continue
+                    if base_form not in ["10-K", "10-Q", "8-K", "S-1"]:
+                        # Also check for special 8-K variants
+                        if not form.startswith("8-K"):
+                            continue
                     
                     # Extract accession number from link
                     link = entry.get('link', '')
@@ -183,6 +201,13 @@ class SECClient:
                         r'AccessionNumber=(\d{10}-\d{2}-\d{6})',
                         link
                     )
+                    
+                    if not acc_match:
+                        # Try alternative pattern
+                        acc_match = re.search(
+                            r'(\d{10}-\d{2}-\d{6})',
+                            link
+                        )
                     
                     accession_number = acc_match.group(1) if acc_match else ""
                     
@@ -194,11 +219,15 @@ class SECClient:
                         '%a, %d %b %Y %H:%M:%S %Z',  # Mon, 23 Jun 2025 16:30:00 EDT
                         '%Y-%m-%dT%H:%M:%S%z',       # 2025-06-23T16:30:00-04:00
                         '%Y-%m-%dT%H:%M:%S',         # 2025-06-23T16:30:00
+                        '%Y-%m-%d %H:%M:%S',         # 2025-06-23 16:30:00
                     ]
                     
                     for fmt in date_formats:
                         try:
-                            filed_datetime = datetime.strptime(published.replace('EDT', 'EST'), fmt)
+                            # Handle timezone abbreviations
+                            date_str = published.replace('EDT', '-0400').replace('EST', '-0500')
+                            date_str = date_str.replace('PDT', '-0700').replace('PST', '-0800')
+                            filed_datetime = datetime.strptime(date_str, fmt)
                             break
                         except:
                             continue
@@ -212,12 +241,13 @@ class SECClient:
                     if filed_datetime.tzinfo:
                         filed_datetime = filed_datetime.replace(tzinfo=None)
                     
-                    # Skip if older than lookback period (temporarily disabled for testing)
+                    # Skip if older than lookback period
                     if filed_datetime < cutoff_time:
                         logger.debug(f"Skipping old filing from {filed_datetime}")
                         continue
                     
-                    filings.append({
+                    # Successfully parsed filing
+                    filing_data = {
                         "cik": cik,
                         "form": form,
                         "company_name": company_name,
@@ -227,16 +257,31 @@ class SECClient:
                         "primary_document": "",  # Will get from detail API if needed
                         "rss_link": link,
                         "summary": entry.get('summary', '')[:200]  # First 200 chars
-                    })
+                    }
+                    
+                    filings.append(filing_data)
+                    
+                    # Log successful parsing for debugging
+                    logger.debug(f"Successfully parsed: {form} - {company_name} (CIK: {cik})")
                     
                 except Exception as e:
-                    logger.debug(f"Error parsing RSS entry: {e}")
+                    logger.error(f"Error parsing RSS entry: {e}", exc_info=True)
+                    logger.debug(f"Failed entry title: '{entry.get('title', 'No title')}'")
                     continue
             
             # Sort by filing datetime (newest first)
             filings.sort(key=lambda x: x['filing_datetime'], reverse=True)
             
             logger.info(f"Successfully parsed {len(filings)} filings from RSS feed")
+            
+            # Log some statistics
+            if filings:
+                form_counts = {}
+                for f in filings:
+                    form_type = f['form'].split('/')[0]  # Base form type
+                    form_counts[form_type] = form_counts.get(form_type, 0) + 1
+                logger.info(f"Filing breakdown: {form_counts}")
+            
             return filings
             
         except httpx.HTTPError as e:

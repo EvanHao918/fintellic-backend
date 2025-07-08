@@ -13,6 +13,12 @@ from app.models.user import User, UserTier
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
+# OAuth2 scheme for optional token authentication
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/login",
+    auto_error=False  # This makes the token optional
+)
+
 
 async def get_current_user(
     db: Session = Depends(get_db),
@@ -154,3 +160,44 @@ async def check_daily_limit(
         )
     
     return current_user
+
+
+async def get_current_user_optional(
+    db: Session = Depends(get_db),
+    token: Optional[str] = Depends(oauth2_scheme_optional)
+) -> Optional[User]:
+    """
+    Get current user if authenticated, otherwise return None
+    
+    Used for endpoints that have different behavior for authenticated vs anonymous users
+    
+    Args:
+        db: Database session
+        token: Optional JWT token from Authorization header
+        
+    Returns:
+        Current user object or None
+    """
+    if not token:
+        return None
+    
+    try:
+        # Verify and decode token
+        payload = verify_token(token)
+        if payload is None:
+            return None
+        
+        # Extract user_id from token
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            return None
+        
+        # Get user from database
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None or not user.is_active:
+            return None
+        
+        return user
+    except:
+        # If any error occurs, treat as anonymous user
+        return None

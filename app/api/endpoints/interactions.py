@@ -42,12 +42,14 @@ async def vote_on_filing(
     Vote on a filing's sentiment
     Users can only vote once per filing, but can change their vote
     """
+    print(f"[DEBUG] Vote request: filing_id={filing_id}, user_id={current_user.id}, sentiment={vote_request.sentiment}")
+    
     # Validate sentiment
     valid_sentiments = ["bullish", "neutral", "bearish"]
-    if vote_request.sentiment not in valid_sentiments:
+    if vote_request.sentiment.lower() not in valid_sentiments:
         raise HTTPException(
             status_code=400,
-            f"Invalid sentiment. Must be one of: {valid_sentiments}"
+            detail=f"Invalid sentiment. Must be one of: {valid_sentiments}"
         )
     
     # Get filing
@@ -55,49 +57,88 @@ async def vote_on_filing(
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")
     
+    print(f"[DEBUG] Current vote counts - Bullish: {filing.bullish_votes}, Neutral: {filing.neutral_votes}, Bearish: {filing.bearish_votes}")
+    
     # Check if user already voted
     existing_vote = db.query(UserVote).filter(
         UserVote.user_id == current_user.id,
         UserVote.filing_id == filing_id
     ).first()
     
-    # Convert sentiment to VoteType
-    vote_type = VoteType(vote_request.sentiment)
+    # Use lowercase sentiment directly
+    sentiment_lower = vote_request.sentiment.lower()
     
     if existing_vote:
-        # User is changing their vote
-        old_vote_type = existing_vote.vote_type
+        print(f"[DEBUG] User already voted: {existing_vote.vote_type}")
         
-        # Decrease old vote count
-        if old_vote_type == VoteType.BULLISH:
-            filing.bullish_votes = max(0, (filing.bullish_votes or 0) - 1)
-        elif old_vote_type == VoteType.NEUTRAL:
-            filing.neutral_votes = max(0, (filing.neutral_votes or 0) - 1)
-        else:  # bearish
-            filing.bearish_votes = max(0, (filing.bearish_votes or 0) - 1)
-        
-        # Update vote type
-        existing_vote.vote_type = vote_type
-        message = f"Vote changed from {old_vote_type.value} to {vote_type.value}"
+        # Check if it's the same vote
+        if existing_vote.vote_type == sentiment_lower:
+            # Same vote, no change needed
+            print(f"[DEBUG] Same vote, no change")
+            message = f"You already voted {sentiment_lower}"
+        else:
+            print(f"[DEBUG] Changing vote from {existing_vote.vote_type} to {sentiment_lower}")
+            # Decrease old vote count
+            if existing_vote.vote_type == "bullish":
+                filing.bullish_votes = max(0, (filing.bullish_votes or 0) - 1)
+            elif existing_vote.vote_type == "neutral":
+                filing.neutral_votes = max(0, (filing.neutral_votes or 0) - 1)
+            else:  # bearish
+                filing.bearish_votes = max(0, (filing.bearish_votes or 0) - 1)
+            
+            # Increase new vote count
+            if sentiment_lower == "bullish":
+                filing.bullish_votes = (filing.bullish_votes or 0) + 1
+            elif sentiment_lower == "neutral":
+                filing.neutral_votes = (filing.neutral_votes or 0) + 1
+            else:  # bearish
+                filing.bearish_votes = (filing.bearish_votes or 0) + 1
+            
+            # Update vote type
+            existing_vote.vote_type = sentiment_lower
+            message = f"Vote changed from {existing_vote.vote_type} to {sentiment_lower}"
     else:
+        print(f"[DEBUG] New vote: {sentiment_lower}")
         # Create new vote record
         new_vote = UserVote(
             user_id=current_user.id,
             filing_id=filing_id,
-            vote_type=vote_type
+            vote_type=sentiment_lower  # 使用小写字符串
         )
         db.add(new_vote)
-        message = f"Successfully voted {vote_type.value}"
+        
+        # Increase vote count for new vote only
+        if sentiment_lower == "bullish":
+            filing.bullish_votes = (filing.bullish_votes or 0) + 1
+        elif sentiment_lower == "neutral":
+            filing.neutral_votes = (filing.neutral_votes or 0) + 1
+        else:  # bearish
+            filing.bearish_votes = (filing.bearish_votes or 0) + 1
+            
+        message = f"Successfully voted {sentiment_lower}"
     
-    # Increase new vote count
-    if vote_type == VoteType.BULLISH:
-        filing.bullish_votes = (filing.bullish_votes or 0) + 1
-    elif vote_type == VoteType.NEUTRAL:
-        filing.neutral_votes = (filing.neutral_votes or 0) + 1
-    else:  # bearish
-        filing.bearish_votes = (filing.bearish_votes or 0) + 1
+    print(f"[DEBUG] Before commit - Bullish: {filing.bullish_votes}, Neutral: {filing.neutral_votes}, Bearish: {filing.bearish_votes}")
     
-    db.commit()
+    try:
+        db.commit()
+        print("[DEBUG] Commit successful")
+    except Exception as e:
+        print(f"[ERROR] Commit failed: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save vote")
+    
+    # Verify vote was saved
+    saved_vote = db.query(UserVote).filter(
+        UserVote.user_id == current_user.id,
+        UserVote.filing_id == filing_id
+    ).first()
+    
+    if saved_vote:
+        print(f"[SUCCESS] Vote saved: user_id={saved_vote.user_id}, filing_id={saved_vote.filing_id}, vote={saved_vote.vote_type}")
+    else:
+        print(f"[ERROR] Vote NOT saved for user_id={current_user.id}, filing_id={filing_id}")
+    
+    print(f"[DEBUG] Returning message: {message}")
     
     return VoteResponse(
         message=message,
@@ -106,7 +147,7 @@ async def vote_on_filing(
             "neutral": filing.neutral_votes or 0,
             "bearish": filing.bearish_votes or 0
         },
-        user_vote=vote_type.value
+        user_vote=sentiment_lower
     )
 
 
@@ -129,6 +170,8 @@ async def get_filing_votes(
         UserVote.filing_id == filing_id
     ).first()
     
+    print(f"[DEBUG] Get votes - user_id={current_user.id}, filing_id={filing_id}, user_vote={user_vote.vote_type if user_vote else None}")
+    
     return {
         "filing_id": filing_id,
         "vote_counts": {
@@ -137,7 +180,7 @@ async def get_filing_votes(
             "bearish": filing.bearish_votes or 0
         },
         "total_votes": (filing.bullish_votes or 0) + (filing.neutral_votes or 0) + (filing.bearish_votes or 0),
-        "user_vote": user_vote.vote_type.value if user_vote else None
+        "user_vote": user_vote.vote_type if user_vote else None
     }
 
 
@@ -165,9 +208,9 @@ async def remove_vote(
         raise HTTPException(status_code=404, detail="Filing not found")
     
     # Decrease vote count
-    if user_vote.vote_type == VoteType.BULLISH:
+    if user_vote.vote_type == "bullish":
         filing.bullish_votes = max(0, (filing.bullish_votes or 0) - 1)
-    elif user_vote.vote_type == VoteType.NEUTRAL:
+    elif user_vote.vote_type == "neutral":
         filing.neutral_votes = max(0, (filing.neutral_votes or 0) - 1)
     else:  # bearish
         filing.bearish_votes = max(0, (filing.bearish_votes or 0) - 1)

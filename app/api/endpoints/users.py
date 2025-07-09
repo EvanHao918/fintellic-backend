@@ -7,6 +7,8 @@ from app.crud.user import crud_user
 from app.models.user import User
 from app.schemas.user import UserResponse, UserUpdate, UserUpdatePassword
 from app.core.security import verify_password, get_password_hash
+from datetime import datetime, timedelta
+from fastapi import Body
 
 router = APIRouter()
 
@@ -116,3 +118,39 @@ def delete_user_me(
     db.commit()
     
     return {"message": "Account deactivated successfully"}
+
+@router.post("/me/upgrade-mock", response_model=dict)
+def mock_upgrade_to_pro(
+    plan: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Mock endpoint to upgrade user to Pro (for development)
+    """
+    if current_user.tier == "pro":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is already Pro"
+        )
+    
+    # Mock upgrade - set Pro status
+    current_user.tier = "pro"
+    current_user.subscription_expires_at = datetime.utcnow() + timedelta(days=30)
+    
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    
+    return {
+        "message": "Successfully upgraded to Pro (Mock)",
+        "user": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "username": current_user.username,
+            "full_name": current_user.full_name,
+            "is_pro": True,
+            "tier": "pro",
+            "subscription_expires_at": current_user.subscription_expires_at.isoformat()
+        }
+    }

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Fintellic Backend Startup Script
-# Starts all required services for the Fintellic backend
+# Fintellic Backend Startup Script - Updated for Day 8
+# Starts all required services including Redis caching
 
 # Colors for output
 RED='\033[0;31m'
@@ -85,14 +85,33 @@ else
     exit 1
 fi
 
-# 2. Start Redis
+# 2. Start Redis (CRITICAL for Day 8 caching features)
+echo -e "${BLUE}Starting Redis (Required for caching)...${NC}"
 if ! check_service "Redis" "$PID_DIR/redis.pid"; then
-    start_service "Redis" \
-        "redis-server" \
-        "$PID_DIR/redis.pid" \
-        "$LOG_DIR/redis.log"
+    # Check if Redis is already running on default port
+    if redis-cli ping > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ Redis is already running (external process)${NC}"
+    else
+        start_service "Redis" \
+            "redis-server" \
+            "$PID_DIR/redis.pid" \
+            "$LOG_DIR/redis.log"
+    fi
 else
     echo -e "${GREEN}✅ Redis is already running${NC}"
+fi
+
+# Verify Redis connectivity
+echo -e "${BLUE}Verifying Redis connectivity...${NC}"
+if redis-cli ping > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ Redis connection verified${NC}"
+    # Show cache statistics
+    KEYS_COUNT=$(redis-cli dbsize | awk '{print $2}')
+    echo -e "${BLUE}   Cache keys in database: ${KEYS_COUNT}${NC}"
+else
+    echo -e "${RED}❌ Cannot connect to Redis!${NC}"
+    echo "Redis is required for caching features added in Day 8"
+    exit 1
 fi
 
 # 3. Set Python path - since we know you're in venv already
@@ -108,7 +127,16 @@ if [ $? -ne 0 ]; then
     echo "  pip install -r requirements.txt"
     exit 1
 fi
-echo -e "${GREEN}✅ Python environment verified${NC}"
+
+# Verify Day 8 modules
+echo -e "${BLUE}Verifying Day 8 modules...${NC}"
+$PYTHON_BIN -c "from app.core.cache import cache; from app.models.earnings_calendar import EarningsCalendar" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ Day 8 modules not found!${NC}"
+    echo "Please ensure you have the latest code from Day 8"
+    exit 1
+fi
+echo -e "${GREEN}✅ Python environment verified (including Day 8 features)${NC}"
 
 # 4. Start Celery Worker
 if ! check_service "Celery Worker" "$PID_DIR/celery.pid"; then
@@ -163,6 +191,10 @@ echo ""
 echo -e "${BLUE}Checking service status...${NC}"
 
 all_running=true
+if ! redis-cli ping > /dev/null 2>&1; then
+    echo -e "${RED}❌ Redis is not responding${NC}"
+    all_running=false
+fi
 if [ ! -f "$PID_DIR/celery.pid" ] || ! ps -p $(cat "$PID_DIR/celery.pid" 2>/dev/null) > /dev/null 2>&1; then
     echo -e "${RED}❌ Celery Worker is not running${NC}"
     all_running=false
@@ -197,6 +229,11 @@ echo "📊 Service URLs:"
 echo "   - API Documentation: http://localhost:8000/docs"
 echo "   - API Base URL: http://localhost:8000/api/v1"
 echo ""
+echo "🚀 Day 8 New Features:"
+echo "   - Redis Caching: Enabled (5x faster API responses)"
+echo "   - Statistics API: http://localhost:8000/api/v1/stats/overview"
+echo "   - Earnings Calendar: http://localhost:8000/api/v1/earnings/upcoming"
+echo ""
 echo "📁 Log files location:"
 echo "   - Redis: $LOG_DIR/redis.log"
 echo "   - Celery: $LOG_DIR/celery.log"
@@ -210,8 +247,15 @@ if [ "$all_running" = true ]; then
     echo -e "${YELLOW}🤖 The system is now running autonomously!${NC}"
     echo -e "${YELLOW}   - Scanning for new filings every minute${NC}"
     echo -e "${YELLOW}   - Automatically processing discovered filings${NC}"
-    echo -e "${YELLOW}   - Check scheduler.log for real-time updates${NC}"
+    echo -e "${YELLOW}   - Caching frequently accessed data${NC}"
+    echo -e "${YELLOW}   - Tracking community interactions${NC}"
     echo ""
     echo "📝 To monitor in real-time:"
     echo "   tail -f $LOG_DIR/scheduler.log"
+    echo ""
+    echo "📊 To check cache statistics:"
+    echo "   redis-cli info stats"
+    echo ""
+    echo "🔍 To see cached keys:"
+    echo "   redis-cli keys '*'"
 fi

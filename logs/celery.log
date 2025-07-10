@@ -119,3 +119,59 @@ Traceback (most recent call last):
     raise WorkerLostError(
 billiard.exceptions.WorkerLostError: Worker exited prematurely: signal 11 (SIGSEGV) Job: 5.
 """
+[2025-07-10 07:47:39,009: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[2349b6db-5f07-4f9e-99bf-75fce81da49a] received
+[2025-07-10 07:47:39,021: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[1f5c5453-f058-453d-a743-429379dfcbe3] received
+[2025-07-10 07:47:39,045: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[249a3a26-b4d3-435f-9873-a697decd4d69] received
+[2025-07-10 07:47:39,059: INFO/ForkPoolWorker-14] Starting processing for filing 20
+[2025-07-10 07:47:39,193: ERROR/MainProcess] Process 'ForkPoolWorker-14' pid:28215 exited with 'signal 11 (SIGSEGV)'
+[2025-07-10 07:47:39,214: ERROR/MainProcess] Task handler raised error: WorkerLostError('Worker exited prematurely: signal 11 (SIGSEGV) Job: 6.')
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+    raise WorkerLostError(
+billiard.einfo.ExceptionWithTraceback: 
+"""
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+    raise WorkerLostError(
+billiard.exceptions.WorkerLostError: Worker exited prematurely: signal 11 (SIGSEGV) Job: 6.
+"""
+[2025-07-10 08:02:54,917: INFO/ForkPoolWorker-15] Starting processing for filing 21
+[2025-07-10 08:02:55,009: ERROR/MainProcess] Process 'ForkPoolWorker-15' pid:37675 exited with 'signal 11 (SIGSEGV)'
+[2025-07-10 08:02:55,023: ERROR/MainProcess] Task handler raised error: WorkerLostError('Worker exited prematurely: signal 11 (SIGSEGV) Job: 7.')
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+    raise WorkerLostError(
+billiard.einfo.ExceptionWithTraceback: 
+"""
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+    raise WorkerLostError(
+billiard.exceptions.WorkerLostError: Worker exited prematurely: signal 11 (SIGSEGV) Job: 7.
+"""
+[2025-07-10 08:06:18,064: INFO/ForkPoolWorker-16] Starting processing for filing 22
+[2025-07-10 08:06:18,240: ERROR/MainProcess] Process 'ForkPoolWorker-16' pid:37680 exited with 'signal 11 (SIGSEGV)'
+[2025-07-10 08:06:18,254: ERROR/MainProcess] Task handler raised error: WorkerLostError('Worker exited prematurely: signal 11 (SIGSEGV) Job: 8.')
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+    raise WorkerLostError(
+billiard.einfo.ExceptionWithTraceback: 
+"""
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+    raise WorkerLostError(
+billiard.exceptions.WorkerLostError: Worker exited prematurely: signal 11 (SIGSEGV) Job: 8.
+"""
+[2025-07-10 08:07:08,193: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[dc38b9c2-80d1-4f20-a6d7-18198b3bf77f] received
+[2025-07-10 08:07:08,203: INFO/ForkPoolWorker-17] Starting processing for filing 23
+[2025-07-10 08:07:08,317: ERROR/MainProcess] Process 'ForkPoolWorker-17' pid:37683 exited with 'signal 11 (SIGSEGV)'
+[2025-07-10 08:07:08,331: ERROR/MainProcess] Task handler raised error: WorkerLostError('Worker exited prematurely: signal 11 (SIGSEGV) Job: 9.')
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+    raise WorkerLostError(
+billiard.einfo.ExceptionWithTraceback: 
+"""
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/billiard/pool.py", line 1265, in mark_as_worker_lost
+    raise WorkerLostError(
+billiard.exceptions.WorkerLostError: Worker exited prematurely: signal 11 (SIGSEGV) Job: 9.
+"""

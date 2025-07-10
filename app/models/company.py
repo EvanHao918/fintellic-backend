@@ -51,9 +51,10 @@ class Company(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_filing_date = Column(DateTime(timezone=True))
     
-    # Relationships (Day 8 addition)
+    # Relationships
     filings = relationship("Filing", back_populates="company")
     earnings_calendar = relationship("EarningsCalendar", back_populates="company")
+    watchers = relationship("Watchlist", back_populates="company", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Company(id={self.id}, ticker='{self.ticker}', name='{self.name}')>"
@@ -64,6 +65,21 @@ class Company(Base):
         if not self.indices:
             return []
         return [idx.strip() for idx in self.indices.split(',')]
+    
+    @property
+    def is_watchable(self):
+        """Check if company is in S&P 500 or NASDAQ 100"""
+        return self.is_sp500 or self.is_nasdaq100
+    
+    @property
+    def indices_list(self):
+        """Get list of indices this company belongs to (for API response)"""
+        indices = []
+        if self.is_sp500:
+            indices.append("S&P 500")
+        if self.is_nasdaq100:
+            indices.append("NASDAQ 100")
+        return indices
     
     def update_indices(self):
         """Update indices field based on boolean flags"""

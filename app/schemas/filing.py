@@ -68,6 +68,9 @@ class FilingDetail(FilingBase):
     created_at: datetime
     updated_at: datetime
     
+    # Add this new field
+    view_limit_info: Optional[dict] = None
+    
     class Config:
         from_attributes = True
 

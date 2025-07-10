@@ -90,6 +90,7 @@ class Filing(Base):
     company = relationship("Company", back_populates="filings")
     comments = relationship("Comment", back_populates="filing", cascade="all, delete-orphan")
     user_votes = relationship("UserVote", back_populates="filing", cascade="all, delete-orphan")
+    user_views = relationship("UserFilingView", back_populates="filing", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Filing(id={self.id}, type={self.filing_type}, company_id={self.company_id})>"

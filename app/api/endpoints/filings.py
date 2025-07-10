@@ -1,6 +1,6 @@
 # app/api/endpoints/filings.py
 """
-Filing-related API endpoints with caching support
+Filing-related API endpoints with caching support and view tracking
 """
 from typing import List, Optional
 from datetime import datetime
@@ -11,6 +11,7 @@ from sqlalchemy import desc
 from app.api import deps
 from app.models.filing import Filing, ProcessingStatus
 from app.models.company import Company
+from app.services.view_tracking import ViewTrackingService
 from app.schemas.filing import FilingBrief, FilingDetail, FilingList
 from app.schemas.company import CompanyBrief
 from app.core.cache import cache, FilingCache, StatsCache, CACHE_TTL
@@ -112,21 +113,53 @@ async def get_filing(
     """
     Get specific filing by ID
     Results are cached for 1 hour
+    Enforces daily view limits for free users
     """
+    # Check if user can view this filing
+    view_check = ViewTrackingService.can_view_filing(db, current_user, filing_id)
+    
+    if not view_check["can_view"]:
+        # Return limited info for users who hit their limit
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "Daily limit reached. Upgrade to Pro for unlimited access.",
+                "error": "DAILY_LIMIT_REACHED",
+                "views_today": view_check["views_today"],
+                "daily_limit": ViewTrackingService.DAILY_FREE_LIMIT,
+                "upgrade_url": "/subscription"
+            }
+        )
+    
     # Generate cache key
     cache_key = FilingCache.get_filing_detail_key(str(filing_id))
     
     # Try cache first
     cached_result = cache.get(cache_key)
     if cached_result:
+        # Record view for free users (Pro users don't need tracking)
+        if not view_check["is_pro"]:
+            ViewTrackingService.record_view(db, current_user, filing_id)
+        
         # Still increment view count even for cached results
         StatsCache.increment_view_count(str(filing_id))
+        
+        # Add view limit info to cached result
+        cached_result["view_limit_info"] = {
+            "views_remaining": view_check["views_remaining"],
+            "is_pro": view_check["is_pro"],
+            "views_today": view_check["views_today"]
+        }
         return cached_result
     
     # Get from database
     filing = db.query(Filing).options(joinedload(Filing.company)).filter(Filing.id == filing_id).first()
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")
+    
+    # Record view for free users
+    if not view_check["is_pro"]:
+        ViewTrackingService.record_view(db, current_user, filing_id)
     
     # Increment view count
     view_count = StatsCache.increment_view_count(str(filing_id))
@@ -165,13 +198,44 @@ async def get_filing(
         financial_metrics=filing.financial_highlights,
         processed_at=filing.processing_completed_at,
         created_at=filing.created_at,
-        updated_at=filing.updated_at
+        updated_at=filing.updated_at,
+        # Add view limit info
+        view_limit_info={
+            "views_remaining": view_check["views_remaining"],
+            "is_pro": view_check["is_pro"],
+            "views_today": view_check["views_today"]
+        }
     )
     
-    # Cache the result
-    cache.set(cache_key, filing_detail.dict(), ttl=CACHE_TTL["filing_detail"])
+    # Cache the result without view_limit_info (since it's user-specific)
+    cache_data = filing_detail.dict()
+    cache_data.pop("view_limit_info", None)
+    cache.set(cache_key, cache_data, ttl=CACHE_TTL["filing_detail"])
     
     return filing_detail
+
+
+@router.get("/check-access/{filing_id}")
+async def check_filing_access(
+    filing_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user = Depends(deps.get_current_user)
+):
+    """
+    Check if user can access a filing without recording a view
+    Useful for UI to show lock/unlock status
+    """
+    view_check = ViewTrackingService.can_view_filing(db, current_user, filing_id)
+    
+    # Also get user's overall stats
+    user_stats = ViewTrackingService.get_user_view_stats(db, current_user.id)
+    
+    return {
+        "filing_id": filing_id,
+        "can_view": view_check["can_view"],
+        "reason": view_check["reason"],
+        "user_stats": user_stats
+    }
 
 
 @router.get("/popular/{period}")
@@ -256,6 +320,3 @@ async def get_popular_filings(
     cache.set(cache_key, result, ttl=CACHE_TTL["popular_filings"])
     
     return result
-
-
-# 删除了旧的投票端点，现在使用 interactions.py 中的投票端点

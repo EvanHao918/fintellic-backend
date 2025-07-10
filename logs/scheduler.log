@@ -1,15 +1,14 @@
-2025-07-08 18:24:38,392 - __main__ - INFO - ============================================================
-2025-07-08 18:24:38,392 - __main__ - INFO - 🚀 Starting Fintellic Filing Scheduler
-2025-07-08 18:24:38,392 - __main__ - INFO -    Time: 2025-07-08 18:24:38
-2025-07-08 18:24:38,392 - __main__ - INFO -    Mode: RSS-based scanning (1-minute intervals)
-2025-07-08 18:24:38,392 - __main__ - INFO - ============================================================
-2025-07-08 18:24:38,398 - __main__ - INFO - ✅ Database connection OK
-2025-07-08 18:24:38,416 - __main__ - INFO - ✅ Redis connection OK
-2025-07-08 18:24:38,416 - __main__ - ERROR - ❌ System health check failed: 'EDGARScanner' object has no attribute 'get_sp500_stats'
-2025-07-08 18:24:38,416 - __main__ - ERROR - System health check failed. Please ensure all services are running:
-2025-07-08 18:24:38,416 - __main__ - ERROR -   1. PostgreSQL database
-2025-07-08 18:24:38,416 - __main__ - ERROR -   2. Redis server
-2025-07-08 18:24:38,416 - __main__ - ERROR -   3. Celery worker
-tabase
-2025-07-08 18:24:38,416 - __main__ - ERROR -   2. Redis server
-2025-07-08 18:24:38,416 - __main__ - ERROR -   3. Celery worker
+2025-07-10 10:11:33,890 - __main__ - INFO - ============================================================
+2025-07-10 10:11:33,890 - __main__ - INFO - 🚀 Starting Fintellic Filing Scheduler
+2025-07-10 10:11:33,890 - __main__ - INFO -    Time: 2025-07-10 10:11:33
+2025-07-10 10:11:33,890 - __main__ - INFO -    Mode: RSS-based scanning (1-minute intervals)
+2025-07-10 10:11:33,890 - __main__ - INFO - ============================================================
+2025-07-10 10:11:33,894 - __main__ - INFO - ✅ Database connection OK
+2025-07-10 10:11:33,911 - __main__ - INFO - ✅ Redis connection OK
+2025-07-10 10:11:33,930 - __main__ - ERROR - ❌ System health check failed: object dict can't be used in 'await' expression
+2025-07-10 10:11:33,930 - __main__ - ERROR - System health check failed. Please ensure all services are running:
+2025-07-10 10:11:33,930 - __main__ - ERROR -   1. PostgreSQL database
+2025-07-10 10:11:33,930 - __main__ - ERROR -   2. Redis server
+2025-07-10 10:11:33,930 - __main__ - ERROR -   3. Celery worker
+25-07-10 10:11:33,930 - __main__ - ERROR -   2. Redis server
+2025-07-10 10:11:33,930 - __main__ - ERROR -   3. Celery worker

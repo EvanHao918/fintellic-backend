@@ -44,6 +44,7 @@ class User(Base):
     # Relationships
     comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
     votes = relationship("UserVote", back_populates="user", cascade="all, delete-orphan")
+    watchlist = relationship("Watchlist", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', tier={self.tier})>"

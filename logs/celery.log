@@ -1,10 +1,10 @@
  
  -------------- celery@Evans-MacBook-Air.local v5.3.4 (emerald-rush)
 --- ***** ----- 
--- ******* ---- macOS-13.2.1-arm64-arm-64bit 2025-07-10 10:09:55
+-- ******* ---- macOS-13.2.1-arm64-arm-64bit 2025-07-10 16:19:24
 - *** --- * --- 
 - ** ---------- [config]
-- ** ---------- .> app:         fintellic:0x102842810
+- ** ---------- .> app:         fintellic:0x106ae09d0
 - ** ---------- .> transport:   redis://localhost:6379/0
 - ** ---------- .> results:     redis://localhost:6379/0
 - *** --- * --- .> concurrency: 8 (prefork)
@@ -19,19 +19,218 @@
   . app.tasks.filing_tasks.process_pending_filings
   . app.tasks.filing_tasks.send_filing_notifications
 
-[2025-07-10 10:09:55,726: WARNING/MainProcess] /Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/celery/worker/consumer/consumer.py:507: CPendingDeprecationWarning: The broker_connection_retry configuration setting will no longer determine
+[2025-07-10 16:19:25,074: WARNING/MainProcess] /Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/celery/worker/consumer/consumer.py:507: CPendingDeprecationWarning: The broker_connection_retry configuration setting will no longer determine
 whether broker connection retries are made during startup in Celery 6.0 and above.
 If you wish to retain the existing behavior for retrying connections on startup,
 you should set broker_connection_retry_on_startup to True.
   warnings.warn(
 
-[2025-07-10 10:09:55,744: INFO/MainProcess] Connected to redis://localhost:6379/0
-[2025-07-10 10:09:55,744: WARNING/MainProcess] /Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/celery/worker/consumer/consumer.py:507: CPendingDeprecationWarning: The broker_connection_retry configuration setting will no longer determine
+[2025-07-10 16:19:25,082: INFO/MainProcess] Connected to redis://localhost:6379/0
+[2025-07-10 16:19:25,082: WARNING/MainProcess] /Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/celery/worker/consumer/consumer.py:507: CPendingDeprecationWarning: The broker_connection_retry configuration setting will no longer determine
 whether broker connection retries are made during startup in Celery 6.0 and above.
 If you wish to retain the existing behavior for retrying connections on startup,
 you should set broker_connection_retry_on_startup to True.
   warnings.warn(
 
-[2025-07-10 10:09:55,746: INFO/MainProcess] mingle: searching for neighbors
-[2025-07-10 10:09:56,753: INFO/MainProcess] mingle: all alone
-[2025-07-10 10:09:56,763: INFO/MainProcess] celery@Evans-MacBook-Air.local ready.
+[2025-07-10 16:19:25,084: INFO/MainProcess] mingle: searching for neighbors
+[2025-07-10 16:19:26,092: INFO/MainProcess] mingle: all alone
+[2025-07-10 16:19:26,113: INFO/MainProcess] celery@Evans-MacBook-Air.local ready.
+[2025-07-10 16:20:44,028: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[b464bc59-e82e-4e4a-bbf0-2f31c0958aeb] received
+[2025-07-10 16:20:44,032: INFO/ForkPoolWorker-8] Starting processing for filing 28
+[2025-07-10 16:20:44,090: INFO/ForkPoolWorker-8] Downloading filing 0000914208-25-000252
+[2025-07-10 16:20:44,106: INFO/ForkPoolWorker-8] Starting download for IVZ 8-K (0000914208-25-000252)
+[2025-07-10 16:20:44,107: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/914208/000091420825000252/0000914208-25-000252-index.htm
+[2025-07-10 16:20:44,197: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/914208/000091420825000252/0000914208-25-000252-index.htm "HTTP/1.1 200 OK"
+[2025-07-10 16:20:44,198: INFO/ForkPoolWorker-8] ✅ Found index page
+[2025-07-10 16:20:44,205: WARNING/ForkPoolWorker-8] No primary document found in index page
+[2025-07-10 16:20:44,215: INFO/ForkPoolWorker-8] Processing filing 0000914208-25-000252 with AI
+[2025-07-10 16:20:44,224: INFO/ForkPoolWorker-8] Starting AI processing for IVZ 8-K
+[2025-07-10 16:20:44,224: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0000914208/000091420825000252
+[2025-07-10 16:20:44,224: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
+[2025-07-10 16:20:44,233: ERROR/ForkPoolWorker-8] Error processing filing 28: Failed to process filing 0000914208-25-000252 with AI
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
+    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
+Exception: Failed to process filing 0000914208-25-000252 with AI
+[2025-07-10 16:20:44,241: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[b464bc59-e82e-4e4a-bbf0-2f31c0958aeb] received
+[2025-07-10 16:20:44,245: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[b464bc59-e82e-4e4a-bbf0-2f31c0958aeb] retry: Retry in 60s: Exception('Failed to process filing 0000914208-25-000252 with AI')
+[2025-07-10 16:21:44,245: INFO/ForkPoolWorker-8] Starting processing for filing 28
+[2025-07-10 16:21:44,301: INFO/ForkPoolWorker-8] Successfully processed filing 28
+[2025-07-10 16:21:44,307: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[b464bc59-e82e-4e4a-bbf0-2f31c0958aeb] succeeded in 0.06402987497858703s: {'status': 'success', 'filing_id': 28, 'company': 'IVZ', 'type': '8-K'}
+[2025-07-10 16:25:13,196: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[f7cbf34b-0781-4e35-938f-3cfa8409b69b] received
+[2025-07-10 16:25:13,202: INFO/ForkPoolWorker-8] Starting processing for filing 29
+[2025-07-10 16:25:13,240: INFO/ForkPoolWorker-8] Downloading filing 0000033213-25-000026
+[2025-07-10 16:25:13,255: INFO/ForkPoolWorker-8] Starting download for EQT 8-K (0000033213-25-000026)
+[2025-07-10 16:25:13,257: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/33213/000003321325000026/0000033213-25-000026-index.htm
+[2025-07-10 16:25:13,359: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/33213/000003321325000026/0000033213-25-000026-index.htm "HTTP/1.1 200 OK"
+[2025-07-10 16:25:13,361: INFO/ForkPoolWorker-8] ✅ Found index page
+[2025-07-10 16:25:13,371: WARNING/ForkPoolWorker-8] No primary document found in index page
+[2025-07-10 16:25:13,382: INFO/ForkPoolWorker-8] Processing filing 0000033213-25-000026 with AI
+[2025-07-10 16:25:13,393: INFO/ForkPoolWorker-8] Starting AI processing for EQT 8-K
+[2025-07-10 16:25:13,394: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0000033213/000003321325000026
+[2025-07-10 16:25:13,394: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
+[2025-07-10 16:25:13,406: ERROR/ForkPoolWorker-8] Error processing filing 29: Failed to process filing 0000033213-25-000026 with AI
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
+    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
+Exception: Failed to process filing 0000033213-25-000026 with AI
+[2025-07-10 16:25:13,414: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[f7cbf34b-0781-4e35-938f-3cfa8409b69b] received
+[2025-07-10 16:25:13,416: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[f7cbf34b-0781-4e35-938f-3cfa8409b69b] retry: Retry in 60s: Exception('Failed to process filing 0000033213-25-000026 with AI')
+[2025-07-10 16:26:13,420: INFO/ForkPoolWorker-8] Starting processing for filing 29
+[2025-07-10 16:26:13,487: INFO/ForkPoolWorker-8] Successfully processed filing 29
+[2025-07-10 16:26:13,495: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[f7cbf34b-0781-4e35-938f-3cfa8409b69b] succeeded in 0.07642175001092255s: {'status': 'success', 'filing_id': 29, 'company': 'EQT', 'type': '8-K'}
+[2025-07-10 16:37:33,622: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[ff8b9d54-af66-4875-af24-198bb97307b4] received
+[2025-07-10 16:37:33,626: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[fbcfe5f1-64f9-4873-8b2d-6b374a9fe535] received
+[2025-07-10 16:37:33,634: INFO/ForkPoolWorker-8] Starting processing for filing 30
+[2025-07-10 16:37:33,652: INFO/ForkPoolWorker-8] Downloading filing 0001104659-25-067013
+[2025-07-10 16:37:33,671: INFO/ForkPoolWorker-8] Starting download for AVB 8-K (0001104659-25-067013)
+[2025-07-10 16:37:33,673: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/915912/000110465925067013/0001104659-25-067013-index.htm
+[2025-07-10 16:37:33,761: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/915912/000110465925067013/0001104659-25-067013-index.htm "HTTP/1.1 200 OK"
+[2025-07-10 16:37:33,763: INFO/ForkPoolWorker-8] ✅ Found index page
+[2025-07-10 16:37:33,774: INFO/ForkPoolWorker-8] Found primary document: tm2520069d1_8k.htm
+[2025-07-10 16:37:33,774: INFO/ForkPoolWorker-8] Found primary document: tm2520069d1_8k_htm.xml
+[2025-07-10 16:37:33,774: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/915912/000110465925067013/tm2520069d1_8k.htm
+[2025-07-10 16:37:36,448: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F915912%2F000110465925067013%2Ftm2520069d1_8k.htm "HTTP/1.1 200 OK"
+[2025-07-10 16:37:36,451: INFO/ForkPoolWorker-8] ✅ Downloaded tm2520069d1_8k.htm (6,356 bytes)
+[2025-07-10 16:37:36,465: INFO/ForkPoolWorker-8] Processing filing 0001104659-25-067013 with AI
+[2025-07-10 16:37:36,477: INFO/ForkPoolWorker-8] Starting AI processing for AVB 8-K
+[2025-07-10 16:37:36,478: INFO/ForkPoolWorker-8] Extracting text from tm2520069d1_8k.htm
+[2025-07-10 16:37:36,479: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
+[2025-07-10 16:37:36,479: INFO/ForkPoolWorker-8] Processing 8-K current report
+[2025-07-10 16:37:36,988: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 16:37:36,995: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 16:37:37,195: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 16:37:37,196: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 16:37:37,411: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 16:37:37,413: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 16:37:37,598: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 16:37:37,599: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 16:37:37,788: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 16:37:37,790: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 16:37:37,807: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001104659-25-067013
+[2025-07-10 16:37:37,813: INFO/ForkPoolWorker-8] Successfully processed filing 30
+[2025-07-10 16:37:37,814: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[7e6135c2-a7c6-41c5-b0fd-32ecdd6bbaeb] received
+[2025-07-10 16:37:37,839: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[ff8b9d54-af66-4875-af24-198bb97307b4] succeeded in 4.204884209029842s: {'status': 'success', 'filing_id': 30, 'company': 'AVB', 'type': '8-K'}
+[2025-07-10 16:37:37,843: INFO/ForkPoolWorker-1] Would send notifications for filing 30
+[2025-07-10 16:37:37,860: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[7e6135c2-a7c6-41c5-b0fd-32ecdd6bbaeb] succeeded in 0.021284874994307756s: {'status': 'notifications_sent'}
+[2025-07-10 16:37:39,628: INFO/ForkPoolWorker-8] Starting processing for filing 31
+[2025-07-10 16:37:39,637: INFO/ForkPoolWorker-8] Downloading filing 0001558370-25-009180
+[2025-07-10 16:37:39,647: INFO/ForkPoolWorker-8] Starting download for CAG 10-K (0001558370-25-009180)
+[2025-07-10 16:37:39,648: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/23217/000155837025009180/0001558370-25-009180-index.htm
+[2025-07-10 16:37:39,741: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/23217/000155837025009180/0001558370-25-009180-index.htm "HTTP/1.1 200 OK"
+[2025-07-10 16:37:39,742: INFO/ForkPoolWorker-8] ✅ Found index page
+[2025-07-10 16:37:39,754: INFO/ForkPoolWorker-8] Found primary document: tmb-20250525x10k.htm
+[2025-07-10 16:37:39,755: INFO/ForkPoolWorker-8] Found primary document: tmb-20250525x10k_htm.xml
+[2025-07-10 16:37:39,756: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/23217/000155837025009180/tmb-20250525x10k.htm
+[2025-07-10 16:37:39,827: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F23217%2F000155837025009180%2Ftmb-20250525x10k.htm "HTTP/1.1 200 OK"
+[2025-07-10 16:37:39,829: INFO/ForkPoolWorker-8] ✅ Downloaded tmb-20250525x10k.htm (6,356 bytes)
+[2025-07-10 16:37:39,840: INFO/ForkPoolWorker-8] Processing filing 0001558370-25-009180 with AI
+[2025-07-10 16:37:39,851: INFO/ForkPoolWorker-8] Starting AI processing for CAG 10-K
+[2025-07-10 16:37:39,852: INFO/ForkPoolWorker-8] Extracting text from tmb-20250525x10k.htm
+[2025-07-10 16:37:39,853: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
+[2025-07-10 16:37:39,854: INFO/ForkPoolWorker-8] Processing 10-K annual report
+[2025-07-10 16:37:39,938: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 16:37:39,940: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 16:37:40,077: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 16:37:40,078: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 16:37:40,177: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 16:37:40,179: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 16:37:40,374: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 16:37:40,381: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 16:37:40,382: INFO/ForkPoolWorker-8] Extracting structured financial data for 10-K
+[2025-07-10 16:37:40,480: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 16:37:40,481: ERROR/ForkPoolWorker-8] Financial data extraction error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 16:37:40,498: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001558370-25-009180
+[2025-07-10 16:37:40,500: INFO/ForkPoolWorker-8] Successfully processed filing 31
+[2025-07-10 16:37:40,501: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[ba161abb-46bc-468b-8299-c5ff279d7ad5] received
+[2025-07-10 16:37:40,503: INFO/ForkPoolWorker-1] Would send notifications for filing 31
+[2025-07-10 16:37:40,503: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[fbcfe5f1-64f9-4873-8b2d-6b374a9fe535] succeeded in 0.875670291017741s: {'status': 'success', 'filing_id': 31, 'company': 'CAG', 'type': '10-K'}
+[2025-07-10 16:37:40,504: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[ba161abb-46bc-468b-8299-c5ff279d7ad5] succeeded in 0.0015591250266879797s: {'status': 'notifications_sent'}
+[2025-07-10 17:02:05,614: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[8644676b-6b7d-4829-977e-6bcad5905b30] received
+[2025-07-10 17:02:05,620: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[e8233ad2-7712-4016-bf28-e71ffb1cb535] received
+[2025-07-10 17:02:05,626: INFO/ForkPoolWorker-8] Starting processing for filing 32
+[2025-07-10 17:02:05,649: INFO/ForkPoolWorker-8] Downloading filing 0001641172-25-018611
+[2025-07-10 17:02:05,669: INFO/ForkPoolWorker-8] Starting download for LBSR S-1 (0001641172-25-018611)
+[2025-07-10 17:02:05,671: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1172178/000164117225018611/0001641172-25-018611-index.htm
+[2025-07-10 17:02:05,760: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1172178/000164117225018611/0001641172-25-018611-index.htm "HTTP/1.1 200 OK"
+[2025-07-10 17:02:05,761: INFO/ForkPoolWorker-8] ✅ Found index page
+[2025-07-10 17:02:05,781: INFO/ForkPoolWorker-8] Found primary document: forms-1.htm
+[2025-07-10 17:02:05,782: INFO/ForkPoolWorker-8] Found primary document: forms-1_htm.xml
+[2025-07-10 17:02:05,782: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/1172178/000164117225018611/forms-1.htm
+[2025-07-10 17:02:05,835: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F1172178%2F000164117225018611%2Fforms-1.htm "HTTP/1.1 200 OK"
+[2025-07-10 17:02:05,836: INFO/ForkPoolWorker-8] ✅ Downloaded forms-1.htm (6,356 bytes)
+[2025-07-10 17:02:05,860: INFO/ForkPoolWorker-8] Processing filing 0001641172-25-018611 with AI
+[2025-07-10 17:02:05,869: INFO/ForkPoolWorker-8] Starting AI processing for LBSR S-1
+[2025-07-10 17:02:05,869: INFO/ForkPoolWorker-8] Extracting text from forms-1.htm
+[2025-07-10 17:02:05,870: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
+[2025-07-10 17:02:05,870: INFO/ForkPoolWorker-8] Processing S-1 IPO registration
+[2025-07-10 17:02:06,085: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 17:02:06,091: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 17:02:06,253: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 17:02:06,255: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 17:02:06,380: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 17:02:06,381: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 17:02:06,535: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 17:02:06,536: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 17:02:06,660: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 17:02:06,662: ERROR/ForkPoolWorker-8] IPO metrics extraction error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 17:02:06,688: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001641172-25-018611
+[2025-07-10 17:02:06,697: INFO/ForkPoolWorker-8] Successfully processed filing 32
+[2025-07-10 17:02:06,698: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[47d495b1-c263-45ee-b9c1-757826c1d800] received
+[2025-07-10 17:02:06,709: INFO/ForkPoolWorker-1] Would send notifications for filing 32
+[2025-07-10 17:02:06,717: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[8644676b-6b7d-4829-977e-6bcad5905b30] succeeded in 1.0916627920232713s: {'status': 'success', 'filing_id': 32, 'company': 'LBSR', 'type': 'S-1'}
+[2025-07-10 17:02:06,737: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[47d495b1-c263-45ee-b9c1-757826c1d800] succeeded in 0.030391582986339927s: {'status': 'notifications_sent'}
+[2025-07-10 17:02:11,619: INFO/ForkPoolWorker-8] Starting processing for filing 33
+[2025-07-10 17:02:11,638: INFO/ForkPoolWorker-8] Downloading filing 0000950103-25-008670
+[2025-07-10 17:02:11,662: INFO/ForkPoolWorker-8] Starting download for C 8-K (0000950103-25-008670)
+[2025-07-10 17:02:11,664: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/831001/000095010325008670/0000950103-25-008670-index.htm
+[2025-07-10 17:02:11,782: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/831001/000095010325008670/0000950103-25-008670-index.htm "HTTP/1.1 200 OK"
+[2025-07-10 17:02:11,783: INFO/ForkPoolWorker-8] ✅ Found index page
+[2025-07-10 17:02:11,793: INFO/ForkPoolWorker-8] Found primary document: dp231100_8k.htm
+[2025-07-10 17:02:11,794: INFO/ForkPoolWorker-8] Found primary document: dp231100_8k_htm.xml
+[2025-07-10 17:02:11,794: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/831001/000095010325008670/dp231100_8k.htm
+[2025-07-10 17:02:11,839: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F831001%2F000095010325008670%2Fdp231100_8k.htm "HTTP/1.1 200 OK"
+[2025-07-10 17:02:11,841: INFO/ForkPoolWorker-8] ✅ Downloaded dp231100_8k.htm (6,356 bytes)
+[2025-07-10 17:02:11,857: INFO/ForkPoolWorker-8] Processing filing 0000950103-25-008670 with AI
+[2025-07-10 17:02:11,874: INFO/ForkPoolWorker-8] Starting AI processing for C 8-K
+[2025-07-10 17:02:11,876: INFO/ForkPoolWorker-8] Extracting text from dp231100_8k.htm
+[2025-07-10 17:02:11,878: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
+[2025-07-10 17:02:11,878: INFO/ForkPoolWorker-8] Processing 8-K current report
+[2025-07-10 17:02:12,024: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 17:02:12,027: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 17:02:12,125: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 17:02:12,127: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 17:02:12,226: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 17:02:12,227: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 17:02:12,328: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 17:02:12,330: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 17:02:12,578: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+[2025-07-10 17:02:12,580: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+[2025-07-10 17:02:12,604: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0000950103-25-008670
+[2025-07-10 17:02:12,608: INFO/ForkPoolWorker-8] Successfully processed filing 33
+[2025-07-10 17:02:12,609: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[1d7d3f8c-7bf5-4555-8ef1-2def0ed1eeaf] received
+[2025-07-10 17:02:12,612: INFO/ForkPoolWorker-1] Would send notifications for filing 33
+[2025-07-10 17:02:12,614: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[e8233ad2-7712-4016-bf28-e71ffb1cb535] succeeded in 0.9946677920524962s: {'status': 'success', 'filing_id': 33, 'company': 'C', 'type': '8-K'}
+[2025-07-10 17:02:12,615: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[1d7d3f8c-7bf5-4555-8ef1-2def0ed1eeaf] succeeded in 0.002600916021037847s: {'status': 'notifications_sent'}
+[2025-07-10 17:25:28,727: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[dba1e2f2-55d4-4e49-84c8-451933f589d4] received
+[2025-07-10 17:25:28,757: INFO/ForkPoolWorker-8] Starting processing for filing 34
+[2025-07-10 17:25:28,812: INFO/ForkPoolWorker-8] Downloading filing 0000027904-25-000012
+[2025-07-10 17:25:28,844: INFO/ForkPoolWorker-8] Starting download for DAL 10-Q (0000027904-25-000012)
+[2025-07-10 17:25:28,848: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/27904/000002790425000012/0000027904-25-000012-index.htm
+[2025-07-10 17:25:28,990: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/27904/000002790425000012/0000027904-25-000012-index.htm "HTTP/1.1 200 OK"
+[2025-07-10 17:25:28,992: INFO/ForkPoolWorker-8] ✅ Found index page
+[2025-07-10 17:25:29,004: WARNING/ForkPoolWorker-8] No primary document found in index page
+[2025-07-10 17:25:29,016: INFO/ForkPoolWorker-8] Processing filing 0000027904-25-000012 with AI
+[2025-07-10 17:25:29,030: INFO/ForkPoolWorker-8] Starting AI processing for DAL 10-Q
+[2025-07-10 17:25:29,030: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0000027904/000002790425000012
+[2025-07-10 17:25:29,031: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
+[2025-07-10 17:25:29,042: ERROR/ForkPoolWorker-8] Error processing filing 34: Failed to process filing 0000027904-25-000012 with AI
+Traceback (most recent call last):
+  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
+    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
+Exception: Failed to process filing 0000027904-25-000012 with AI
+[2025-07-10 17:25:29,081: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[dba1e2f2-55d4-4e49-84c8-451933f589d4] received
+[2025-07-10 17:25:29,083: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[dba1e2f2-55d4-4e49-84c8-451933f589d4] retry: Retry in 60s: Exception('Failed to process filing 0000027904-25-000012 with AI')
+[2025-07-10 17:26:29,060: INFO/ForkPoolWorker-8] Starting processing for filing 34
+[2025-07-10 17:26:29,114: INFO/ForkPoolWorker-8] Successfully processed filing 34
+[2025-07-10 17:26:29,121: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[dba1e2f2-55d4-4e49-84c8-451933f589d4] succeeded in 0.06133658398175612s: {'status': 'success', 'filing_id': 34, 'company': 'DAL', 'type': '10-Q'}

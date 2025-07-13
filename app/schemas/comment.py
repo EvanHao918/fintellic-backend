@@ -11,7 +11,6 @@ from app.models import UserTier
 class CommentBase(BaseModel):
     """Base comment schema"""
     content: str = Field(..., min_length=1, max_length=1000)
-    reply_to_comment_id: Optional[int] = None
 
 
 class CommentCreate(CommentBase):
@@ -29,17 +28,6 @@ class CommentVoteRequest(BaseModel):
     vote_type: str = Field(..., pattern="^(upvote|downvote|none)$")
 
 
-class ReplyInfo(BaseModel):
-    """Schema for reply information"""
-    comment_id: int
-    user_id: int
-    username: str
-    content_preview: str
-    
-    class Config:
-        from_attributes = True
-
-
 class CommentResponse(BaseModel):
     """Schema for comment response"""
     id: int
@@ -55,7 +43,6 @@ class CommentResponse(BaseModel):
     downvotes: int = 0
     net_votes: int = 0
     user_vote: int = 0  # -1, 0, or 1
-    reply_to: Optional[ReplyInfo] = None
     
     class Config:
         from_attributes = True

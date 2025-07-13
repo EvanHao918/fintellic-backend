@@ -27,15 +27,15 @@ class UserVote(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     filing_id = Column(Integer, ForeignKey("filings.id", ondelete="CASCADE"), nullable=False, index=True)
     
-    # Vote information - 使用字符串而不是枚举
+    # Vote information - using string instead of enum
     vote_type = Column(String(10), nullable=False)
     
     # Timestamp
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     
-    # Relationships
-    user = relationship("User", back_populates="votes")
-    filing = relationship("Filing", back_populates="user_votes")
+    # Relationships - explicitly specify foreign_keys to avoid ambiguity
+    user = relationship("User", back_populates="votes", foreign_keys=[user_id])
+    filing = relationship("Filing", back_populates="user_votes", foreign_keys=[filing_id])
     
     # Unique constraint to prevent duplicate votes
     __table_args__ = (

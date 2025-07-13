@@ -11,6 +11,7 @@ from app.models.comment import Comment
 from app.models.user_filing_view import UserFilingView
 from app.models.watchlist import Watchlist
 from app.models.earnings_calendar import EarningsCalendar
+from app.models.comment_vote import CommentVote
 
 
 __all__ = [
@@ -24,6 +25,8 @@ __all__ = [
     "UserVote",
     "VoteType",
     "Comment",
-    "Watchlist"
+    "UserFilingView",
+    "Watchlist",
     "EarningsCalendar",
+    "CommentVote",
 ]

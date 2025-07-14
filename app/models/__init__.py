@@ -7,6 +7,8 @@ from app.models.earnings_calendar import EarningsCalendar, EarningsTime
 from app.models.comment import Comment
 from app.models.user_vote import UserVote, VoteType
 from app.models.comment_vote import CommentVote
+from app.models.watchlist import Watchlist  # 添加这行
+from app.models.user_filing_view import UserFilingView  # 添加这行
 
 __all__ = [
     "Base",
@@ -22,5 +24,7 @@ __all__ = [
     "Comment",
     "UserVote",
     "VoteType",
-    "CommentVote"
+    "CommentVote",
+    "Watchlist",  # 添加这行
+    "UserFilingView"  # 添加这行
 ]

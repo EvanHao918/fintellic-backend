@@ -63,6 +63,13 @@ class FilingDetail(FilingBase):
     # IPO info (for S-1)
     ipo_details: Optional[Dict[str, Any]] = None
     
+    # Differentiated display fields (new)
+    specific_data: Optional[Dict[str, Any]] = Field(default={}, description="Type-specific structured data")
+    chart_data: Optional[Dict[str, Any]] = Field(default=None, description="Pre-processed chart data")
+    
+    # Special fields for 10-Q
+    earnings_comparison: Optional[Dict[str, Any]] = Field(default=None, description="Actual vs expected earnings data")
+    
     # Metadata
     processed_at: Optional[datetime] = None
     created_at: datetime

@@ -107,6 +107,7 @@ async def get_filings(
 @router.get("/{filing_id}", response_model=FilingDetail)
 async def get_filing(
     filing_id: int,
+    include_charts: bool = Query(True, description="Include chart data in response"),
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.get_current_user)
 ):
@@ -131,8 +132,8 @@ async def get_filing(
             }
         )
     
-    # Generate cache key
-    cache_key = FilingCache.get_filing_detail_key(str(filing_id))
+    # Generate cache key (include charts parameter)
+    cache_key = FilingCache.get_filing_detail_key(f"{filing_id}_charts_{include_charts}")
     
     # Try cache first
     cached_result = cache.get(cache_key)
@@ -199,6 +200,9 @@ async def get_filing(
         processed_at=filing.processing_completed_at,
         created_at=filing.created_at,
         updated_at=filing.updated_at,
+        # Add new fields for differentiated display
+        specific_data=filing.get_specific_data if filing.filing_specific_data else {},
+        chart_data=filing.chart_data if include_charts and filing.chart_data else None,
         # Add view limit info
         view_limit_info={
             "views_remaining": view_check["views_remaining"],
@@ -207,13 +211,23 @@ async def get_filing(
         }
     )
     
+    # Special handling for 10-Q: add earnings comparison if available
+    if filing.filing_type.value == "10-Q" and filing.filing_specific_data:
+        try:
+            # This would call an external API or use cached data
+            # For now, we'll just pass through any comparison data stored
+            comparison_data = filing.filing_specific_data.get("earnings_comparison")
+            if comparison_data:
+                filing_detail.earnings_comparison = comparison_data
+        except Exception:
+            pass  # Graceful degradation
+    
     # Cache the result without view_limit_info (since it's user-specific)
     cache_data = filing_detail.dict()
     cache_data.pop("view_limit_info", None)
     cache.set(cache_key, cache_data, ttl=CACHE_TTL["filing_detail"])
     
     return filing_detail
-
 
 @router.get("/check-access/{filing_id}")
 async def check_filing_access(

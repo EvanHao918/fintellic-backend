@@ -86,11 +86,29 @@ class Filing(Base):
     event_type = Column(String(100), nullable=True)  # For 8-K event types
     comment_count = Column(Integer, default=0, nullable=False)
     
+    # New fields for differentiated display (Day 15+ addition)
+    filing_specific_data = Column(JSON, default={})
+    chart_data = Column(JSON, default={})  # Pre-processed chart data
+    
     # Relationships
     company = relationship("Company", back_populates="filings")
     comments = relationship("Comment", back_populates="filing", cascade="all, delete-orphan")
     user_votes = relationship("UserVote", back_populates="filing", cascade="all, delete-orphan")
     user_views = relationship("UserFilingView", back_populates="filing", cascade="all, delete-orphan")
+    
+    @property
+    def get_specific_data(self):
+        """Return structured data based on form_type"""
+        if self.filing_type == FilingType.FORM_10K:
+            return self.filing_specific_data.get("10k_data", {})
+        elif self.filing_type == FilingType.FORM_10Q:
+            return self.filing_specific_data.get("10q_data", {})
+        elif self.filing_type == FilingType.FORM_8K:
+            return self.filing_specific_data.get("8k_data", {})
+        elif self.filing_type == FilingType.FORM_S1:
+            return self.filing_specific_data.get("s1_data", {})
+        else:
+            return {}
     
     def __repr__(self):
         return f"<Filing(id={self.id}, type={self.filing_type}, company_id={self.company_id})>"

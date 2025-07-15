@@ -2,7 +2,7 @@
 """
 Filing-related API endpoints with caching support and view tracking
 """
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
@@ -11,6 +11,7 @@ from sqlalchemy import desc
 from app.api import deps
 from app.models.filing import Filing, ProcessingStatus
 from app.models.company import Company
+from app.models.user import UserVote
 from app.services.view_tracking import ViewTrackingService
 from app.schemas.filing import FilingBrief, FilingDetail, FilingList
 from app.schemas.company import CompanyBrief
@@ -87,7 +88,8 @@ async def get_filings(
             sentiment=filing.management_tone.value if filing.management_tone else None,
             tags=filing.key_tags or [],
             vote_counts=vote_counts,
-            comment_count=filing.comment_count or 0
+            comment_count=filing.comment_count or 0,
+            event_type=filing.event_type  # For 8-K
         )
         filing_responses.append(filing_brief)
     
@@ -112,7 +114,8 @@ async def get_filing(
     current_user = Depends(deps.get_current_user)
 ):
     """
-    Get specific filing by ID
+    Get specific filing by ID with differentiated display support
+    Returns type-specific fields based on filing_type
     Results are cached for 1 hour
     Enforces daily view limits for free users
     """
@@ -151,6 +154,16 @@ async def get_filing(
             "is_pro": view_check["is_pro"],
             "views_today": view_check["views_today"]
         }
+        
+        # Add user vote if authenticated
+        if current_user:
+            vote = db.query(UserVote).filter(
+                UserVote.user_id == current_user.id,
+                UserVote.filing_id == filing_id
+            ).first()
+            if vote:
+                cached_result["user_vote"] = vote.vote_type
+        
         return cached_result
     
     # Get from database
@@ -165,6 +178,16 @@ async def get_filing(
     # Increment view count
     view_count = StatsCache.increment_view_count(str(filing_id))
     
+    # Get user vote if authenticated
+    user_vote = None
+    if current_user:
+        vote = db.query(UserVote).filter(
+            UserVote.user_id == current_user.id,
+            UserVote.filing_id == filing_id
+        ).first()
+        if vote:
+            user_vote = vote.vote_type
+    
     # Get vote counts from database
     vote_counts = {
         "bullish": filing.bullish_votes or 0,
@@ -172,62 +195,113 @@ async def get_filing(
         "bearish": filing.bearish_votes or 0
     }
     
-    # Prepare response
-    filing_detail = FilingDetail(
-        id=filing.id,
-        form_type=filing.filing_type.value,
-        filing_date=filing.filing_date,
-        accession_number=filing.accession_number,
-        file_url=filing.primary_doc_url or "",
-        cik=filing.company.cik,
-        company=CompanyBrief(
-            id=filing.company.id,
-            name=filing.company.name,
-            ticker=filing.company.ticker,
-            cik=filing.company.cik
-        ),
-        status=filing.status.value,
-        ai_summary=filing.ai_summary,
-        one_liner=filing.ai_summary[:100] + "..." if filing.ai_summary else None,
-        sentiment=filing.management_tone.value if filing.management_tone else None,
-        sentiment_explanation=filing.tone_explanation,
-        key_points=[],  # Extract from ai_summary if needed
-        risks=[],  # To be extracted from filing
-        opportunities=[],  # To be extracted from filing
-        questions_answers=filing.key_questions or [],
-        tags=filing.key_tags or [],
-        financial_metrics=filing.financial_highlights,
-        processed_at=filing.processing_completed_at,
-        created_at=filing.created_at,
-        updated_at=filing.updated_at,
-        # Add new fields for differentiated display
-        specific_data=filing.get_specific_data if filing.filing_specific_data else {},
-        chart_data=filing.chart_data if include_charts and filing.chart_data else None,
+    # Prepare base response data
+    response_data = {
+        "id": filing.id,
+        "form_type": filing.filing_type.value,
+        "filing_date": filing.filing_date,
+        "accession_number": filing.accession_number,
+        "file_url": filing.primary_doc_url or "",
+        "cik": filing.company.cik,
+        "company": CompanyBrief.from_orm(filing.company),
+        "status": filing.status.value,
+        "ai_summary": filing.ai_summary,
+        "one_liner": filing.ai_summary[:100] + "..." if filing.ai_summary else None,
+        "sentiment": filing.management_tone.value if filing.management_tone else None,
+        "sentiment_explanation": filing.tone_explanation,
+        "key_points": extract_key_points(filing),
+        "risks": extract_risks(filing),
+        "opportunities": extract_opportunities(filing),
+        "questions_answers": filing.key_questions or [],
+        "tags": filing.key_tags or [],
+        "financial_metrics": filing.financial_highlights,
+        "processed_at": filing.processing_completed_at,
+        "created_at": filing.created_at,
+        "updated_at": filing.updated_at,
+        # Add interaction stats
+        "vote_counts": vote_counts,
+        "comment_count": filing.comment_count or 0,
+        "user_vote": user_vote,
         # Add view limit info
-        view_limit_info={
+        "view_limit_info": {
             "views_remaining": view_check["views_remaining"],
             "is_pro": view_check["is_pro"],
             "views_today": view_check["views_today"]
-        }
-    )
+        },
+        # Existing differentiated fields
+        "specific_data": filing.get_specific_data if filing.filing_specific_data else {},
+        "chart_data": filing.chart_data if include_charts and filing.chart_data else None,
+    }
     
-    # Special handling for 10-Q: add earnings comparison if available
-    if filing.filing_type.value == "10-Q" and filing.filing_specific_data:
-        try:
-            # This would call an external API or use cached data
-            # For now, we'll just pass through any comparison data stored
-            comparison_data = filing.filing_specific_data.get("earnings_comparison")
-            if comparison_data:
-                filing_detail.earnings_comparison = comparison_data
-        except Exception:
-            pass  # Graceful degradation
+    # Add common fields
+    response_data.update({
+        "fiscal_year": filing.fiscal_year,
+        "fiscal_quarter": filing.fiscal_quarter,
+        "period_end_date": filing.period_end_date,
+    })
     
-    # Cache the result without view_limit_info (since it's user-specific)
-    cache_data = filing_detail.dict()
+    # Add type-specific fields based on filing_type
+    filing_type = filing.filing_type.value
+    
+    if filing_type == "10-K":
+        response_data.update({
+            "auditor_opinion": filing.auditor_opinion,
+            "three_year_financials": filing.three_year_financials,
+            "business_segments": filing.business_segments,
+            "risk_summary": filing.risk_summary,
+            "growth_drivers": filing.growth_drivers,
+            "management_outlook": filing.management_outlook,
+            "strategic_adjustments": filing.strategic_adjustments,
+            "financial_highlights": filing.financial_highlights
+        })
+    
+    elif filing_type == "10-Q":
+        response_data.update({
+            "expectations_comparison": filing.expectations_comparison,
+            "cost_structure": filing.cost_structure,
+            "guidance_update": filing.guidance_update,
+            "growth_decline_analysis": filing.growth_decline_analysis,
+            "management_tone_analysis": filing.management_tone_analysis,
+            "beat_miss_analysis": filing.beat_miss_analysis,
+            "core_metrics": extract_core_metrics(filing),
+            # Special handling for earnings comparison
+            "earnings_comparison": filing.expectations_comparison  # Use same data
+        })
+    
+    elif filing_type == "8-K":
+        response_data.update({
+            "item_type": filing.item_type,
+            "items": filing.items,
+            "event_timeline": filing.event_timeline,
+            "event_nature_analysis": filing.event_nature_analysis,
+            "market_impact_analysis": filing.market_impact_analysis,
+            "key_considerations": filing.key_considerations,
+            "event_type": filing.event_type,
+            "event_summary": extract_event_summary(filing),
+            "event_details": {  # For backward compatibility
+                "type": filing.event_type,
+                "items": filing.items
+            }
+        })
+    
+    elif filing_type == "S-1":
+        response_data.update({
+            "ipo_details": filing.ipo_details,
+            "company_overview": filing.company_overview,
+            "financial_summary": filing.financial_summary,
+            "risk_categories": filing.risk_categories,
+            "growth_path_analysis": filing.growth_path_analysis,
+            "competitive_moat_analysis": filing.competitive_moat_analysis
+        })
+    
+    # Cache the result without view_limit_info and user_vote (since they're user-specific)
+    cache_data = response_data.copy()
     cache_data.pop("view_limit_info", None)
+    cache_data.pop("user_vote", None)
     cache.set(cache_key, cache_data, ttl=CACHE_TTL["filing_detail"])
     
-    return filing_detail
+    return response_data
+
 
 @router.get("/check-access/{filing_id}")
 async def check_filing_access(
@@ -334,3 +408,47 @@ async def get_popular_filings(
     cache.set(cache_key, result, ttl=CACHE_TTL["popular_filings"])
     
     return result
+
+
+# Helper functions
+def extract_core_metrics(filing: Filing) -> Dict[str, Any]:
+    """Extract core metrics from financial_highlights for 10-Q"""
+    if not filing.financial_highlights:
+        return None
+    
+    highlights = filing.financial_highlights
+    return {
+        "revenue": highlights.get("revenue"),
+        "net_income": highlights.get("net_income"),
+        "eps": highlights.get("eps"),
+        "operating_margin": highlights.get("operating_margin")
+    }
+
+
+def extract_event_summary(filing: Filing) -> str:
+    """Extract event summary from AI summary for 8-K"""
+    # Use first paragraph of AI summary as event summary
+    if filing.ai_summary:
+        return filing.ai_summary.split('\n')[0]
+    return None
+
+
+def extract_key_points(filing: Filing) -> List[str]:
+    """Extract key points from filing"""
+    # TODO: Implement proper extraction logic
+    # For now, return empty list
+    return []
+
+
+def extract_risks(filing: Filing) -> List[str]:
+    """Extract risks from filing"""
+    # TODO: Implement proper extraction logic
+    # For now, return empty list
+    return []
+
+
+def extract_opportunities(filing: Filing) -> List[str]:
+    """Extract opportunities from filing"""
+    # TODO: Implement proper extraction logic
+    # For now, return empty list
+    return []

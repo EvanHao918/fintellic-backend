@@ -90,6 +90,46 @@ class Filing(Base):
     filing_specific_data = Column(JSON, default={})
     chart_data = Column(JSON, default={})  # Pre-processed chart data
     
+    # ==================== NEW FIELDS FOR DIFFERENTIATED DISPLAY (Day 19) ====================
+    
+    # 10-K Specific Fields
+    auditor_opinion = Column(Text)  # Auditor's opinion text
+    three_year_financials = Column(JSON)  # 3-year financial trend data
+    business_segments = Column(JSON)  # Business segment breakdown
+    risk_summary = Column(JSON)  # Categorized risk factors
+    growth_drivers = Column(Text)  # GPT: Growth analysis
+    management_outlook = Column(Text)  # GPT: Management outlook
+    strategic_adjustments = Column(Text)  # GPT: Strategic changes
+    
+    # 10-Q Specific Fields
+    expectations_comparison = Column(JSON)  # Actual vs expected metrics
+    cost_structure = Column(JSON)  # Cost breakdown analysis
+    guidance_update = Column(JSON)  # Guidance changes
+    growth_decline_analysis = Column(Text)  # GPT: Growth/decline drivers
+    management_tone_analysis = Column(Text)  # GPT: Tone analysis
+    beat_miss_analysis = Column(Text)  # GPT: Beat/miss reasons
+    
+    # 8-K Specific Fields
+    item_type = Column(String(10))  # e.g., "5.02", "1.01"
+    items = Column(JSON)  # Array of reported items
+    event_timeline = Column(JSON)  # Event dates and timeline
+    event_nature_analysis = Column(Text)  # GPT: Event nature
+    market_impact_analysis = Column(Text)  # GPT: Market impact
+    key_considerations = Column(Text)  # GPT: Key points
+    
+    # S-1 Specific Fields
+    ipo_details = Column(JSON)  # IPO pricing, underwriters, proceeds
+    company_overview = Column(Text)  # Business description
+    financial_summary = Column(JSON)  # Pre-IPO financials
+    risk_categories = Column(JSON)  # Categorized risks
+    growth_path_analysis = Column(Text)  # GPT: Growth path
+    competitive_moat_analysis = Column(Text)  # GPT: Competitive advantage
+    
+    # Common fields
+    fiscal_year = Column(String(10))  # e.g., "2024"
+    fiscal_quarter = Column(String(10))  # e.g., "Q3 2024"
+    period_end_date = Column(DateTime(timezone=True))  # Period end date
+    
     # Relationships
     company = relationship("Company", back_populates="filings")
     comments = relationship("Comment", back_populates="filing", cascade="all, delete-orphan")

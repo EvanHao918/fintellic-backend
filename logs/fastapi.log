@@ -14529,3 +14529,642 @@ INFO:     127.0.0.1:53681 - "GET /api/v1/filings/55 HTTP/1.1" 200 OK
 2025-07-15 15:59:13,725 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
 2025-07-15 15:59:13,736 - app.services.sec_client - INFO - Found 20 10-K entries
 2025-07-15 15:59:13,737 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 15:59:17,214 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 15:59:17,281 - app.services.sec_client - INFO - Found 48 10-Q entries
+2025-07-15 15:59:17,282 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 15:59:18,315 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 15:59:18,380 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 15:59:18,381 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 15:59:22,065 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 15:59:22,094 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 15:59:22,095 - app.services.sec_client - INFO - Total entries to process: 205
+2025-07-15 15:59:22,095 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 15:59:22,095 - app.services.sec_client - INFO - Entry 1: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 15:59:22,095 - app.services.sec_client - INFO - Entry 2: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 15:59:22,095 - app.services.sec_client - INFO - Entry 3: 10-K - OneSolution Technology Inc. (0000774415) (Filer)
+2025-07-15 15:59:22,101 - app.services.sec_client - INFO - Successfully parsed 7 filings from RSS feed
+2025-07-15 15:59:22,101 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 5, '10-Q': 1, 'S-1': 1}
+2025-07-15 15:59:22,101 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 7 total
+2025-07-15 16:00:22,103 - app.services.scheduler - INFO - Starting scheduled scan #584 at 2025-07-15 16:00:22
+2025-07-15 16:00:22,104 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:00:22,105 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:00:22,105 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:00:22,105 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:00:27,740 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:00:27,771 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-15 16:00:27,771 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:00:30,509 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:00:30,546 - app.services.sec_client - INFO - Found 48 10-Q entries
+2025-07-15 16:00:30,547 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:00:32,960 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:00:33,025 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:00:33,025 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:00:34,599 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:00:34,630 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:00:34,631 - app.services.sec_client - INFO - Total entries to process: 205
+2025-07-15 16:00:34,631 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:00:34,631 - app.services.sec_client - INFO - Entry 1: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:00:34,631 - app.services.sec_client - INFO - Entry 2: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:00:34,631 - app.services.sec_client - INFO - Entry 3: 10-K - OneSolution Technology Inc. (0000774415) (Filer)
+2025-07-15 16:00:34,640 - app.services.sec_client - INFO - Successfully parsed 7 filings from RSS feed
+2025-07-15 16:00:34,640 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 5, '10-Q': 1, 'S-1': 1}
+2025-07-15 16:00:34,640 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 7 total
+2025-07-15 16:01:34,642 - app.services.scheduler - INFO - Starting scheduled scan #585 at 2025-07-15 16:01:34
+2025-07-15 16:01:34,644 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:01:34,644 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:01:34,644 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:01:34,645 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:01:37,268 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:01:37,294 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-15 16:01:37,295 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:01:38,804 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:01:38,847 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:01:38,847 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:01:39,437 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:01:39,503 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:01:39,504 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:01:41,492 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:01:41,525 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:01:41,525 - app.services.sec_client - INFO - Total entries to process: 206
+2025-07-15 16:01:41,525 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:01:41,526 - app.services.sec_client - INFO - Entry 1: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:01:41,526 - app.services.sec_client - INFO - Entry 2: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:01:41,526 - app.services.sec_client - INFO - Entry 3: 10-K - OneSolution Technology Inc. (0000774415) (Filer)
+2025-07-15 16:01:41,534 - app.services.sec_client - INFO - Successfully parsed 10 filings from RSS feed
+2025-07-15 16:01:41,535 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 7, '10-Q': 2, 'S-1': 1}
+2025-07-15 16:01:41,535 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 10 total
+2025-07-15 16:02:41,537 - app.services.scheduler - INFO - Starting scheduled scan #586 at 2025-07-15 16:02:41
+2025-07-15 16:02:41,543 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:02:41,544 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:02:41,545 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:02:41,547 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:02:44,514 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:02:44,541 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-15 16:02:44,558 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:02:45,917 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:02:45,948 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:02:45,949 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:02:46,697 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:02:46,740 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:02:46,740 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:02:49,920 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:02:49,946 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:02:49,946 - app.services.sec_client - INFO - Total entries to process: 206
+2025-07-15 16:02:49,946 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:02:49,946 - app.services.sec_client - INFO - Entry 1: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:02:49,946 - app.services.sec_client - INFO - Entry 2: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:02:49,946 - app.services.sec_client - INFO - Entry 3: 10-K - OneSolution Technology Inc. (0000774415) (Filer)
+2025-07-15 16:02:49,950 - app.services.sec_client - INFO - Successfully parsed 13 filings from RSS feed
+2025-07-15 16:02:49,950 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 10, '10-Q': 2, 'S-1': 1}
+2025-07-15 16:02:49,950 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 13 total
+2025-07-15 16:03:49,952 - app.services.scheduler - INFO - Starting scheduled scan #587 at 2025-07-15 16:03:49
+2025-07-15 16:03:49,956 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:03:49,956 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:03:49,958 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:03:49,958 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:03:52,346 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:03:52,360 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-15 16:03:52,361 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:03:53,917 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:03:53,982 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:03:53,982 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:03:55,079 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:03:55,153 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:03:55,153 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:03:57,577 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:03:57,614 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:03:57,614 - app.services.sec_client - INFO - Total entries to process: 206
+2025-07-15 16:03:57,614 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:03:57,614 - app.services.sec_client - INFO - Entry 1: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:03:57,614 - app.services.sec_client - INFO - Entry 2: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:03:57,614 - app.services.sec_client - INFO - Entry 3: 10-K - OneSolution Technology Inc. (0000774415) (Filer)
+2025-07-15 16:03:57,623 - app.services.sec_client - INFO - Successfully parsed 12 filings from RSS feed
+2025-07-15 16:03:57,623 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 9, '10-Q': 2, 'S-1': 1}
+2025-07-15 16:03:57,623 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 12 total
+2025-07-15 16:04:57,625 - app.services.scheduler - INFO - Starting scheduled scan #588 at 2025-07-15 16:04:57
+2025-07-15 16:04:57,627 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:04:57,628 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:04:57,628 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:04:57,628 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:05:00,743 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:05:00,762 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-15 16:05:00,762 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:05:05,060 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:05:05,095 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:05:05,095 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:05:05,899 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:05:05,943 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:05:05,943 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:05:08,594 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:05:08,613 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:05:08,613 - app.services.sec_client - INFO - Total entries to process: 206
+2025-07-15 16:05:08,613 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:05:08,613 - app.services.sec_client - INFO - Entry 1: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:05:08,613 - app.services.sec_client - INFO - Entry 2: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:05:08,613 - app.services.sec_client - INFO - Entry 3: 10-K - OneSolution Technology Inc. (0000774415) (Filer)
+2025-07-15 16:05:08,619 - app.services.sec_client - INFO - Successfully parsed 14 filings from RSS feed
+2025-07-15 16:05:08,619 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 11, '10-Q': 2, 'S-1': 1}
+2025-07-15 16:05:08,619 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 14 total
+2025-07-15 16:06:08,621 - app.services.scheduler - INFO - Starting scheduled scan #589 at 2025-07-15 16:06:08
+2025-07-15 16:06:08,624 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:06:08,624 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:06:08,625 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:06:08,625 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:06:12,320 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:06:12,339 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-15 16:06:12,340 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:06:13,512 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:06:13,546 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:06:13,546 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:06:14,061 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:06:14,117 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:06:14,117 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:06:16,984 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:06:17,012 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:06:17,012 - app.services.sec_client - INFO - Total entries to process: 206
+2025-07-15 16:06:17,012 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:06:17,012 - app.services.sec_client - INFO - Entry 1: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:06:17,012 - app.services.sec_client - INFO - Entry 2: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:06:17,012 - app.services.sec_client - INFO - Entry 3: 10-K - OneSolution Technology Inc. (0000774415) (Filer)
+2025-07-15 16:06:17,020 - app.services.sec_client - INFO - Successfully parsed 15 filings from RSS feed
+2025-07-15 16:06:17,020 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 13, '10-Q': 2}
+2025-07-15 16:06:17,020 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 15 total
+2025-07-15 16:07:17,021 - app.services.scheduler - INFO - Starting scheduled scan #590 at 2025-07-15 16:07:17
+2025-07-15 16:07:17,023 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:07:17,023 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:07:17,023 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:07:17,023 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:07:19,294 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:07:19,309 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:07:19,309 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:07:21,728 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:07:21,759 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:07:21,760 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:07:22,693 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:07:22,746 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:07:22,746 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:07:24,734 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:07:24,774 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:07:24,775 - app.services.sec_client - INFO - Total entries to process: 207
+2025-07-15 16:07:24,775 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:07:24,775 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:07:24,775 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:07:24,775 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:07:24,782 - app.services.sec_client - INFO - Successfully parsed 18 filings from RSS feed
+2025-07-15 16:07:24,782 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 15, '10-K': 1, '10-Q': 2}
+2025-07-15 16:07:24,783 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 18 total
+2025-07-15 16:08:24,784 - app.services.scheduler - INFO - Starting scheduled scan #591 at 2025-07-15 16:08:24
+2025-07-15 16:08:24,788 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:08:24,788 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:08:24,788 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:08:24,788 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:08:27,352 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:08:27,368 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:08:27,368 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:08:30,789 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:08:30,849 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:08:30,849 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:08:32,301 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:08:32,351 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:08:32,351 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:08:34,257 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:08:34,300 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:08:34,300 - app.services.sec_client - INFO - Total entries to process: 207
+2025-07-15 16:08:34,300 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:08:34,300 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:08:34,300 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:08:34,300 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:08:34,310 - app.services.sec_client - INFO - Successfully parsed 18 filings from RSS feed
+2025-07-15 16:08:34,310 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 15, '10-K': 1, '10-Q': 2}
+2025-07-15 16:08:34,312 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 18 total
+2025-07-15 16:09:34,314 - app.services.scheduler - INFO - Starting scheduled scan #592 at 2025-07-15 16:09:34
+2025-07-15 16:09:34,316 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:09:34,316 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:09:34,316 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:09:34,316 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:09:37,985 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:09:38,009 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:09:38,009 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:09:39,856 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:09:39,890 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:09:39,891 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:09:40,599 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:09:40,641 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:09:40,641 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:09:42,948 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:09:42,976 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:09:42,976 - app.services.sec_client - INFO - Total entries to process: 207
+2025-07-15 16:09:42,976 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:09:42,976 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:09:42,976 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:09:42,976 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:09:42,980 - app.services.sec_client - INFO - Successfully parsed 20 filings from RSS feed
+2025-07-15 16:09:42,980 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 17, '10-K': 1, '10-Q': 2}
+2025-07-15 16:09:42,980 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 20 total
+2025-07-15 16:10:42,981 - app.services.scheduler - INFO - Starting scheduled scan #593 at 2025-07-15 16:10:42
+2025-07-15 16:10:42,982 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:10:42,982 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:10:42,982 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:10:42,982 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:10:44,914 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:10:44,927 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:10:44,927 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:10:47,132 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:10:47,151 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:10:47,151 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:10:47,771 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:10:47,804 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:10:47,805 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:10:50,272 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:10:50,285 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:10:50,285 - app.services.sec_client - INFO - Total entries to process: 207
+2025-07-15 16:10:50,285 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:10:50,285 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:10:50,285 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:10:50,285 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:10:50,289 - app.services.sec_client - INFO - Successfully parsed 24 filings from RSS feed
+2025-07-15 16:10:50,289 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 21, '10-K': 1, '10-Q': 2}
+2025-07-15 16:10:50,289 - app.services.edgar_scanner - INFO - Found 0 relevant filings out of 24 total
+2025-07-15 16:11:50,290 - app.services.scheduler - INFO - Starting scheduled scan #594 at 2025-07-15 16:11:50
+2025-07-15 16:11:50,292 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:11:50,293 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:11:50,293 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:11:50,293 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:11:51,429 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:11:51,453 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:11:51,453 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:11:54,237 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:11:54,266 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:11:54,267 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:11:55,167 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:11:55,208 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:11:55,209 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:11:56,474 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:11:56,485 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:11:56,485 - app.services.sec_client - INFO - Total entries to process: 207
+2025-07-15 16:11:56,485 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:11:56,485 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:11:56,485 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:11:56,485 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:11:56,489 - app.services.sec_client - INFO - Successfully parsed 25 filings from RSS feed
+2025-07-15 16:11:56,489 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 22, '10-K': 1, '10-Q': 2}
+2025-07-15 16:11:56,489 - app.services.edgar_scanner - INFO - Found 1 relevant filings out of 25 total
+2025-07-15 16:11:56,549 - app.services.edgar_scanner - INFO - S&P 500 filing: OMC - 8-K (2025-07-15)
+2025-07-15 16:11:56,576 - app.services.edgar_scanner - INFO - New filing discovered: OMC (S&P 500) - 8-K (2025-07-15) via RSS
+2025-07-15 16:11:56,603 - app.services.edgar_scanner - INFO - ✅ Queued filing 61 for processing. Celery task ID: 8369e819-1ed1-4855-936a-b182ed3013d9
+2025-07-15 16:11:56,606 - app.services.edgar_scanner - INFO - Added 1 new filings to database
+2025-07-15 16:11:56,606 - app.services.scheduler - INFO - Scan #594 completed in 6.32s. Found 1 new filings! Total found: 17
+2025-07-15 16:11:56,606 - app.services.scheduler - INFO -   → OMC 8-K (2025-07-15) via RSS
+2025-07-15 16:12:56,607 - app.services.scheduler - INFO - Starting scheduled scan #595 at 2025-07-15 16:12:56
+2025-07-15 16:12:56,610 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:12:56,611 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:12:56,611 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:12:56,611 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:12:58,547 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:12:58,568 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:12:58,568 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:13:00,356 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:13:00,418 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:13:00,419 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:13:01,413 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:13:01,469 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:13:01,470 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:13:03,767 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:13:03,794 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:13:03,794 - app.services.sec_client - INFO - Total entries to process: 207
+2025-07-15 16:13:03,794 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:13:03,794 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:13:03,794 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:13:03,795 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:13:03,802 - app.services.sec_client - INFO - Successfully parsed 26 filings from RSS feed
+2025-07-15 16:13:03,803 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 23, '10-K': 1, '10-Q': 2}
+2025-07-15 16:13:03,803 - app.services.edgar_scanner - INFO - Found 1 relevant filings out of 26 total
+2025-07-15 16:13:03,820 - app.services.edgar_scanner - INFO - S&P 500 filing: OMC - 8-K (2025-07-15)
+2025-07-15 16:14:03,847 - app.services.scheduler - INFO - Starting scheduled scan #596 at 2025-07-15 16:14:03
+2025-07-15 16:14:03,849 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:14:03,850 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:14:03,850 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:14:03,850 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:14:05,941 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:14:05,969 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:14:05,969 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:14:08,795 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:14:08,835 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:14:08,836 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:14:09,194 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:14:09,259 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:14:09,259 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:14:11,767 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:14:11,782 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:14:11,783 - app.services.sec_client - INFO - Total entries to process: 207
+2025-07-15 16:14:11,783 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:14:11,783 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:14:11,783 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:14:11,783 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:14:11,792 - app.services.sec_client - INFO - Successfully parsed 26 filings from RSS feed
+2025-07-15 16:14:11,792 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 23, '10-K': 1, '10-Q': 2}
+2025-07-15 16:14:11,793 - app.services.edgar_scanner - INFO - Found 1 relevant filings out of 26 total
+2025-07-15 16:14:11,807 - app.services.edgar_scanner - INFO - S&P 500 filing: OMC - 8-K (2025-07-15)
+2025-07-15 16:15:11,815 - app.services.scheduler - INFO - Starting scheduled scan #597 at 2025-07-15 16:15:11
+2025-07-15 16:15:11,817 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:15:11,818 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:15:11,818 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:15:11,818 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:15:14,335 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:15:14,354 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:15:14,355 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:15:16,992 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:15:17,026 - app.services.sec_client - INFO - Found 49 10-Q entries
+2025-07-15 16:15:17,026 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:15:17,821 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:15:17,875 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:15:17,875 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:15:19,755 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:15:19,767 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:15:19,767 - app.services.sec_client - INFO - Total entries to process: 207
+2025-07-15 16:15:19,767 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:15:19,768 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:15:19,768 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:15:19,768 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:15:19,772 - app.services.sec_client - INFO - Successfully parsed 26 filings from RSS feed
+2025-07-15 16:15:19,772 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 23, '10-K': 1, '10-Q': 2}
+2025-07-15 16:15:19,772 - app.services.edgar_scanner - INFO - Found 1 relevant filings out of 26 total
+2025-07-15 16:15:19,785 - app.services.edgar_scanner - INFO - S&P 500 filing: OMC - 8-K (2025-07-15)
+2025-07-15 16:16:19,794 - app.services.scheduler - INFO - Starting scheduled scan #598 at 2025-07-15 16:16:19
+2025-07-15 16:16:19,797 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:16:19,797 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:16:19,797 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:16:19,797 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:16:22,734 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:16:22,764 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:16:22,765 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:16:25,907 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:16:25,928 - app.services.sec_client - INFO - Found 51 10-Q entries
+2025-07-15 16:16:25,928 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:16:26,420 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:16:26,487 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:16:26,487 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:16:27,797 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:16:27,833 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:16:27,834 - app.services.sec_client - INFO - Total entries to process: 209
+2025-07-15 16:16:27,834 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:16:27,834 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:16:27,834 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:16:27,834 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:16:27,842 - app.services.sec_client - INFO - Successfully parsed 39 filings from RSS feed
+2025-07-15 16:16:27,842 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 34, '10-Q': 4, '10-K': 1}
+2025-07-15 16:16:27,843 - app.services.edgar_scanner - INFO - Found 3 relevant filings out of 39 total
+2025-07-15 16:16:27,878 - app.services.edgar_scanner - INFO - S&P 500 filing: AIZ - 8-K (2025-07-15)
+2025-07-15 16:16:27,886 - app.services.edgar_scanner - INFO - S&P 500 filing: JBHT - 8-K (2025-07-15)
+2025-07-15 16:16:27,895 - app.services.edgar_scanner - INFO - S&P 500 filing: OMC - 8-K (2025-07-15)
+2025-07-15 16:16:27,917 - app.services.edgar_scanner - INFO - New filing discovered: AIZ (S&P 500) - 8-K (2025-07-15) via RSS
+2025-07-15 16:16:27,921 - app.services.edgar_scanner - INFO - ✅ Queued filing 62 for processing. Celery task ID: 104d3457-3448-4fb1-967a-c0279df3ce75
+2025-07-15 16:16:27,925 - app.services.edgar_scanner - INFO - New filing discovered: JBHT (S&P 500) - 8-K (2025-07-15) via RSS
+2025-07-15 16:16:27,926 - app.services.edgar_scanner - INFO - ✅ Queued filing 63 for processing. Celery task ID: 4b1250d4-77f7-4171-a43e-1ec6e740135c
+2025-07-15 16:16:27,928 - app.services.edgar_scanner - INFO - Added 2 new filings to database
+2025-07-15 16:16:27,929 - app.services.scheduler - INFO - Scan #598 completed in 8.14s. Found 2 new filings! Total found: 19
+2025-07-15 16:16:27,929 - app.services.scheduler - INFO -   → AIZ 8-K (2025-07-15) via RSS
+2025-07-15 16:16:27,929 - app.services.scheduler - INFO -   → JBHT 8-K (2025-07-15) via RSS
+2025-07-15 16:17:27,930 - app.services.scheduler - INFO - Starting scheduled scan #599 at 2025-07-15 16:17:27
+2025-07-15 16:17:27,934 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:17:27,934 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:17:27,934 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:17:27,934 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:17:29,265 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:17:29,274 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:17:29,275 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:17:32,058 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:17:32,117 - app.services.sec_client - INFO - Found 52 10-Q entries
+2025-07-15 16:17:32,117 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:17:32,249 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:17:32,285 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:17:32,285 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:17:35,508 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:17:35,544 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:17:35,545 - app.services.sec_client - INFO - Total entries to process: 210
+2025-07-15 16:17:35,545 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:17:35,545 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:17:35,545 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:17:35,545 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:17:35,554 - app.services.sec_client - INFO - Successfully parsed 40 filings from RSS feed
+2025-07-15 16:17:35,554 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 34, '10-Q': 5, '10-K': 1}
+2025-07-15 16:17:35,555 - app.services.edgar_scanner - INFO - Found 3 relevant filings out of 40 total
+2025-07-15 16:17:35,590 - app.services.edgar_scanner - INFO - S&P 500 filing: AIZ - 8-K (2025-07-15)
+2025-07-15 16:17:35,598 - app.services.edgar_scanner - INFO - S&P 500 filing: JBHT - 8-K (2025-07-15)
+2025-07-15 16:17:35,606 - app.services.edgar_scanner - INFO - S&P 500 filing: OMC - 8-K (2025-07-15)
+2025-07-15 16:18:35,619 - app.services.scheduler - INFO - Starting scheduled scan #600 at 2025-07-15 16:18:35
+2025-07-15 16:18:35,622 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:18:35,622 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:18:35,622 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:18:35,622 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:18:37,903 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:18:37,920 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:18:37,920 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:18:39,918 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:18:39,953 - app.services.sec_client - INFO - Found 52 10-Q entries
+2025-07-15 16:18:39,953 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:18:40,669 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:18:40,741 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:18:40,741 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:18:43,230 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:18:43,264 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:18:43,264 - app.services.sec_client - INFO - Total entries to process: 210
+2025-07-15 16:18:43,264 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:18:43,264 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:18:43,265 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:18:43,265 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:18:43,273 - app.services.sec_client - INFO - Successfully parsed 43 filings from RSS feed
+2025-07-15 16:18:43,273 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 37, '10-Q': 5, '10-K': 1}
+2025-07-15 16:18:43,274 - app.services.edgar_scanner - INFO - Found 3 relevant filings out of 43 total
+2025-07-15 16:18:43,291 - app.services.edgar_scanner - INFO - S&P 500 filing: AIZ - 8-K (2025-07-15)
+2025-07-15 16:18:43,300 - app.services.edgar_scanner - INFO - S&P 500 filing: JBHT - 8-K (2025-07-15)
+2025-07-15 16:18:43,309 - app.services.edgar_scanner - INFO - S&P 500 filing: OMC - 8-K (2025-07-15)
+2025-07-15 16:19:43,321 - app.services.scheduler - INFO - Starting scheduled scan #601 at 2025-07-15 16:19:43
+2025-07-15 16:19:43,323 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:19:43,323 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:19:43,323 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:19:43,324 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:19:45,245 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:19:45,272 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:19:45,273 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:19:46,512 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:19:46,543 - app.services.sec_client - INFO - Found 52 10-Q entries
+2025-07-15 16:19:46,543 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:19:46,986 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:19:47,028 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:19:47,029 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:19:49,128 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:19:49,161 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:19:49,162 - app.services.sec_client - INFO - Total entries to process: 210
+2025-07-15 16:19:49,162 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:19:49,162 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:19:49,162 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:19:49,162 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:19:49,170 - app.services.sec_client - INFO - Successfully parsed 44 filings from RSS feed
+2025-07-15 16:19:49,171 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 38, '10-Q': 5, '10-K': 1}
+2025-07-15 16:19:49,171 - app.services.edgar_scanner - INFO - Found 3 relevant filings out of 44 total
+2025-07-15 16:19:49,227 - app.services.edgar_scanner - INFO - S&P 500 filing: AIZ - 8-K (2025-07-15)
+2025-07-15 16:19:49,236 - app.services.edgar_scanner - INFO - S&P 500 filing: JBHT - 8-K (2025-07-15)
+2025-07-15 16:19:49,244 - app.services.edgar_scanner - INFO - S&P 500 filing: OMC - 8-K (2025-07-15)
+2025-07-15 16:20:49,258 - app.services.scheduler - INFO - Starting scheduled scan #602 at 2025-07-15 16:20:49
+2025-07-15 16:20:49,261 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:20:49,262 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:20:49,262 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:20:49,263 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:20:52,171 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:20:52,194 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:20:52,195 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:20:54,676 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:20:54,704 - app.services.sec_client - INFO - Found 52 10-Q entries
+2025-07-15 16:20:54,704 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:20:55,471 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:20:55,515 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:20:55,516 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:20:59,001 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:20:59,031 - app.services.sec_client - INFO - Found 37 S-1 entries
+2025-07-15 16:20:59,031 - app.services.sec_client - INFO - Total entries to process: 210
+2025-07-15 16:20:59,031 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:20:59,031 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:20:59,031 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:20:59,031 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:20:59,035 - app.services.sec_client - INFO - Successfully parsed 44 filings from RSS feed
+2025-07-15 16:20:59,035 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 38, '10-Q': 5, '10-K': 1}
+2025-07-15 16:20:59,035 - app.services.edgar_scanner - INFO - Found 3 relevant filings out of 44 total
+2025-07-15 16:20:59,046 - app.services.edgar_scanner - INFO - S&P 500 filing: AIZ - 8-K (2025-07-15)
+2025-07-15 16:20:59,054 - app.services.edgar_scanner - INFO - S&P 500 filing: JBHT - 8-K (2025-07-15)
+2025-07-15 16:20:59,061 - app.services.edgar_scanner - INFO - S&P 500 filing: OMC - 8-K (2025-07-15)
+2025-07-15 16:21:59,073 - app.services.scheduler - INFO - Starting scheduled scan #603 at 2025-07-15 16:21:59
+2025-07-15 16:21:59,075 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:21:59,075 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:21:59,075 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:21:59,075 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:22:00,540 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:22:00,567 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:22:00,568 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:22:02,594 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:22:02,667 - app.services.sec_client - INFO - Found 52 10-Q entries
+2025-07-15 16:22:02,668 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:22:03,818 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:22:03,882 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:22:03,882 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:22:06,699 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:22:06,737 - app.services.sec_client - INFO - Found 38 S-1 entries
+2025-07-15 16:22:06,737 - app.services.sec_client - INFO - Total entries to process: 211
+2025-07-15 16:22:06,737 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:22:06,737 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:22:06,737 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:22:06,737 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:22:06,746 - app.services.sec_client - INFO - Successfully parsed 48 filings from RSS feed
+2025-07-15 16:22:06,746 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 42, 'S-1': 1, '10-Q': 4, '10-K': 1}
+2025-07-15 16:22:06,747 - app.services.edgar_scanner - INFO - Found 4 relevant filings out of 48 total
+2025-07-15 16:22:06,779 - app.services.edgar_scanner - INFO - S&P 500 filing: PRU - 8-K (2025-07-15)
+2025-07-15 16:22:06,786 - app.services.edgar_scanner - INFO - S&P 500 filing: AIZ - 8-K (2025-07-15)
+2025-07-15 16:22:06,795 - app.services.edgar_scanner - INFO - S&P 500 filing: JBHT - 8-K (2025-07-15)
+2025-07-15 16:23:06,812 - app.services.scheduler - INFO - Starting scheduled scan #604 at 2025-07-15 16:23:06
+2025-07-15 16:23:06,815 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:23:06,815 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:23:06,816 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:23:06,816 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:23:09,986 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:23:10,022 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:23:10,023 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:23:12,544 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:23:12,590 - app.services.sec_client - INFO - Found 52 10-Q entries
+2025-07-15 16:23:12,590 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:23:13,259 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:23:13,323 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:23:13,323 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:23:16,239 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:23:16,273 - app.services.sec_client - INFO - Found 38 S-1 entries
+2025-07-15 16:23:16,274 - app.services.sec_client - INFO - Total entries to process: 211
+2025-07-15 16:23:16,274 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:23:16,274 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:23:16,274 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:23:16,274 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:23:16,283 - app.services.sec_client - INFO - Successfully parsed 48 filings from RSS feed
+2025-07-15 16:23:16,283 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 42, 'S-1': 1, '10-Q': 4, '10-K': 1}
+2025-07-15 16:23:16,283 - app.services.edgar_scanner - INFO - Found 4 relevant filings out of 48 total
+2025-07-15 16:23:16,301 - app.services.edgar_scanner - INFO - S&P 500 filing: PRU - 8-K (2025-07-15)
+2025-07-15 16:23:16,313 - app.services.edgar_scanner - INFO - S&P 500 filing: AIZ - 8-K (2025-07-15)
+2025-07-15 16:23:16,321 - app.services.edgar_scanner - INFO - S&P 500 filing: JBHT - 8-K (2025-07-15)
+2025-07-15 16:24:16,335 - app.services.scheduler - INFO - Starting scheduled scan #605 at 2025-07-15 16:24:16
+2025-07-15 16:24:16,339 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:24:16,339 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:24:16,339 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:24:16,339 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:24:17,930 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:24:17,956 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:24:17,956 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:24:21,186 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:24:21,233 - app.services.sec_client - INFO - Found 52 10-Q entries
+2025-07-15 16:24:21,233 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:24:21,971 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:24:22,037 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:24:22,037 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:24:24,122 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:24:24,161 - app.services.sec_client - INFO - Found 38 S-1 entries
+2025-07-15 16:24:24,161 - app.services.sec_client - INFO - Total entries to process: 211
+2025-07-15 16:24:24,161 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:24:24,161 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:24:24,161 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:24:24,161 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:24:24,170 - app.services.sec_client - INFO - Successfully parsed 48 filings from RSS feed
+2025-07-15 16:24:24,170 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 42, 'S-1': 1, '10-Q': 4, '10-K': 1}
+2025-07-15 16:24:24,170 - app.services.edgar_scanner - INFO - Found 4 relevant filings out of 48 total
+2025-07-15 16:24:24,188 - app.services.edgar_scanner - INFO - S&P 500 filing: PRU - 8-K (2025-07-15)
+2025-07-15 16:24:24,200 - app.services.edgar_scanner - INFO - S&P 500 filing: AIZ - 8-K (2025-07-15)
+2025-07-15 16:24:24,208 - app.services.edgar_scanner - INFO - S&P 500 filing: JBHT - 8-K (2025-07-15)
+2025-07-15 16:25:24,221 - app.services.scheduler - INFO - Starting scheduled scan #606 at 2025-07-15 16:25:24
+2025-07-15 16:25:24,224 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:25:24,224 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:25:24,225 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:25:24,225 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:25:26,557 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:25:26,596 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:25:26,597 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:25:29,794 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:25:29,837 - app.services.sec_client - INFO - Found 52 10-Q entries
+2025-07-15 16:25:29,837 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:25:30,534 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:25:30,600 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:25:30,600 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:25:33,243 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:25:33,278 - app.services.sec_client - INFO - Found 38 S-1 entries
+2025-07-15 16:25:33,279 - app.services.sec_client - INFO - Total entries to process: 211
+2025-07-15 16:25:33,279 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:25:33,279 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:25:33,279 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:25:33,279 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:25:33,288 - app.services.sec_client - INFO - Successfully parsed 49 filings from RSS feed
+2025-07-15 16:25:33,288 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 43, 'S-1': 1, '10-Q': 4, '10-K': 1}
+2025-07-15 16:25:33,288 - app.services.edgar_scanner - INFO - Found 4 relevant filings out of 49 total
+2025-07-15 16:25:33,324 - app.services.edgar_scanner - INFO - S&P 500 filing: PRU - 8-K (2025-07-15)
+2025-07-15 16:25:33,334 - app.services.edgar_scanner - INFO - S&P 500 filing: AIZ - 8-K (2025-07-15)
+2025-07-15 16:25:33,344 - app.services.edgar_scanner - INFO - S&P 500 filing: JBHT - 8-K (2025-07-15)
+2025-07-15 16:26:33,360 - app.services.scheduler - INFO - Starting scheduled scan #607 at 2025-07-15 16:26:33
+2025-07-15 16:26:33,364 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-15 16:26:33,364 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-15 16:26:33,365 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-15 16:26:33,365 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-15 16:26:37,551 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-15 16:26:37,576 - app.services.sec_client - INFO - Found 21 10-K entries
+2025-07-15 16:26:37,577 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-15 16:26:41,238 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-15 16:26:41,327 - app.services.sec_client - INFO - Found 52 10-Q entries
+2025-07-15 16:26:41,328 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-15 16:26:42,467 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-15 16:26:42,531 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-15 16:26:42,531 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-15 16:26:44,207 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-15 16:26:44,243 - app.services.sec_client - INFO - Found 38 S-1 entries
+2025-07-15 16:26:44,243 - app.services.sec_client - INFO - Total entries to process: 211
+2025-07-15 16:26:44,243 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-15 16:26:44,243 - app.services.sec_client - INFO - Entry 1: 10-K - International Media Acquisition Corp. (0001846235) (Filer)
+2025-07-15 16:26:44,243 - app.services.sec_client - INFO - Entry 2: 10-K - LSEB Creative Corp. (0001888740) (Filer)
+2025-07-15 16:26:44,244 - app.services.sec_client - INFO - Entry 3: 10-K - Graphene & Solar Technologies Ltd (0001497649) (Filer)
+2025-07-15 16:26:44,252 - app.services.sec_client - INFO - Successfully parsed 49 filings from RSS feed
+2025-07-15 16:26:44,253 - app.services.sec_client - INFO - Filing breakdown: {'8-K': 43, 'S-1': 1, '10-Q': 4, '10-K': 1}
+2025-07-15 16:26:44,253 - app.services.edgar_scanner - INFO - Found 4 relevant filings out of 49 total
+2025-07-15 16:26:44,296 - app.services.edgar_scanner - INFO - S&P 500 filing: PRU - 8-K (2025-07-15)
+2025-07-15 16:26:44,318 - app.services.edgar_scanner - INFO - S&P 500 filing: AIZ - 8-K (2025-07-15)
+2025-07-15 16:26:44,327 - app.services.edgar_scanner - INFO - S&P 500 filing: JBHT - 8-K (2025-07-15)

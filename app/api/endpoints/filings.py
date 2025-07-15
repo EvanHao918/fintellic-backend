@@ -11,7 +11,7 @@ from sqlalchemy import desc
 from app.api import deps
 from app.models.filing import Filing, ProcessingStatus
 from app.models.company import Company
-from app.models.user import UserVote
+from app.models import UserVote
 from app.services.view_tracking import ViewTrackingService
 from app.schemas.filing import FilingBrief, FilingDetail, FilingList
 from app.schemas.company import CompanyBrief

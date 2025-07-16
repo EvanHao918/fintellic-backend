@@ -78,12 +78,13 @@ async def get_filings(
             filing_date=filing.filing_date,
             accession_number=filing.accession_number,
             file_url=filing.primary_doc_url or "",
-            company=CompanyBrief(
-                id=filing.company.id,
-                name=filing.company.name,
-                ticker=filing.company.ticker,
-                cik=filing.company.cik
-            ),
+            company={
+                "id": filing.company.id,
+                "name": filing.company.name,
+                "ticker": filing.company.ticker,
+                "cik": filing.company.cik,
+                "sector": filing.company.sector if hasattr(filing.company, 'sector') else None
+            },
             one_liner=filing.ai_summary[:100] + "..." if filing.ai_summary else None,
             sentiment=filing.management_tone.value if filing.management_tone else None,
             tags=filing.key_tags or [],
@@ -106,7 +107,7 @@ async def get_filings(
     return result
 
 
-@router.get("/{filing_id}", response_model=FilingDetail)
+@router.get("/{filing_id}")
 async def get_filing(
     filing_id: int,
     include_charts: bool = Query(True, description="Include chart data in response"),
@@ -166,10 +167,14 @@ async def get_filing(
         
         return cached_result
     
-    # Get from database
+    # Get from database with company joined
     filing = db.query(Filing).options(joinedload(Filing.company)).filter(Filing.id == filing_id).first()
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")
+    
+    # Ensure company is loaded
+    if not filing.company:
+        raise HTTPException(status_code=500, detail="Filing company data not found")
     
     # Record view for free users
     if not view_check["is_pro"]:
@@ -203,7 +208,13 @@ async def get_filing(
         "accession_number": filing.accession_number,
         "file_url": filing.primary_doc_url or "",
         "cik": filing.company.cik,
-        "company": CompanyBrief.from_orm(filing.company),
+        "company": {
+            "ticker": filing.company.ticker,
+            "name": filing.company.name,
+            "cik": filing.company.cik,
+            "id": filing.company.id,
+            "sector": filing.company.sector if hasattr(filing.company, 'sector') else None
+        },
         "status": filing.status.value,
         "ai_summary": filing.ai_summary,
         "one_liner": filing.ai_summary[:100] + "..." if filing.ai_summary else None,

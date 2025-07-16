@@ -4,7 +4,7 @@ Company schemas for API requests and responses
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class CompanyBase(BaseModel):
@@ -19,8 +19,7 @@ class CompanyBrief(CompanyBase):
     id: int
     sector: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CompanyDetail(CompanyBase):
@@ -54,8 +53,7 @@ class CompanyDetail(CompanyBase):
     total_filings: int = 0
     is_watched: bool = False  # Will be set based on current user
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CompanyList(BaseModel):

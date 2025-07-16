@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-from app.schemas.company import CompanyBrief
+# 注意：不再导入 CompanyBrief，因为我们将使用字典
 
 
 class FilingBase(BaseModel):
@@ -19,7 +19,7 @@ class FilingBase(BaseModel):
 class FilingBrief(FilingBase):
     """Brief filing info for lists"""
     id: int
-    company: CompanyBrief
+    company: Dict[str, Any]  # 改为字典类型
     one_liner: Optional[str] = None
     sentiment: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
@@ -38,7 +38,7 @@ class FilingBrief(FilingBase):
 class Filing10KDetail(FilingBase):
     """10-K specific detail schema"""
     id: int
-    company: CompanyBrief
+    company: Dict[str, Any]  # 改为字典类型
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -53,6 +53,7 @@ class Filing10KDetail(FilingBase):
     growth_drivers: Optional[str] = None
     management_outlook: Optional[str] = None
     strategic_adjustments: Optional[str] = None
+    market_impact_10k: Optional[str] = None  # ✨ NEW - GPT: 潜在市场影响
     
     # Financial highlights
     financial_highlights: Optional[Dict[str, Any]] = None
@@ -69,7 +70,7 @@ class Filing10KDetail(FilingBase):
 class Filing10QDetail(FilingBase):
     """10-Q specific detail schema"""
     id: int
-    company: CompanyBrief
+    company: Dict[str, Any]  # 改为字典类型
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -83,6 +84,7 @@ class Filing10QDetail(FilingBase):
     growth_decline_analysis: Optional[str] = None
     management_tone_analysis: Optional[str] = None
     beat_miss_analysis: Optional[str] = None
+    market_impact_10q: Optional[str] = None  # ✨ NEW - GPT: 潜在市场影响
     
     # Core metrics
     core_metrics: Optional[Dict[str, Any]] = None
@@ -99,7 +101,7 @@ class Filing10QDetail(FilingBase):
 class Filing8KDetail(FilingBase):
     """8-K specific detail schema"""
     id: int
-    company: CompanyBrief
+    company: Dict[str, Any]  # 改为字典类型
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -128,7 +130,7 @@ class Filing8KDetail(FilingBase):
 class FilingS1Detail(FilingBase):
     """S-1 specific detail schema"""
     id: int
-    company: CompanyBrief
+    company: Dict[str, Any]  # 改为字典类型
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -154,7 +156,7 @@ class FilingDetail(FilingBase):
     """Detailed filing info with all possible fields for backward compatibility"""
     id: int
     cik: str
-    company: CompanyBrief
+    company: Dict[str, Any]  # 改为字典类型
     status: str
     
     # AI-generated content
@@ -200,6 +202,7 @@ class FilingDetail(FilingBase):
     growth_drivers: Optional[str] = None
     management_outlook: Optional[str] = None
     strategic_adjustments: Optional[str] = None
+    market_impact_10k: Optional[str] = None  # ✨ NEW
     
     # 10-Q specific fields
     expectations_comparison: Optional[Dict[str, Any]] = None
@@ -209,6 +212,7 @@ class FilingDetail(FilingBase):
     management_tone_analysis: Optional[str] = None
     beat_miss_analysis: Optional[str] = None
     core_metrics: Optional[Dict[str, Any]] = None
+    market_impact_10q: Optional[str] = None  # ✨ NEW
     
     # 8-K specific fields
     item_type: Optional[str] = None

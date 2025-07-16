@@ -100,6 +100,7 @@ class Filing(Base):
     growth_drivers = Column(Text)  # GPT: Growth analysis
     management_outlook = Column(Text)  # GPT: Management outlook
     strategic_adjustments = Column(Text)  # GPT: Strategic changes
+    market_impact_10k = Column(Text)  # GPT: 10-K 潜在市场影响 ✨ NEW
     
     # 10-Q Specific Fields
     expectations_comparison = Column(JSON)  # Actual vs expected metrics
@@ -108,6 +109,7 @@ class Filing(Base):
     growth_decline_analysis = Column(Text)  # GPT: Growth/decline drivers
     management_tone_analysis = Column(Text)  # GPT: Tone analysis
     beat_miss_analysis = Column(Text)  # GPT: Beat/miss reasons
+    market_impact_10q = Column(Text)  # GPT: 10-Q 潜在市场影响 ✨ NEW
     
     # 8-K Specific Fields
     item_type = Column(String(10))  # e.g., "5.02", "1.01"

@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
+import traceback
 
 # Import routers
 from app.api.api import api_router
@@ -53,11 +55,42 @@ app.add_middleware(
         "*"  # Allow all origins in development
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
+
+# Add global exception handler to ensure CORS headers are included in error responses
+@app.exception_handler(Exception)
+async def universal_exception_handler(request: Request, exc: Exception):
+    """Handle all exceptions and ensure CORS headers are included"""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    
+    # Get detailed error information for debugging
+    error_detail = str(exc)
+    error_type = type(exc).__name__
+    
+    # In development, include more detailed error information
+    if app.debug or logger.level <= logging.DEBUG:
+        error_trace = traceback.format_exc()
+        logger.error(f"Traceback:\n{error_trace}")
+    
+    # Return JSON response with CORS headers
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "error": error_type,
+            "message": error_detail if app.debug else "An error occurred processing your request"
+        },
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
 
 # Root endpoint
 @app.get("/")

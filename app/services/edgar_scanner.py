@@ -276,10 +276,17 @@ class EDGARScanner:
             is_sp500 = False
             is_nasdaq100 = False
         
+        # Check if we have a valid ticker
+        ticker = company_info.get("ticker")
+        if not ticker or ticker == f"CIK{cik}":
+            # Skip companies without real tickers (likely funds, trusts, etc.)
+            logger.info(f"Skipping company without ticker: {company_info.get('name', company_name)} (CIK: {cik})")
+            return None
+        
         # Create new company record
         company = Company(
             cik=cik,
-            ticker=company_info.get("ticker", f"CIK{cik}"),
+            ticker=ticker,
             name=company_info.get("name", company_name),
             legal_name=company_info.get("name", company_name),
             sic=company_info.get("sic"),

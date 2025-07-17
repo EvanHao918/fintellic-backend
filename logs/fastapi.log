@@ -5469,3 +5469,210 @@ INFO:     127.0.0.1:52909 - "GET /api/v1/filings/63/comments HTTP/1.1" 200 OK
 2025-07-16 19:57:35,211 - app.services.sec_client - INFO - Entry 3: 10-K - Agentix Corp. (0001603345) (Filer)
 2025-07-16 19:57:35,217 - app.services.sec_client - INFO - Successfully parsed 0 filings from RSS feed
 2025-07-16 19:57:35,218 - app.services.edgar_scanner - INFO - No new filings found in RSS feed
+2025-07-16 19:58:35,219 - app.services.scheduler - INFO - Starting scheduled scan #221 at 2025-07-16 19:58:35
+2025-07-16 19:58:35,221 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-16 19:58:35,221 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-16 19:58:35,222 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-16 19:58:35,222 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-16 19:58:35,468 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-16 19:58:35,495 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-16 19:58:35,495 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-16 19:58:35,621 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-16 19:58:35,655 - app.services.sec_client - INFO - Found 55 10-Q entries
+2025-07-16 19:58:35,656 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-16 19:58:35,765 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-16 19:58:35,807 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-16 19:58:35,808 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-16 19:58:35,920 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-16 19:58:35,935 - app.services.sec_client - INFO - Found 39 S-1 entries
+2025-07-16 19:58:35,935 - app.services.sec_client - INFO - Total entries to process: 214
+2025-07-16 19:58:35,935 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-16 19:58:35,935 - app.services.sec_client - INFO - Entry 1: 10-K/A - ORAMED PHARMACEUTICALS INC. (0001176309) (Filer)
+2025-07-16 19:58:35,935 - app.services.sec_client - INFO - Entry 2: 10-K - P2 Solar, Inc. (0001172069) (Filer)
+2025-07-16 19:58:35,935 - app.services.sec_client - INFO - Entry 3: 10-K - Agentix Corp. (0001603345) (Filer)
+2025-07-16 19:58:35,940 - app.services.sec_client - INFO - Successfully parsed 0 filings from RSS feed
+2025-07-16 19:58:35,940 - app.services.edgar_scanner - INFO - No new filings found in RSS feed
+2025-07-16 19:59:35,941 - app.services.scheduler - INFO - Starting scheduled scan #222 at 2025-07-16 19:59:35
+2025-07-16 19:59:35,943 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-16 19:59:35,943 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-16 19:59:35,944 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-16 19:59:35,944 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-16 19:59:36,156 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-16 19:59:36,170 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-16 19:59:36,170 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-16 19:59:36,324 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-16 19:59:36,353 - app.services.sec_client - INFO - Found 55 10-Q entries
+2025-07-16 19:59:36,353 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-16 19:59:36,448 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-16 19:59:36,491 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-16 19:59:36,491 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-16 19:59:36,600 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-16 19:59:36,613 - app.services.sec_client - INFO - Found 39 S-1 entries
+2025-07-16 19:59:36,614 - app.services.sec_client - INFO - Total entries to process: 214
+2025-07-16 19:59:36,614 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-16 19:59:36,614 - app.services.sec_client - INFO - Entry 1: 10-K/A - ORAMED PHARMACEUTICALS INC. (0001176309) (Filer)
+2025-07-16 19:59:36,614 - app.services.sec_client - INFO - Entry 2: 10-K - P2 Solar, Inc. (0001172069) (Filer)
+2025-07-16 19:59:36,614 - app.services.sec_client - INFO - Entry 3: 10-K - Agentix Corp. (0001603345) (Filer)
+2025-07-16 19:59:36,619 - app.services.sec_client - INFO - Successfully parsed 0 filings from RSS feed
+2025-07-16 19:59:36,619 - app.services.edgar_scanner - INFO - No new filings found in RSS feed
+2025-07-16 20:00:36,624 - app.services.scheduler - INFO - Starting scheduled scan #223 at 2025-07-16 20:00:36
+2025-07-16 20:00:36,629 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-16 20:00:36,630 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-16 20:00:36,631 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-16 20:00:36,631 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-16 20:00:36,848 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-16 20:00:36,870 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-16 20:00:36,870 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-16 20:00:37,019 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-16 20:00:37,057 - app.services.sec_client - INFO - Found 55 10-Q entries
+2025-07-16 20:00:37,057 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-16 20:00:37,183 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-16 20:00:37,227 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-16 20:00:37,227 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-16 20:00:37,375 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-16 20:00:37,396 - app.services.sec_client - INFO - Found 39 S-1 entries
+2025-07-16 20:00:37,396 - app.services.sec_client - INFO - Total entries to process: 214
+2025-07-16 20:00:37,396 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-16 20:00:37,396 - app.services.sec_client - INFO - Entry 1: 10-K/A - ORAMED PHARMACEUTICALS INC. (0001176309) (Filer)
+2025-07-16 20:00:37,396 - app.services.sec_client - INFO - Entry 2: 10-K - P2 Solar, Inc. (0001172069) (Filer)
+2025-07-16 20:00:37,396 - app.services.sec_client - INFO - Entry 3: 10-K - Agentix Corp. (0001603345) (Filer)
+2025-07-16 20:00:37,402 - app.services.sec_client - INFO - Successfully parsed 0 filings from RSS feed
+2025-07-16 20:00:37,403 - app.services.edgar_scanner - INFO - No new filings found in RSS feed
+2025-07-16 20:01:37,404 - app.services.scheduler - INFO - Starting scheduled scan #224 at 2025-07-16 20:01:37
+2025-07-16 20:01:37,406 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-16 20:01:37,406 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-16 20:01:37,409 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-16 20:01:37,410 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-16 20:01:37,631 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-16 20:01:37,656 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-16 20:01:37,656 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-16 20:01:37,793 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-16 20:01:37,828 - app.services.sec_client - INFO - Found 55 10-Q entries
+2025-07-16 20:01:37,829 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-16 20:01:37,924 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-16 20:01:37,961 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-16 20:01:37,962 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-16 20:01:38,081 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-16 20:01:38,097 - app.services.sec_client - INFO - Found 39 S-1 entries
+2025-07-16 20:01:38,097 - app.services.sec_client - INFO - Total entries to process: 214
+2025-07-16 20:01:38,097 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-16 20:01:38,097 - app.services.sec_client - INFO - Entry 1: 10-K/A - ORAMED PHARMACEUTICALS INC. (0001176309) (Filer)
+2025-07-16 20:01:38,097 - app.services.sec_client - INFO - Entry 2: 10-K - P2 Solar, Inc. (0001172069) (Filer)
+2025-07-16 20:01:38,097 - app.services.sec_client - INFO - Entry 3: 10-K - Agentix Corp. (0001603345) (Filer)
+2025-07-16 20:01:38,103 - app.services.sec_client - INFO - Successfully parsed 0 filings from RSS feed
+2025-07-16 20:01:38,103 - app.services.edgar_scanner - INFO - No new filings found in RSS feed
+2025-07-16 20:02:38,102 - app.services.scheduler - INFO - Starting scheduled scan #225 at 2025-07-16 20:02:38
+2025-07-16 20:02:38,102 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-16 20:02:38,102 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-16 20:02:38,103 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-16 20:02:38,103 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-16 20:02:38,304 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-16 20:02:38,310 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-16 20:02:38,311 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-16 20:02:38,455 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-16 20:02:38,471 - app.services.sec_client - INFO - Found 55 10-Q entries
+2025-07-16 20:02:38,471 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-16 20:02:38,590 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-16 20:02:38,659 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-16 20:02:38,660 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-16 20:02:38,811 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-16 20:02:38,839 - app.services.sec_client - INFO - Found 39 S-1 entries
+2025-07-16 20:02:38,840 - app.services.sec_client - INFO - Total entries to process: 214
+2025-07-16 20:02:38,840 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-16 20:02:38,840 - app.services.sec_client - INFO - Entry 1: 10-K/A - ORAMED PHARMACEUTICALS INC. (0001176309) (Filer)
+2025-07-16 20:02:38,840 - app.services.sec_client - INFO - Entry 2: 10-K - P2 Solar, Inc. (0001172069) (Filer)
+2025-07-16 20:02:38,840 - app.services.sec_client - INFO - Entry 3: 10-K - Agentix Corp. (0001603345) (Filer)
+2025-07-16 20:02:38,848 - app.services.sec_client - INFO - Successfully parsed 0 filings from RSS feed
+2025-07-16 20:02:38,849 - app.services.edgar_scanner - INFO - No new filings found in RSS feed
+2025-07-16 20:03:38,850 - app.services.scheduler - INFO - Starting scheduled scan #226 at 2025-07-16 20:03:38
+2025-07-16 20:03:38,852 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-16 20:03:38,852 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-16 20:03:38,852 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-16 20:03:38,852 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-16 20:03:39,426 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-16 20:03:39,446 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-16 20:03:39,447 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-16 20:03:39,645 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-16 20:03:39,675 - app.services.sec_client - INFO - Found 55 10-Q entries
+2025-07-16 20:03:39,676 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-16 20:03:39,805 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-16 20:03:39,865 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-16 20:03:39,865 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-16 20:03:40,012 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-16 20:03:40,029 - app.services.sec_client - INFO - Found 39 S-1 entries
+2025-07-16 20:03:40,029 - app.services.sec_client - INFO - Total entries to process: 214
+2025-07-16 20:03:40,029 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-16 20:03:40,029 - app.services.sec_client - INFO - Entry 1: 10-K/A - ORAMED PHARMACEUTICALS INC. (0001176309) (Filer)
+2025-07-16 20:03:40,029 - app.services.sec_client - INFO - Entry 2: 10-K - P2 Solar, Inc. (0001172069) (Filer)
+2025-07-16 20:03:40,029 - app.services.sec_client - INFO - Entry 3: 10-K - Agentix Corp. (0001603345) (Filer)
+2025-07-16 20:03:40,035 - app.services.sec_client - INFO - Successfully parsed 0 filings from RSS feed
+2025-07-16 20:03:40,036 - app.services.edgar_scanner - INFO - No new filings found in RSS feed
+2025-07-16 20:04:40,037 - app.services.scheduler - INFO - Starting scheduled scan #227 at 2025-07-16 20:04:40
+2025-07-16 20:04:40,039 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-16 20:04:40,039 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-16 20:04:40,040 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-16 20:04:40,040 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-16 20:04:40,437 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-16 20:04:40,493 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-16 20:04:40,493 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-16 20:04:40,660 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-16 20:04:40,694 - app.services.sec_client - INFO - Found 55 10-Q entries
+2025-07-16 20:04:40,695 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-16 20:04:40,825 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-16 20:04:40,864 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-16 20:04:40,864 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-16 20:04:41,019 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-16 20:04:41,042 - app.services.sec_client - INFO - Found 39 S-1 entries
+2025-07-16 20:04:41,042 - app.services.sec_client - INFO - Total entries to process: 214
+2025-07-16 20:04:41,042 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-16 20:04:41,042 - app.services.sec_client - INFO - Entry 1: 10-K/A - ORAMED PHARMACEUTICALS INC. (0001176309) (Filer)
+2025-07-16 20:04:41,042 - app.services.sec_client - INFO - Entry 2: 10-K - P2 Solar, Inc. (0001172069) (Filer)
+2025-07-16 20:04:41,042 - app.services.sec_client - INFO - Entry 3: 10-K - Agentix Corp. (0001603345) (Filer)
+2025-07-16 20:04:41,046 - app.services.sec_client - INFO - Successfully parsed 0 filings from RSS feed
+2025-07-16 20:04:41,046 - app.services.edgar_scanner - INFO - No new filings found in RSS feed
+2025-07-16 20:05:41,046 - app.services.scheduler - INFO - Starting scheduled scan #228 at 2025-07-16 20:05:41
+2025-07-16 20:05:41,048 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-16 20:05:41,048 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-16 20:05:41,048 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-16 20:05:41,049 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-16 20:05:41,230 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-16 20:05:41,243 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-16 20:05:41,243 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-16 20:05:41,414 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-16 20:05:41,442 - app.services.sec_client - INFO - Found 55 10-Q entries
+2025-07-16 20:05:41,442 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-16 20:05:41,560 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-16 20:05:41,596 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-16 20:05:41,596 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-16 20:05:41,776 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-16 20:05:41,797 - app.services.sec_client - INFO - Found 39 S-1 entries
+2025-07-16 20:05:41,798 - app.services.sec_client - INFO - Total entries to process: 214
+2025-07-16 20:05:41,798 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-16 20:05:41,798 - app.services.sec_client - INFO - Entry 1: 10-K/A - ORAMED PHARMACEUTICALS INC. (0001176309) (Filer)
+2025-07-16 20:05:41,798 - app.services.sec_client - INFO - Entry 2: 10-K - P2 Solar, Inc. (0001172069) (Filer)
+2025-07-16 20:05:41,798 - app.services.sec_client - INFO - Entry 3: 10-K - Agentix Corp. (0001603345) (Filer)
+2025-07-16 20:05:41,805 - app.services.sec_client - INFO - Successfully parsed 0 filings from RSS feed
+2025-07-16 20:05:41,806 - app.services.edgar_scanner - INFO - No new filings found in RSS feed
+2025-07-16 20:06:41,806 - app.services.scheduler - INFO - Starting scheduled scan #229 at 2025-07-16 20:06:41
+2025-07-16 20:06:41,807 - app.services.edgar_scanner - INFO - Starting EDGAR RSS scan...
+2025-07-16 20:06:41,807 - app.services.edgar_scanner - INFO - DEBUG: Monitoring 502 companies (S&P 500 + NASDAQ 100)
+2025-07-16 20:06:41,808 - app.services.sec_client - INFO - Fetching RSS feed for all filings...
+2025-07-16 20:06:41,808 - app.services.sec_client - INFO - Fetching 10-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K
+2025-07-16 20:06:42,120 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-K "HTTP/1.1 200 OK"
+2025-07-16 20:06:42,143 - app.services.sec_client - INFO - Found 20 10-K entries
+2025-07-16 20:06:42,143 - app.services.sec_client - INFO - Fetching 10-Q filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q
+2025-07-16 20:06:42,363 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=10-Q "HTTP/1.1 200 OK"
+2025-07-16 20:06:42,406 - app.services.sec_client - INFO - Found 55 10-Q entries
+2025-07-16 20:06:42,407 - app.services.sec_client - INFO - Fetching 8-K filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K
+2025-07-16 20:06:42,534 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=8-K "HTTP/1.1 200 OK"
+2025-07-16 20:06:42,580 - app.services.sec_client - INFO - Found 100 8-K entries
+2025-07-16 20:06:42,581 - app.services.sec_client - INFO - Fetching S-1 filings from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1
+2025-07-16 20:06:42,765 - httpx - INFO - HTTP Request: GET https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=exclude&output=atom&count=100&start=0&type=S-1 "HTTP/1.1 200 OK"
+2025-07-16 20:06:42,793 - app.services.sec_client - INFO - Found 39 S-1 entries
+2025-07-16 20:06:42,794 - app.services.sec_client - INFO - Total entries to process: 214
+2025-07-16 20:06:42,795 - app.services.sec_client - INFO - Sample entries after filtering:
+2025-07-16 20:06:42,795 - app.services.sec_client - INFO - Entry 1: 10-K/A - ORAMED PHARMACEUTICALS INC. (0001176309) (Filer)
+2025-07-16 20:06:42,795 - app.services.sec_client - INFO - Entry 2: 10-K - P2 Solar, Inc. (0001172069) (Filer)
+2025-07-16 20:06:42,795 - app.services.sec_client - INFO - Entry 3: 10-K - Agentix Corp. (0001603345) (Filer)
+2025-07-16 20:06:42,802 - app.services.sec_client - INFO - Successfully parsed 0 filings from RSS feed
+2025-07-16 20:06:42,803 - app.services.edgar_scanner - INFO - No new filings found in RSS feed

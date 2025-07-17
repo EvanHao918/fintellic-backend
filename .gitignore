@@ -20,3 +20,7 @@ logs/
 logs/
 *.backup
 logs/
+.env
+.env.*
+.env
+.env.*

@@ -4,6 +4,7 @@ AI Processor Service
 Uses OpenAI to generate summaries and analysis of SEC filings
 Differentiated processing for 10-K, 10-Q, 8-K, and S-1 filings
 Enhanced with structured financial data extraction
+Day 20: Added market impact analysis for 10-K and 10-Q
 """
 import os
 import json
@@ -147,10 +148,10 @@ Write a professional summary (400-500 words) that helps investors understand the
 
         summary = await self._generate_text(summary_prompt, max_tokens=1200)
         
-        # Extract one-line summary for feed
+        # Extract one-line summary
         feed_summary = await self._generate_feed_summary(summary, filing.filing_type.value)
         
-        # Analyze management tone
+        # Analyze tone
         tone_data = await self._analyze_tone(content)
         
         # Generate comprehensive Q&A
@@ -160,21 +161,78 @@ Write a professional summary (400-500 words) that helps investors understand the
         financial_data = await self._extract_structured_financial_data(filing.filing_type.value, content, full_text)
         
         # Generate tags
-        tags = self._generate_10k_tags(summary, financial_data)
+        tags = self._generate_10k_tags(summary)
         
-        return {
+        # ✨ NEW: Generate market impact analysis for 10-K
+        market_impact_prompt = f"""You are a senior financial analyst. Based on this {filing.company.name} annual report (10-K), analyze the potential market impact.
+
+Summary content:
+{summary}
+
+Financial data:
+{json.dumps(financial_data, indent=2) if financial_data else "No specific financial data"}
+
+Please analyze:
+1. Points that may attract positive market attention (e.g., beating expectations, new business breakthroughs, successful strategic transformation)
+2. Aspects that may need continued market observation (e.g., dependency risks, increased competition, regulatory changes)
+3. Potential impact of long-term strategic adjustments on valuation
+4. Relative performance compared to peers
+
+Requirements:
+- Use soft expressions like "may", "could", "worth noting"
+- Avoid predicting specific price movements
+- Focus on fundamental analysis
+- Keep it 200-300 words
+
+Output format:
+Points that may attract market attention:
+Positive aspects:
+- [Point 1]
+- [Point 2]
+
+Areas to watch:
+- [Observation 1]
+- [Observation 2]
+
+[Summary assessment]"""
+
+        market_impact_10k = await self._generate_text(market_impact_prompt, max_tokens=600)
+        
+        # Store all fields including differentiated display fields
+        result = {
             'summary': summary,
             'feed_summary': feed_summary,
             'tone': tone_data['tone'],
             'tone_explanation': tone_data['explanation'],
             'questions': questions,
             'tags': tags,
-            'financial_data': financial_data
+            'financial_data': financial_data,
+            # Differentiated display fields for 10-K
+            'auditor_opinion': await self._extract_auditor_opinion(full_text),
+            'three_year_financials': await self._extract_three_year_financials(full_text),
+            'business_segments': await self._extract_business_segments(content, full_text),
+            'risk_summary': await self._extract_risk_summary(content),
+            'growth_drivers': await self._generate_growth_drivers(filing.company.name, summary, financial_data),
+            'management_outlook': await self._generate_management_outlook(content, summary),
+            'strategic_adjustments': await self._generate_strategic_adjustments(content, summary),
+            'market_impact_10k': market_impact_10k  # ✨ NEW
         }
-    
+        
+        # Update filing with differentiated fields
+        filing.auditor_opinion = result.get('auditor_opinion')
+        filing.three_year_financials = result.get('three_year_financials')
+        filing.business_segments = result.get('business_segments')
+        filing.risk_summary = result.get('risk_summary')
+        filing.growth_drivers = result.get('growth_drivers')
+        filing.management_outlook = result.get('management_outlook')
+        filing.strategic_adjustments = result.get('strategic_adjustments')
+        filing.market_impact_10k = result.get('market_impact_10k')  # ✨ NEW
+        
+        return result
+
     async def _process_10q(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
         """
-        Process 10-Q quarterly report with focus on quarterly performance
+        Process 10-Q quarterly report with focus on trends and changes
         """
         logger.info("Processing 10-Q quarterly report")
         
@@ -214,16 +272,71 @@ Write a concise but comprehensive summary (300-400 words) that helps investors u
         # Generate tags
         tags = self._generate_10q_tags(summary)
         
-        return {
+        # ✨ NEW: Generate market impact analysis for 10-Q
+        market_impact_prompt = f"""You are a senior financial analyst. Based on this {filing.company.name} quarterly report (10-Q), analyze the potential short-term market impact.
+
+Summary content:
+{summary}
+
+Financial data:
+{json.dumps(financial_data, indent=2) if financial_data else "No specific financial data"}
+
+Please analyze:
+1. Performance vs market expectations (areas that beat or missed expectations)
+2. Points that may trigger short-term market reactions
+3. Market implications of guidance adjustments
+4. Quarterly performance compared to industry peers
+
+Requirements:
+- Use soft expressions like "may", "could", "worth noting"
+- Avoid predicting specific price movements
+- Focus on short-term performance drivers
+- Keep it 200-300 words
+
+Output format:
+Performance may draw attention for:
+Short-term reactions possible:
+- [Point 1]
+- [Point 2]
+
+Worth continued monitoring:
+- [Observation 1]
+- [Observation 2]
+
+[Summary assessment]"""
+
+        market_impact_10q = await self._generate_text(market_impact_prompt, max_tokens=600)
+        
+        # Store all fields including differentiated display fields
+        result = {
             'summary': summary,
             'feed_summary': feed_summary,
             'tone': tone_data['tone'],
             'tone_explanation': tone_data['explanation'],
             'questions': questions,
             'tags': tags,
-            'financial_data': financial_data
+            'financial_data': financial_data,
+            # Differentiated display fields for 10-Q
+            'expectations_comparison': await self._extract_expectations_comparison(content, financial_data),
+            'cost_structure': await self._extract_cost_structure(content, full_text),
+            'guidance_update': await self._extract_guidance_update(content),
+            'growth_decline_analysis': await self._generate_growth_decline_analysis(summary, financial_data),
+            'management_tone_analysis': await self._generate_management_tone_analysis(content, tone_data),
+            'beat_miss_analysis': await self._generate_beat_miss_analysis(summary, financial_data),
+            'market_impact_10q': market_impact_10q  # ✨ NEW
         }
-    
+        
+        # Update filing with differentiated fields
+        filing.expectations_comparison = result.get('expectations_comparison')
+        filing.cost_structure = result.get('cost_structure')
+        filing.guidance_update = result.get('guidance_update')
+        filing.growth_decline_analysis = result.get('growth_decline_analysis')
+        filing.management_tone_analysis = result.get('management_tone_analysis')
+        filing.beat_miss_analysis = result.get('beat_miss_analysis')
+        filing.market_impact_10q = result.get('market_impact_10q')  # ✨ NEW
+        
+        return result
+
     async def _process_8k(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
         """
         Process 8-K current report with focus on specific events
@@ -269,7 +382,10 @@ Write a clear, factual summary (200-300 words) that helps investors quickly unde
         # Generate event-specific tags
         tags = self._generate_8k_tags(summary, event_type)
         
-        return {
+        # Extract structured 8-K data
+        structured_data = await self._extract_8k_structured_data(content, event_type)
+        
+        result = {
             'summary': summary,
             'feed_summary': feed_summary,
             'tone': tone_data['tone'],
@@ -277,9 +393,26 @@ Write a clear, factual summary (200-300 words) that helps investors quickly unde
             'questions': questions,
             'tags': tags,
             'event_type': event_type,
-            'financial_data': financial_data
+            'financial_data': financial_data,
+            # Differentiated display fields for 8-K
+            'item_type': structured_data.get('item_type'),
+            'items': structured_data.get('items'),
+            'event_timeline': structured_data.get('event_timeline'),
+            'event_nature_analysis': await self._generate_event_nature_analysis(event_type, summary),
+            'market_impact_analysis': await self._generate_8k_market_impact(filing.company.name, event_type, summary),
+            'key_considerations': await self._generate_key_considerations(event_type, summary)
         }
-    
+        
+        # Update filing with differentiated fields
+        filing.item_type = result.get('item_type')
+        filing.items = result.get('items')
+        filing.event_timeline = result.get('event_timeline')
+        filing.event_nature_analysis = result.get('event_nature_analysis')
+        filing.market_impact_analysis = result.get('market_impact_analysis')
+        filing.key_considerations = result.get('key_considerations')
+        
+        return result
+
     async def _process_s1(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
         """
         Process S-1 IPO registration with focus on business model and risks
@@ -308,253 +441,951 @@ Write a comprehensive IPO summary (400-500 words) that helps investors evaluate 
         summary = await self._generate_text(summary_prompt, max_tokens=1200)
         
         # Extract one-line summary
-        feed_summary = await self._generate_feed_summary(summary, "IPO Filing")
+        feed_summary = await self._generate_feed_summary(summary, filing.filing_type.value)
         
-        # For S-1, analyze the "story" being told
+        # Analyze tone (usually optimistic for S-1)
         tone_data = await self._analyze_ipo_tone(content)
         
         # Generate IPO-specific Q&A
         questions = await self._generate_ipo_questions(filing.company.name, content)
         
-        # Extract IPO financial metrics
-        financial_data = await self._extract_ipo_metrics(content, full_text)
+        # Extract IPO-specific data
+        ipo_data = await self._extract_ipo_data(content, full_text)
+        financial_data = ipo_data.get('financial_summary', {})
         
-        # Generate IPO tags
+        # Generate tags
         tags = self._generate_s1_tags(summary)
         
-        return {
+        # Extract S-1 specific structured data
+        result = {
             'summary': summary,
             'feed_summary': feed_summary,
             'tone': tone_data['tone'],
             'tone_explanation': tone_data['explanation'],
             'questions': questions,
             'tags': tags,
-            'financial_data': financial_data
+            'financial_data': financial_data,
+            # Differentiated display fields for S-1
+            'ipo_details': ipo_data.get('ipo_details'),
+            'company_overview': await self._generate_company_overview(filing.company.name, content),
+            'financial_summary': financial_data,
+            'risk_categories': await self._extract_risk_categories(content),
+            'growth_path_analysis': await self._generate_growth_path_analysis(filing.company.name, summary, financial_data),
+            'competitive_moat_analysis': await self._generate_competitive_moat_analysis(content, summary)
         }
-    
-    async def _extract_structured_financial_data(self, filing_type: str, content: str, full_text: str = "") -> Dict:
-        """
-        Extract structured financial data using AI for visualization
-        """
-        logger.info(f"Extracting structured financial data for {filing_type}")
         
-        # Prepare content for extraction
-        extract_content = content[:8000] if len(content) > 8000 else content
+        # Update filing with differentiated fields
+        filing.ipo_details = result.get('ipo_details')
+        filing.company_overview = result.get('company_overview')
+        filing.financial_summary = result.get('financial_summary')
+        filing.risk_categories = result.get('risk_categories')
+        filing.growth_path_analysis = result.get('growth_path_analysis')
+        filing.competitive_moat_analysis = result.get('competitive_moat_analysis')
         
-        prompt = f"""Analyze this {filing_type} filing and extract key financial metrics for visualization.
+        return result
 
-Content:
-{extract_content}
+    # ====================== HELPER METHODS ======================
 
-Return ONLY a valid JSON object with this exact structure. Use null for any missing data:
-{{
-    "revenue_trend": [
-        {{"period": "Q1 2024", "value": 125.5, "label": "Q1"}},
-        {{"period": "Q2 2024", "value": 128.3, "label": "Q2"}},
-        {{"period": "Q3 2024", "value": 132.1, "label": "Q3"}},
-        {{"period": "Q4 2024", "value": 135.8, "label": "Q4"}}
-    ],
-    "key_metrics": [
-        {{"label": "Total Revenue", "value": 135.8, "unit": "B", "change": 8.5, "direction": "up"}},
-        {{"label": "Net Income", "value": 25.3, "unit": "B", "change": 12.1, "direction": "up"}},
-        {{"label": "Gross Margin", "value": 42.3, "unit": "%", "change": 1.2, "direction": "up"}},
-        {{"label": "Operating Cash Flow", "value": 35.2, "unit": "B", "change": -2.3, "direction": "down"}}
-    ],
-    "segment_breakdown": [
-        {{"category": "Products", "value": 85.2, "percentage": 62.7}},
-        {{"category": "Services", "value": 35.3, "percentage": 26.0}},
-        {{"category": "Other", "value": 15.3, "percentage": 11.3}}
-    ]
-}}
+    def _prepare_content(self, content: str) -> str:
+        """Prepare content for processing, truncate if needed"""
+        if len(content) > self.max_tokens * 3:  # Rough estimate: 1 token ≈ 3 chars
+            content = content[:self.max_tokens * 3]
+            logger.info(f"Truncated content to {len(content)} chars")
+        return content
 
-Extract the actual numbers from the filing. Values should be in billions (B) or millions (M) as appropriate.
-For percentages, use the actual percentage value (e.g., 42.3 for 42.3%).
-For the "change" field, calculate year-over-year or quarter-over-quarter change if data is available.
-Direction should be "up", "down", or "flat" based on the change."""
-
+    async def _generate_text(self, prompt: str, max_tokens: int = 500) -> str:
+        """Generate text using OpenAI with error handling"""
         try:
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a financial data analyst. Extract only real numbers from the filing. Do not make up data."},
+                    {"role": "system", "content": "You are a professional financial analyst with expertise in SEC filings analysis."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=800,
-                temperature=0.1
+                max_tokens=max_tokens,
+                temperature=0.7
             )
-            
-            result = response.choices[0].message.content.strip()
-            
-            # Parse JSON response
-            if result.startswith('```json'):
-                result = result[7:]
-            if result.startswith('```'):
-                result = result[3:]
-            if result.endswith('```'):
-                result = result[:-3]
-            
-            financial_data = json.loads(result.strip())
-            
-            # Validate and clean the data
-            return self._validate_financial_data(financial_data)
-            
+            return response.choices[0].message.content.strip()
         except Exception as e:
-            logger.error(f"Financial data extraction error: {e}")
-            # Return empty structure if extraction fails
-            return {
-                "revenue_trend": [],
-                "key_metrics": [],
-                "segment_breakdown": []
-            }
-    
-    async def _extract_event_metrics(self, event_type: str, content: str) -> Dict:
-        """
-        Extract metrics specific to 8-K events
-        """
-        if "Financial Obligation" in event_type or "Debt" in event_type:
-            prompt = f"""Extract key financial metrics from this 8-K filing about {event_type}.
+            logger.error(f"Error generating text: {e}")
+            return ""
 
-Content:
+    async def _generate_feed_summary(self, summary: str, filing_type: str) -> str:
+        """Generate a one-line summary for the feed"""
+        prompt = f"""Based on this {filing_type} summary, create a single compelling sentence (max 100 characters) that captures the most important takeaway:
+
+{summary}
+
+Requirements:
+- Must be under 100 characters
+- Focus on the single most important fact or trend
+- Use active voice
+- Be specific with numbers when relevant"""
+
+        return await self._generate_text(prompt, max_tokens=50)
+
+    async def _analyze_tone(self, content: str) -> Dict:
+        """Analyze management tone from filing content"""
+        prompt = f"""Analyze the management tone in this filing. Classify as one of:
+- OPTIMISTIC: Positive outlook, growth expectations, confidence
+- CONFIDENT: Steady progress, meeting targets, stable outlook  
+- NEUTRAL: Balanced view, normal operations, mixed signals
+- CAUTIOUS: Some concerns, watchful stance, conservative outlook
+- CONCERNED: Significant challenges, risks, negative trends
+
+Content excerpt:
 {content[:3000]}
 
-Return a JSON object with relevant metrics such as:
-- Amount of debt/obligation
-- Interest rate
-- Maturity date
-- Purpose of funds
+Provide:
+1. Tone classification (one word from above)
+2. Brief explanation (2-3 sentences)
 
 Format:
-{{
-    "key_metrics": [
-        {{"label": "Debt Amount", "value": 500, "unit": "M"}},
-        {{"label": "Interest Rate", "value": 3.5, "unit": "%"}},
-        {{"label": "Maturity", "value": "2029", "unit": ""}}
-    ]
-}}"""
-        else:
-            # For other 8-K events, extract any mentioned financial impacts
-            prompt = f"""Extract any financial metrics or impacts mentioned in this 8-K filing about {event_type}.
+TONE: [classification]
+EXPLANATION: [your explanation]"""
+
+        response = await self._generate_text(prompt, max_tokens=150)
+        
+        # Parse response
+        tone = ManagementTone.NEUTRAL  # default
+        explanation = ""
+        
+        if response:
+            lines = response.split('\n')
+            for line in lines:
+                if line.startswith('TONE:'):
+                    tone_str = line.replace('TONE:', '').strip()
+                    try:
+                        tone = ManagementTone[tone_str]
+                    except:
+                        pass
+                elif line.startswith('EXPLANATION:'):
+                    explanation = line.replace('EXPLANATION:', '').strip()
+        
+        return {'tone': tone, 'explanation': explanation}
+
+    async def _generate_annual_questions(self, company_name: str, content: str) -> List[Dict]:
+        """Generate Q&A for annual reports"""
+        prompt = f"""Generate 3 important questions investors might have about this {company_name} annual report, with brief answers.
+
+Content excerpt:
+{content[:2000]}
+
+Format each as:
+Q: [Question]
+A: [Brief answer, 2-3 sentences]"""
+
+        response = await self._generate_text(prompt, max_tokens=400)
+        
+        questions = []
+        if response:
+            qa_pairs = response.split('\n\n')
+            for pair in qa_pairs:
+                if 'Q:' in pair and 'A:' in pair:
+                    parts = pair.split('\nA:')
+                    if len(parts) == 2:
+                        question = parts[0].replace('Q:', '').strip()
+                        answer = parts[1].strip()
+                        questions.append({'question': question, 'answer': answer})
+        
+        return questions[:3]  # Ensure max 3 questions
+
+    async def _generate_quarterly_questions(self, company_name: str, content: str) -> List[Dict]:
+        """Generate Q&A for quarterly reports"""
+        prompt = f"""Generate 3 important questions investors might have about this {company_name} quarterly report, with brief answers.
+
+Focus on:
+- Quarterly performance vs expectations
+- Guidance changes
+- Key metrics trends
+
+Content excerpt:
+{content[:2000]}
+
+Format each as:
+Q: [Question]
+A: [Brief answer, 2-3 sentences]"""
+
+        response = await self._generate_text(prompt, max_tokens=400)
+        
+        questions = []
+        if response:
+            qa_pairs = response.split('\n\n')
+            for pair in qa_pairs:
+                if 'Q:' in pair and 'A:' in pair:
+                    parts = pair.split('\nA:')
+                    if len(parts) == 2:
+                        question = parts[0].replace('Q:', '').strip()
+                        answer = parts[1].strip()
+                        questions.append({'question': question, 'answer': answer})
+        
+        return questions[:3]
+
+    # 在 app/services/ai_processor.py 的 _extract_structured_financial_data 方法中
+# 找到这部分代码并替换
+
+async def _extract_structured_financial_data(self, filing_type: str, content: str, full_text: str) -> Dict:
+    """Extract structured financial data from filing"""
+    prompt = f"""Extract key financial metrics from this {filing_type} filing. Look for:
+
+- Revenue (current period and YoY change)
+- Net income/loss
+- EPS (earnings per share)
+- Gross margin
+- Operating margin
+- Cash and cash equivalents
+- Debt levels
 
 Content:
 {content[:3000]}
 
-Return a JSON object with any relevant metrics found."""
+Return as JSON with available metrics. Use null for missing data.
+Format numbers as integers (no decimals for millions/billions).
 
-        try:
-            response = await self._generate_text(prompt, max_tokens=400)
-            result = self._parse_json_response(response)
-            return result if result else {}
-        except:
-            return {}
-    
-    async def _extract_ipo_metrics(self, content: str, full_text: str) -> Dict:
-        """
-        Extract IPO-specific financial metrics
-        """
-        prompt = f"""Extract key financial metrics from this S-1 IPO filing.
-
-Content:
-{content[:5000]}
-
-Return a JSON object with:
+Example format:
 {{
-    "revenue_trend": [
-        {{"period": "2021", "value": 100, "label": "2021"}},
-        {{"period": "2022", "value": 150, "label": "2022"}},
-        {{"period": "2023", "value": 225, "label": "2023"}}
-    ],
-    "key_metrics": [
-        {{"label": "Latest Revenue", "value": 225, "unit": "M"}},
-        {{"label": "Revenue Growth", "value": 50, "unit": "%"}},
-        {{"label": "Gross Margin", "value": 65, "unit": "%"}},
-        {{"label": "Net Loss", "value": -45, "unit": "M"}}
-    ],
-    "valuation_metrics": [
-        {{"label": "Expected Valuation", "value": 5, "unit": "B"}},
-        {{"label": "Price Range", "value": "15-17", "unit": "$/share"}}
-    ]
+  "revenue": 95000000000,
+  "revenue_yoy_change": 8.5,
+  "net_income": 20000000000,
+  "eps": 5.67,
+  "gross_margin": 43.2,
+  "operating_margin": 29.8,
+  "cash": 30000000000,
+  "total_debt": 120000000000
 }}"""
 
-        try:
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "Extract real financial data from the IPO filing."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=600,
-                temperature=0.1
-            )
-            
-            result = self._parse_json_response(response.choices[0].message.content)
-            return result if result else {}
-        except Exception as e:
-            logger.error(f"IPO metrics extraction error: {e}")
+    response = await self._generate_text(prompt, max_tokens=300)
+    
+    try:
+        # Extract JSON from response
+        json_start = response.find('{')
+        json_end = response.rfind('}') + 1
+        if json_start >= 0 and json_end > json_start:
+            return json.loads(response[json_start:json_end])
+    except:
+        logger.error("Failed to parse financial data JSON")
+    
+    return {}
+
+    def _generate_10k_tags(self, summary: str) -> List[str]:
+        """Generate tags for 10-K filing"""
+        tags = []
+        
+        # Check for common 10-K themes
+        summary_lower = summary.lower()
+        
+        if any(word in summary_lower for word in ['record', 'growth', 'increase']):
+            tags.append('Growth')
+        if any(word in summary_lower for word in ['dividend', 'buyback', 'repurchase']):
+            tags.append('Capital Return')
+        if any(word in summary_lower for word in ['acquisition', 'merger', 'm&a']):
+            tags.append('M&A')
+        if any(word in summary_lower for word in ['restructur', 'transform']):
+            tags.append('Restructuring')
+        if 'ai' in summary_lower or 'artificial intelligence' in summary_lower:
+            tags.append('AI Investment')
+        if any(word in summary_lower for word in ['margin', 'profitability']):
+            tags.append('Margins')
+        
+        # Always add
+        tags.append('Annual Report')
+        
+        return list(set(tags))[:5]  # Max 5 tags
+
+    def _generate_10q_tags(self, summary: str) -> List[str]:
+        """Generate tags for 10-Q filing"""
+        tags = []
+        
+        summary_lower = summary.lower()
+        
+        if any(word in summary_lower for word in ['beat', 'exceed', 'surpass']):
+            tags.append('Earnings Beat')
+        if any(word in summary_lower for word in ['miss', 'below', 'disappoint']):
+            tags.append('Earnings Miss')
+        if 'guidance' in summary_lower:
+            tags.append('Guidance Update')
+        if any(word in summary_lower for word in ['margin', 'profitability']):
+            tags.append('Margins')
+        if any(word in summary_lower for word in ['growth', 'increase']):
+            tags.append('Growth')
+        
+        tags.append('Quarterly Results')
+        
+        return list(set(tags))[:5]
+
+    def _identify_8k_event_type(self, content: str) -> str:
+        """Identify the type of 8-K event from content"""
+        content_lower = content.lower()
+        
+        # Common 8-K events
+        if 'item 1.01' in content_lower or 'entry into' in content_lower:
+            return "Material Agreement"
+        elif 'item 2.02' in content_lower or 'results of operations' in content_lower:
+            return "Earnings Release"
+        elif 'item 5.02' in content_lower or ('departure' in content_lower and 'officer' in content_lower):
+            return "Executive Change"
+        elif 'item 7.01' in content_lower or 'regulation fd' in content_lower:
+            return "Regulation FD Disclosure"
+        elif 'item 8.01' in content_lower:
+            return "Other Events"
+        elif 'merger' in content_lower or 'acquisition' in content_lower:
+            return "M&A Activity"
+        elif 'dividend' in content_lower:
+            return "Dividend Announcement"
+        else:
+            return "Corporate Event"
+
+    def _generate_8k_tags(self, summary: str, event_type: str) -> List[str]:
+        """Generate tags for 8-K filing"""
+        tags = [event_type]
+        
+        summary_lower = summary.lower()
+        
+        if 'ceo' in summary_lower or 'cfo' in summary_lower or 'executive' in summary_lower:
+            tags.append('Leadership Change')
+        if 'earnings' in summary_lower:
+            tags.append('Earnings')
+        if 'acquisition' in summary_lower or 'merger' in summary_lower:
+            tags.append('M&A')
+        if 'dividend' in summary_lower:
+            tags.append('Dividend')
+        
+        return list(set(tags))[:5]
+
+    def _generate_s1_tags(self, summary: str) -> List[str]:
+        """Generate tags for S-1 filing"""
+        tags = ['IPO']
+        
+        summary_lower = summary.lower()
+        
+        if 'technology' in summary_lower or 'software' in summary_lower:
+            tags.append('Tech IPO')
+        if 'biotech' in summary_lower or 'pharmaceutical' in summary_lower:
+            tags.append('Biotech IPO')
+        if 'saas' in summary_lower:
+            tags.append('SaaS')
+        if 'ai' in summary_lower or 'artificial intelligence' in summary_lower:
+            tags.append('AI')
+        if 'profitable' in summary_lower:
+            tags.append('Profitable')
+        elif 'loss' in summary_lower:
+            tags.append('Pre-Revenue')
+        
+        return list(set(tags))[:5]
+
+    async def _analyze_8k_tone(self, content: str, event_type: str) -> Dict:
+        """Analyze tone specific to 8-K events"""
+        # For 8-K, tone often depends on event type
+        if event_type == "Earnings Release":
+            return await self._analyze_tone(content)
+        elif event_type == "Executive Change":
+            # Executive changes are usually neutral unless negative circumstances
+            if any(word in content.lower() for word in ['resignation', 'termination', 'departure']):
+                return {'tone': ManagementTone.CAUTIOUS, 'explanation': 'Executive departure may signal transition period'}
+            else:
+                return {'tone': ManagementTone.NEUTRAL, 'explanation': 'Routine executive appointment'}
+        else:
+            return {'tone': ManagementTone.NEUTRAL, 'explanation': f'{event_type} disclosed as required'}
+
+    async def _generate_8k_questions(self, company_name: str, content: str, event_type: str) -> List[Dict]:
+        """Generate event-specific questions for 8-K"""
+        prompt = f"""Generate 2 important questions investors might have about this {company_name} {event_type} announcement, with brief answers.
+
+Content excerpt:
+{content[:1500]}
+
+Format each as:
+Q: [Question]
+A: [Brief answer, 2-3 sentences]"""
+
+        response = await self._generate_text(prompt, max_tokens=300)
+        
+        questions = []
+        if response:
+            qa_pairs = response.split('\n\n')
+            for pair in qa_pairs:
+                if 'Q:' in pair and 'A:' in pair:
+                    parts = pair.split('\nA:')
+                    if len(parts) == 2:
+                        question = parts[0].replace('Q:', '').strip()
+                        answer = parts[1].strip()
+                        questions.append({'question': question, 'answer': answer})
+        
+        return questions[:2]
+
+    async def _extract_event_metrics(self, event_type: str, content: str) -> Dict:
+        """Extract metrics specific to the event type"""
+        if event_type != "Earnings Release":
             return {}
-    
-    def _validate_financial_data(self, data: Dict) -> Dict:
-        """
-        Validate and clean extracted financial data
-        """
-        validated = {}
         
-        # Validate revenue trend
-        if 'revenue_trend' in data and isinstance(data['revenue_trend'], list):
-            valid_trend = []
-            for item in data['revenue_trend']:
-                if isinstance(item, dict) and 'value' in item and isinstance(item['value'], (int, float)):
-                    valid_trend.append(item)
-            if valid_trend:
-                validated['revenue_trend'] = valid_trend[:8]  # Limit to 8 data points
+        # For earnings releases, extract key metrics
+        return await self._extract_structured_financial_data("8-K Earnings", content, content)
+
+    async def _analyze_ipo_tone(self, content: str) -> Dict:
+        """Analyze tone for S-1 filings (usually optimistic)"""
+        # S-1 filings are typically optimistic as companies are selling their story
+        return {
+            'tone': ManagementTone.OPTIMISTIC,
+            'explanation': 'Company presenting growth story and market opportunity for IPO'
+        }
+
+    async def _generate_ipo_questions(self, company_name: str, content: str) -> List[Dict]:
+        """Generate IPO-specific questions"""
+        prompt = f"""Generate 3 important questions investors might have about this {company_name} IPO, with brief answers.
+
+Focus on:
+- Business model viability
+- Path to profitability
+- Competitive advantages
+- Use of proceeds
+
+Content excerpt:
+{content[:2000]}
+
+Format each as:
+Q: [Question]
+A: [Brief answer, 2-3 sentences]"""
+
+        response = await self._generate_text(prompt, max_tokens=400)
         
-        # Validate key metrics
-        if 'key_metrics' in data and isinstance(data['key_metrics'], list):
-            valid_metrics = []
-            for item in data['key_metrics']:
-                if isinstance(item, dict) and 'label' in item and 'value' in item:
-                    valid_metrics.append(item)
-            if valid_metrics:
-                validated['key_metrics'] = valid_metrics[:6]  # Limit to 6 metrics
+        questions = []
+        if response:
+            qa_pairs = response.split('\n\n')
+            for pair in qa_pairs:
+                if 'Q:' in pair and 'A:' in pair:
+                    parts = pair.split('\nA:')
+                    if len(parts) == 2:
+                        question = parts[0].replace('Q:', '').strip()
+                        answer = parts[1].strip()
+                        questions.append({'question': question, 'answer': answer})
         
-        # Validate segment breakdown
-        if 'segment_breakdown' in data and isinstance(data['segment_breakdown'], list):
-            valid_segments = []
-            for item in data['segment_breakdown']:
-                if isinstance(item, dict) and 'category' in item and 'value' in item:
-                    valid_segments.append(item)
-            if valid_segments:
-                validated['segment_breakdown'] = valid_segments[:6]  # Limit to 6 segments
+        return questions[:3]
+
+    async def _extract_ipo_data(self, content: str, full_text: str) -> Dict:
+        """Extract IPO-specific data from S-1"""
+        prompt = f"""Extract IPO details from this S-1 filing:
+
+Content:
+{content[:3000]}
+
+Extract:
+1. Proposed ticker symbol
+2. Expected price range
+3. Number of shares offered
+4. Expected market cap
+5. Lead underwriters
+6. Use of proceeds summary
+7. Notable investors (if mentioned)
+
+Return as JSON. Example:
+{{
+  "ipo_details": {{
+    "ticker": "XYZ",
+    "price_range": "$15-17",
+    "shares_offered": "10 million",
+    "expected_valuation": "$1.5 billion",
+    "lead_underwriters": ["Goldman Sachs", "Morgan Stanley"],
+    "use_of_proceeds": ["General corporate purposes", "R&D", "Sales and marketing"],
+    "notable_investors": ["Sequoia Capital", "Andreessen Horowitz"]
+  }},
+  "financial_summary": {{
+    "revenue_last_year": 100000000,
+    "revenue_growth_rate": 150,
+    "net_loss_last_year": -50000000,
+    "cash_burn_rate": 10000000
+  }}
+}}"""
+
+        response = await self._generate_text(prompt, max_tokens=500)
         
-        return validated
-    
-    def _parse_json_response(self, response: str) -> Optional[Dict]:
-        """
-        Parse JSON from AI response
-        """
         try:
-            # Clean up response
-            if response.startswith('```json'):
-                response = response[7:]
-            if response.startswith('```'):
-                response = response[3:]
-            if response.endswith('```'):
-                response = response[:-3]
-            
-            return json.loads(response.strip())
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response[json_start:json_end])
         except:
-            return None
-    
+            logger.error("Failed to parse IPO data JSON")
+        
+        return {'ipo_details': {}, 'financial_summary': {}}
+
+    # ====================== DIFFERENTIATED DISPLAY FIELD EXTRACTORS ======================
+
+    async def _extract_auditor_opinion(self, full_text: str) -> str:
+        """Extract auditor opinion from 10-K"""
+        prompt = f"""Extract the auditor's opinion from this 10-K filing. Look for the auditor's report section.
+
+Content excerpt:
+{full_text[:5000]}
+
+Provide a brief summary of the auditor's opinion (e.g., "Unqualified opinion from PwC" or "Clean opinion from Deloitte with no material weaknesses")"""
+
+        return await self._generate_text(prompt, max_tokens=100)
+
+    async def _extract_three_year_financials(self, full_text: str) -> Dict:
+        """Extract 3-year financial trends from 10-K"""
+        prompt = f"""Extract 3-year financial data from this 10-K filing. Look for:
+- Revenue for last 3 years
+- Net income for last 3 years  
+- Key margins
+
+Content:
+{full_text[:5000]}
+
+Return as JSON:
+{{
+  "revenue": [
+    {{"year": "2023", "amount": 394328000000}},
+    {{"year": "2022", "amount": 365817000000}},
+    {{"year": "2021", "amount": 347155000000}}
+  ],
+  "net_income": [...],
+  "gross_margin": [...],
+  "operating_margin": [...]
+}}"""
+
+        response = await self._generate_text(prompt, max_tokens=400)
+        
+        try:
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response[json_start:json_end])
+        except:
+            pass
+        
+        return {}
+
+    async def _extract_business_segments(self, content: str, full_text: str) -> List[Dict]:
+        """Extract business segment breakdown"""
+        prompt = f"""Extract business segment information from this 10-K filing. Look for segment revenue and percentages.
+
+Content:
+{content[:3000]}
+
+Return as JSON array:
+[
+  {{"name": "iPhone", "revenue": 200000000000, "percentage": 52.1}},
+  {{"name": "Services", "revenue": 85000000000, "percentage": 22.2}},
+  ...
+]"""
+
+        response = await self._generate_text(prompt, max_tokens=300)
+        
+        try:
+            json_start = response.find('[')
+            json_end = response.rfind(']') + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response[json_start:json_end])
+        except:
+            pass
+        
+        return []
+
+    async def _extract_risk_summary(self, content: str) -> Dict:
+        """Extract and categorize key risks"""
+        prompt = f"""Extract and categorize the key risk factors from this 10-K filing.
+
+Content excerpt:
+{content[:3000]}
+
+Categorize risks into:
+- operational: Business operation risks
+- financial: Financial and market risks  
+- regulatory: Legal and compliance risks
+- competitive: Competition and market position risks
+
+Return as JSON:
+{{
+  "operational": ["Supply chain disruption", "Key personnel loss"],
+  "financial": ["Foreign exchange exposure", "Interest rate risk"],
+  "regulatory": ["Data privacy laws", "Tax law changes"],
+  "competitive": ["New market entrants", "Technology disruption"]
+}}"""
+
+        response = await self._generate_text(prompt, max_tokens=400)
+        
+        try:
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response[json_start:json_end])
+        except:
+            pass
+        
+        return {}
+
+    async def _generate_growth_drivers(self, company_name: str, summary: str, financial_data: Dict) -> str:
+        """Generate analysis of growth drivers"""
+        prompt = f"""Based on this {company_name} annual report summary and financial data, identify and explain the key growth drivers.
+
+Summary:
+{summary[:1000]}
+
+Financial data:
+{json.dumps(financial_data, indent=2) if financial_data else "N/A"}
+
+Provide a concise analysis (150-200 words) of:
+1. Primary growth drivers
+2. Emerging growth opportunities
+3. Growth sustainability factors"""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _generate_management_outlook(self, content: str, summary: str) -> str:
+        """Extract and analyze management's forward-looking statements"""
+        prompt = f"""Analyze management's outlook and forward-looking statements from this annual report.
+
+Summary:
+{summary[:1000]}
+
+Content excerpt:
+{content[:2000]}
+
+Provide a concise summary (150-200 words) of:
+1. Management's view on future prospects
+2. Key priorities mentioned
+3. Tone of forward guidance"""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _generate_strategic_adjustments(self, content: str, summary: str) -> str:
+        """Identify strategic changes or pivots"""
+        prompt = f"""Identify any strategic adjustments or changes in direction from this annual report.
+
+Summary:
+{summary[:1000]}
+
+Look for:
+1. New strategic initiatives
+2. Changes in business focus
+3. Market expansion or contraction
+4. Technology or product pivots
+
+Provide a concise analysis (150-200 words)."""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _extract_expectations_comparison(self, content: str, financial_data: Dict) -> Dict:
+        """Extract actual vs expected metrics for 10-Q"""
+        prompt = f"""Extract comparison of actual results vs market expectations from this quarterly report.
+
+Content:
+{content[:2000]}
+
+Financial data:
+{json.dumps(financial_data, indent=2) if financial_data else "N/A"}
+
+Look for mentions of:
+- Consensus estimates
+- Actual vs expected EPS
+- Revenue vs expectations
+- Guidance vs previous guidance
+
+Return as JSON:
+{{
+  "eps_actual": 1.53,
+  "eps_expected": 1.51,
+  "revenue_actual": 90000000000,
+  "revenue_expected": 89500000000,
+  "beat_miss": "beat",
+  "beat_miss_amount": "+1.3%"
+}}"""
+
+        response = await self._generate_text(prompt, max_tokens=300)
+        
+        try:
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response[json_start:json_end])
+        except:
+            pass
+        
+        return {}
+
+    async def _extract_cost_structure(self, content: str, full_text: str) -> Dict:
+        """Extract cost structure breakdown for 10-Q"""
+        prompt = f"""Extract cost structure information from this quarterly report.
+
+Content:
+{content[:2000]}
+
+Look for:
+- Cost of goods sold
+- Operating expenses breakdown
+- R&D spending
+- SG&A expenses
+
+Return as JSON with amounts and percentages of revenue."""
+
+        response = await self._generate_text(prompt, max_tokens=300)
+        
+        try:
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response[json_start:json_end])
+        except:
+            pass
+        
+        return {}
+
+    async def _extract_guidance_update(self, content: str) -> Dict:
+        """Extract guidance updates from 10-Q"""
+        prompt = f"""Extract any guidance updates or changes from this quarterly report.
+
+Content:
+{content[:2000]}
+
+Look for:
+- Revenue guidance
+- EPS guidance
+- Margin guidance
+- Any guidance changes from previous quarter
+
+Return as JSON:
+{{
+  "revenue_guidance": "$89-91 billion",
+  "eps_guidance": "$1.45-1.50",
+  "guidance_change": "raised",
+  "previous_guidance": "$87-90 billion"
+}}"""
+
+        response = await self._generate_text(prompt, max_tokens=300)
+        
+        try:
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response[json_start:json_end])
+        except:
+            pass
+        
+        return {}
+
+    async def _generate_growth_decline_analysis(self, summary: str, financial_data: Dict) -> str:
+        """Analyze growth or decline drivers for 10-Q"""
+        prompt = f"""Based on this quarterly report summary and financial data, analyze what drove growth or decline this quarter.
+
+Summary:
+{summary[:1000]}
+
+Financial data:
+{json.dumps(financial_data, indent=2) if financial_data else "N/A"}
+
+Provide a concise analysis (150-200 words) of:
+1. Key growth or decline drivers
+2. Segment performance
+3. Geographic variations
+4. One-time vs recurring factors"""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _generate_management_tone_analysis(self, content: str, tone_data: Dict) -> str:
+        """Detailed analysis of management tone for 10-Q"""
+        prompt = f"""Provide a detailed analysis of management's tone and messaging in this quarterly report.
+
+Current tone assessment: {tone_data.get('tone', 'NEUTRAL')}
+Explanation: {tone_data.get('explanation', '')}
+
+Content excerpt:
+{content[:1500]}
+
+Analyze:
+1. Confidence level in guidance
+2. Discussion of challenges vs opportunities
+3. Change in tone from previous quarters (if mentioned)
+4. Key phrases that indicate sentiment
+
+Provide concise analysis (150-200 words)."""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _generate_beat_miss_analysis(self, summary: str, financial_data: Dict) -> str:
+        """Analyze reasons for beating or missing expectations"""
+        prompt = f"""Based on this quarterly report, analyze why the company beat or missed expectations.
+
+Summary:
+{summary[:1000]}
+
+Financial data:
+{json.dumps(financial_data, indent=2) if financial_data else "N/A"}
+
+Provide a concise analysis (150-200 words) of:
+1. Specific factors that led to outperformance or underperformance
+2. Whether these factors are likely to persist
+3. Management's explanation
+4. Market's likely interpretation"""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _extract_8k_structured_data(self, content: str, event_type: str) -> Dict:
+        """Extract structured data specific to 8-K filings"""
+        # Extract Item number
+        item_pattern = r'Item\s+(\d+\.\d+)'
+        item_match = re.search(item_pattern, content, re.IGNORECASE)
+        item_type = item_match.group(1) if item_match else None
+        
+        # Extract dates mentioned
+        date_pattern = r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}'
+        dates = re.findall(date_pattern, content)
+        
+        return {
+            'item_type': item_type,
+            'items': [{'item': item_type, 'description': event_type}] if item_type else [],
+            'event_timeline': {'dates_mentioned': dates[:5]} if dates else {}
+        }
+
+    async def _generate_event_nature_analysis(self, event_type: str, summary: str) -> str:
+        """Analyze the nature and significance of 8-K event"""
+        prompt = f"""Analyze the nature and significance of this {event_type} event.
+
+Summary:
+{summary}
+
+Provide a concise analysis (100-150 words) covering:
+1. Type and nature of the event
+2. Materiality to the company
+3. Typical market interpretation of such events
+4. Required regulatory disclosure aspects"""
+
+        return await self._generate_text(prompt, max_tokens=250)
+
+    async def _generate_8k_market_impact(self, company_name: str, event_type: str, summary: str) -> str:
+        """Generate market impact analysis for 8-K events"""
+        prompt = f"""Analyze the potential market impact of this {company_name} {event_type} announcement.
+
+Summary:
+{summary}
+
+Provide a balanced analysis (150-200 words) of:
+1. Immediate market reaction expectations
+2. Longer-term implications
+3. Impact on specific stakeholder groups
+4. Comparison to similar events in the industry
+
+Use soft language like "may", "could", "potentially". Avoid specific price predictions."""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _generate_key_considerations(self, event_type: str, summary: str) -> str:
+        """Generate key considerations for investors regarding 8-K event"""
+        prompt = f"""Based on this {event_type} announcement, what are the key considerations for investors?
+
+Summary:
+{summary}
+
+List 3-4 key points investors should consider, such as:
+- Impact on operations
+- Financial implications
+- Strategic changes
+- Timeline of effects
+
+Be concise and factual (100-150 words total)."""
+
+        return await self._generate_text(prompt, max_tokens=250)
+
+    async def _generate_company_overview(self, company_name: str, content: str) -> str:
+        """Generate company overview for S-1"""
+        prompt = f"""Create a concise company overview for {company_name} based on their S-1 filing.
+
+Content:
+{content[:2000]}
+
+Include:
+1. What the company does (business model)
+2. Target market and customers
+3. Key products or services
+4. Founding story and timeline
+5. Current scale (employees, customers, geographic presence)
+
+Keep it to 200-250 words."""
+
+        return await self._generate_text(prompt, max_tokens=400)
+
+    async def _extract_risk_categories(self, content: str) -> Dict:
+        """Extract and categorize risks for S-1"""
+        prompt = f"""Extract and categorize the key risk factors from this S-1 filing.
+
+Content excerpt:
+{content[:3000]}
+
+Categorize risks into:
+- business_risks: Core business model risks
+- market_risks: Market and competition risks
+- regulatory_risks: Legal and regulatory risks
+- financial_risks: Financial and liquidity risks
+
+Return as JSON:
+{{
+  "business_risks": ["Limited operating history", "Customer concentration"],
+  "market_risks": ["Intense competition", "Market adoption uncertainty"],
+  "regulatory_risks": ["Data privacy regulations", "Securities law compliance"],
+  "financial_risks": ["History of losses", "Need for additional capital"]
+}}"""
+
+        response = await self._generate_text(prompt, max_tokens=400)
+        
+        try:
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response[json_start:json_end])
+        except:
+            pass
+        
+        return {}
+
+    async def _generate_growth_path_analysis(self, company_name: str, summary: str, financial_data: Dict) -> str:
+        """Analyze growth path for S-1 companies"""
+        prompt = f"""Analyze the growth path and potential for {company_name} based on their S-1 filing.
+
+Summary:
+{summary[:1000]}
+
+Financial data:
+{json.dumps(financial_data, indent=2) if financial_data else "N/A"}
+
+Provide analysis (200-250 words) of:
+1. Historical growth trajectory
+2. Market opportunity size
+3. Growth strategy and expansion plans
+4. Key metrics and milestones
+5. Path to profitability (if applicable)"""
+
+        return await self._generate_text(prompt, max_tokens=400)
+
+    async def _generate_competitive_moat_analysis(self, content: str, summary: str) -> str:
+        """Analyze competitive advantages for S-1 companies"""
+        prompt = f"""Analyze the competitive moat and differentiation based on this S-1 filing.
+
+Summary:
+{summary[:1000]}
+
+Content excerpt:
+{content[:1500]}
+
+Provide analysis (200-250 words) of:
+1. Unique value proposition
+2. Competitive advantages
+3. Barriers to entry
+4. Network effects or switching costs
+5. Technology or IP advantages"""
+
+        return await self._generate_text(prompt, max_tokens=400)
+
     async def _process_generic(self, filing: Filing, primary_content: str) -> Dict:
-        """
-        Generic processing fallback for other filing types
-        """
+        """Generic processing fallback for other filing types"""
+        logger.info(f"Processing generic filing type: {filing.filing_type.value}")
+        
         content = self._prepare_content(primary_content)
         
+        # Generate basic summary
         summary = await self._generate_summary(filing.company.name, filing.filing_type.value, content)
         feed_summary = await self._generate_feed_summary(summary, filing.filing_type.value)
         tone_data = await self._analyze_tone(content)
         questions = await self._generate_questions(filing.company.name, filing.filing_type.value, content)
-        tags = self._extract_tags(summary)
+        tags = self._generate_tags(filing.filing_type.value, summary)
         
         return {
             'summary': summary,
@@ -562,603 +1393,62 @@ Return a JSON object with:
             'tone': tone_data['tone'],
             'tone_explanation': tone_data['explanation'],
             'questions': questions,
-            'tags': tags,
-            'financial_data': {}
+            'tags': tags
         }
-    
-    def _prepare_content(self, content: str, max_chars: int = 45000) -> str:
-        """
-        Prepare content for AI processing, truncating if necessary
-        """
-        if len(content) > max_chars:
-            logger.info(f"Truncating content from {len(content)} to {max_chars} chars")
-            return content[:max_chars]
-        return content
-    
-    def _identify_8k_event_type(self, content: str) -> str:
-        """
-        Identify the type of 8-K event from content
-        """
-        # Common 8-K item patterns
-        event_mapping = {
-            r"item\s*1\.01": "Entry into Material Agreement",
-            r"item\s*1\.02": "Termination of Material Agreement",
-            r"item\s*2\.01": "Completion of Acquisition or Disposition",
-            r"item\s*2\.02": "Results of Operations",
-            r"item\s*2\.03": "Material Direct Financial Obligation",
-            r"item\s*3\.01": "Notice of Delisting",
-            r"item\s*3\.02": "Unregistered Sales of Securities",
-            r"item\s*4\.01": "Changes in Accountant",
-            r"item\s*5\.01": "Changes in Control",
-            r"item\s*5\.02": "Executive Officer Changes",
-            r"item\s*5\.03": "Amendments to Corporate Governance",
-            r"item\s*7\.01": "Regulation FD Disclosure",
-            r"item\s*8\.01": "Other Events"
-        }
-        
-        content_lower = content.lower()
-        
-        for pattern, event_type in event_mapping.items():
-            if re.search(pattern, content_lower):
-                return event_type
-        
-        # Try to infer from content
-        if "ceo" in content_lower or "cfo" in content_lower or "executive" in content_lower:
-            return "Executive Changes"
-        elif "earnings" in content_lower or "results" in content_lower:
-            return "Earnings Results"
-        elif "acquisition" in content_lower or "merger" in content_lower:
-            return "Merger/Acquisition"
-        elif "dividend" in content_lower:
-            return "Dividend Announcement"
-        elif "debt" in content_lower or "note" in content_lower or "bond" in content_lower:
-            return "Debt Issuance"
-        
-        return "Material Event"
-    
-    def _extract_financial_data(self, full_text: str) -> Dict:
-        """
-        Extract basic financial data from filing text (legacy method kept for compatibility)
-        """
-        financial_data = {}
-        
-        # Define patterns for common financial metrics
-        patterns = {
-            'revenue': [
-                r"(?:total\s+)?(?:net\s+)?revenues?\s*[:=]\s*\$?([\d,]+(?:\.\d+)?)\s*(?:billion|million)?",
-                r"(?:total\s+)?(?:net\s+)?sales\s*[:=]\s*\$?([\d,]+(?:\.\d+)?)\s*(?:billion|million)?",
-            ],
-            'net_income': [
-                r"net\s+income\s*[:=]\s*\$?([\d,]+(?:\.\d+)?)\s*(?:billion|million)?",
-                r"net\s+earnings?\s*[:=]\s*\$?([\d,]+(?:\.\d+)?)\s*(?:billion|million)?",
-            ],
-            'eps': [
-                r"(?:diluted\s+)?earnings?\s+per\s+share\s*[:=]\s*\$?([\d.]+)",
-                r"(?:diluted\s+)?eps\s*[:=]\s*\$?([\d.]+)",
-            ]
-        }
-        
-        text_lower = full_text.lower()
-        
-        for metric, pattern_list in patterns.items():
-            for pattern in pattern_list:
-                match = re.search(pattern, text_lower)
-                if match:
-                    value = match.group(1).replace(',', '')
-                    # Check if it's in billions or millions
-                    if 'billion' in match.group(0):
-                        value = float(value) * 1000  # Convert to millions
-                    financial_data[metric] = f"${value}M"
-                    break
-        
-        return financial_data
-    
-    def _extract_ipo_financials(self, full_text: str) -> Dict:
-        """
-        Extract financial history from S-1 filing (legacy method)
-        """
-        financial_data = {}
-        
-        # Look for revenue trends
-        revenue_pattern = r"(?:fiscal\s+)?(?:year\s+)?(\d{4})\s*[:]\s*\$?([\d,]+(?:\.\d+)?)\s*(?:billion|million)?"
-        
-        matches = re.findall(revenue_pattern, full_text.lower())
-        if matches:
-            revenue_history = {}
-            for year, amount in matches[-3:]:  # Last 3 years
-                revenue_history[f"revenue_{year}"] = f"${amount.replace(',', '')}M"
-            financial_data.update(revenue_history)
-        
-        return financial_data
-    
-    # Tag generation methods remain the same...
-    def _generate_10k_tags(self, summary: str, financial_data: Dict) -> List[str]:
-        """Generate tags for 10-K filing"""
-        tags = []
-        summary_lower = summary.lower()
-        
-        # Performance tags
-        if "record" in summary_lower and "revenue" in summary_lower:
-            tags.append("#RecordRevenue")
-        if "growth" in summary_lower:
-            tags.append("#Growth")
-        if "decline" in summary_lower or "decrease" in summary_lower:
-            tags.append("#Challenges")
-        
-        # Geographic tags
-        if "china" in summary_lower:
-            if "challenge" in summary_lower or "headwind" in summary_lower:
-                tags.append("#ChinaChallenges")
-            else:
-                tags.append("#ChinaGrowth")
-        if "india" in summary_lower:
-            tags.append("#IndiaGrowth")
-        
-        # Strategic tags
-        if "ai" in summary_lower or "artificial intelligence" in summary_lower:
-            tags.append("#AIInvestment")
-        if "acquisition" in summary_lower or "m&a" in summary_lower:
-            tags.append("#M&A")
-        if "dividend" in summary_lower:
-            tags.append("#Dividend")
-        if "buyback" in summary_lower:
-            tags.append("#Buyback")
-        
-        # Ensure at least one tag
-        if not tags:
-            tags.append("#AnnualReport")
-        
-        return tags[:5]  # Limit to 5 tags
-    
-    def _generate_10q_tags(self, summary: str) -> List[str]:
-        """Generate tags for 10-Q filing"""
-        tags = []
-        summary_lower = summary.lower()
-        
-        if "beat" in summary_lower and "expectation" in summary_lower:
-            tags.append("#BeatExpectations")
-        if "miss" in summary_lower and "expectation" in summary_lower:
-            tags.append("#MissedExpectations")
-        if "margin" in summary_lower and "expansion" in summary_lower:
-            tags.append("#MarginExpansion")
-        if "cloud" in summary_lower and "growth" in summary_lower:
-            tags.append("#CloudGrowth")
-        if "ai" in summary_lower and "demand" in summary_lower:
-            tags.append("#AIdemand")
-        if "guidance" in summary_lower and ("raise" in summary_lower or "up" in summary_lower):
-            tags.append("#GuidanceUp")
-        
-        # Ensure at least one tag
-        if not tags:
-            tags.append("#QuarterlyResults")
-        
-        return tags[:5]
-    
-    def _generate_8k_tags(self, summary: str, event_type: str) -> List[str]:
-        """Generate tags for 8-K filing"""
-        tags = []
-        summary_lower = summary.lower()
-        
-        # Event-specific tags
-        if "Executive" in event_type:
-            tags.append("#ExecutiveChange")
-        elif "Material Agreement" in event_type:
-            tags.append("#MaterialAgreement")
-        elif "Financial Obligation" in event_type or "Debt Issuance" in event_type:
-            tags.append("#DebtIssuance")
-        elif "Results" in event_type:
-            tags.append("#EarningsUpdate")
-        elif "Acquisition" in event_type:
-            tags.append("#M&A")
-        
-        # Content-based tags
-        if "note" in summary_lower and ("issuance" in summary_lower or "issue" in summary_lower):
-            tags.append("#DebtOffering")
-        
-        # Amount extraction
-        amount_pattern = r'\$?([\d,]+(?:\.\d+)?)\s*(billion|million)'
-        matches = re.findall(amount_pattern, summary_lower)
-        if matches:
-            # Get the largest amount mentioned
-            amounts = []
-            for amount_str, unit in matches:
-                amount = float(amount_str.replace(',', ''))
-                if unit == 'billion':
-                    amount *= 1000  # Convert to millions
-                amounts.append((amount, amount_str, unit))
-            
-            if amounts:
-                largest = max(amounts, key=lambda x: x[0])
-                if largest[2] == 'billion':
-                    tags.append(f"#${largest[1]}B")
-                else:
-                    tags.append(f"#${largest[1]}M")
-        
-        # Ensure we always have at least one tag
-        if not tags:
-            tags.append("#CorporateUpdate")
-        
-        return tags[:4]  # Limit to 4 tags for 8-K
-    
-    def _generate_s1_tags(self, summary: str) -> List[str]:
-        """Generate tags for S-1 filing"""
-        tags = []
-        summary_lower = summary.lower()
-        
-        # Always include IPO tag
-        tags.append("#IPO")
-        
-        # Exchange tags
-        if "nyse" in summary_lower:
-            tags.append("#NYSEListing")
-        elif "nasdaq" in summary_lower:
-            tags.append("#NASDAQListing")
-        
-        # Valuation tags
-        valuation_pattern = r"\$?([\d,]+(?:\.\d+)?)\s*billion\s*valuation"
-        val_match = re.search(valuation_pattern, summary_lower)
-        if val_match:
-            amount = val_match.group(1).replace(',', '')
-            tags.append(f"#${amount}BValuation")
-        
-        # Industry tags
-        if "technology" in summary_lower or "tech" in summary_lower:
-            tags.append("#TechIPO")
-        elif "biotech" in summary_lower:
-            tags.append("#BiotechIPO")
-        
-        return tags[:4]
-    
-    # Helper methods for async OpenAI calls
-    async def _generate_text(self, prompt: str, max_tokens: int = 1000) -> str:
-        """Generate text using OpenAI"""
-        try:
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a professional financial analyst. Provide clear, concise analysis without using emojis or informal language."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_tokens,
-                temperature=0.3
-            )
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            logger.error(f"OpenAI API error: {e}")
-            return f"Analysis generation failed: {str(e)}"
-    
-    async def _generate_feed_summary(self, full_summary: str, filing_type: str) -> str:
-        """Generate one-line summary for feed display"""
-        prompt = f"""Based on this {filing_type} summary, create a single compelling sentence (max 15 words) that captures the most important point for investors. Focus on what matters most - performance, major changes, or key events.
 
-Summary:
-{full_summary[:500]}
-
-Write just one clear, impactful sentence:"""
-
-        response = await self._generate_text(prompt, max_tokens=50)
-        # Clean up the response
-        response = response.strip().strip('"').strip("'")
-        if not response.endswith('.'):
-            response += '.'
-        return response
-    
-    async def _analyze_tone(self, content: str) -> Dict:
-        """
-        Analyze the management tone in the filing
-        """
-        prompt = f"""Analyze the tone of this SEC filing text and classify it as one of:
-- OPTIMISTIC: Positive outlook, growth emphasis, confident language
-- CONFIDENT: Steady progress, meeting targets, controlled growth
-- NEUTRAL: Balanced reporting, factual, no strong positive/negative emphasis
-- CAUTIOUS: Emphasizing challenges, conservative outlook, risk-focused
-- CONCERNED: Significant risks, defensive language, problems highlighted
-
-Text:
-{content[:3000]}
-
-Respond in JSON format:
-{{
-    "tone": "TONE_CLASSIFICATION",
-    "explanation": "Brief explanation (50-100 words) of why this tone was identified"
-}}"""
-
-        try:
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a professional financial sentiment analyst. Analyze tone objectively."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=200,
-                temperature=0.2
-            )
-            
-            result = response.choices[0].message.content.strip()
-            
-            # Parse JSON response
-            try:
-                # Remove markdown code block markers if present
-                if result.startswith('```json'):
-                    result = result[7:]
-                if result.startswith('```'):
-                    result = result[3:]
-                if result.endswith('```'):
-                    result = result[:-3]
-                
-                result = result.strip()
-                
-                tone_data = json.loads(result)
-                tone_map = {
-                    'OPTIMISTIC': ManagementTone.OPTIMISTIC,
-                    'CONFIDENT': ManagementTone.CONFIDENT,
-                    'NEUTRAL': ManagementTone.NEUTRAL,
-                    'CAUTIOUS': ManagementTone.CAUTIOUS,
-                    'CONCERNED': ManagementTone.CONCERNED
-                }
-                
-                return {
-                    'tone': tone_map.get(tone_data['tone'], ManagementTone.NEUTRAL),
-                    'explanation': tone_data['explanation']
-                }
-            except:
-                return {
-                    'tone': ManagementTone.NEUTRAL,
-                    'explanation': 'Unable to determine tone'
-                }
-                
-        except Exception as e:
-            logger.error(f"Tone analysis error: {e}")
-            return {
-                'tone': ManagementTone.NEUTRAL,
-                'explanation': f'Analysis failed: {str(e)}'
-            }
-    
-    async def _analyze_8k_tone(self, content: str, event_type: str) -> Dict:
-        """Analyze tone for 8-K filings based on event type"""
-        prompt = f"""This is an 8-K filing about: {event_type}
-
-Analyze the tone considering the nature of this event. For 8-K filings, tone should reflect:
-- OPTIMISTIC: Positive developments (promotions, good earnings, expansion)
-- CONFIDENT: Planned transitions, meeting expectations
-- NEUTRAL: Routine disclosures, regular updates
-- CAUTIOUS: Challenges being addressed, transitions
-- CONCERNED: Negative events, departures, missed targets
-
-Text:
-{content[:2000]}
-
-Respond in JSON format:
-{{
-    "tone": "TONE_CLASSIFICATION",
-    "explanation": "Brief explanation (50-100 words)"
-}}"""
-
-        return await self._analyze_tone_with_prompt(prompt)
-    
-    async def _analyze_ipo_tone(self, content: str) -> Dict:
-        """Analyze the tone/story of S-1 IPO filing"""
-        prompt = f"""Analyze the tone of this IPO S-1 filing. For IPO filings, assess:
-- OPTIMISTIC: Strong growth story, market leadership claims, aggressive projections
-- CONFIDENT: Solid fundamentals, clear path to profitability, reasonable claims
-- NEUTRAL: Balanced presentation of opportunities and risks
-- CAUTIOUS: Heavy emphasis on risks, conservative projections
-- CONCERNED: Significant losses, unclear path to profitability, many risk factors
-
-Text:
-{content[:3000]}
-
-Classify the overall IPO story as "Ambitious yet Honest", "Aggressive", "Conservative", or "Balanced".
-
-Respond in JSON format:
-{{
-    "tone": "TONE_CLASSIFICATION",
-    "explanation": "Analysis of the IPO narrative and tone (50-100 words)"
-}}"""
-
-        return await self._analyze_tone_with_prompt(prompt)
-    
-    async def _analyze_tone_with_prompt(self, prompt: str) -> Dict:
-        """Helper method to analyze tone with custom prompt"""
-        try:
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a professional financial analyst."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=200,
-                temperature=0.2
-            )
-            
-            result = response.choices[0].message.content.strip()
-            
-            # Parse JSON
-            if result.startswith('```'):
-                result = result.split('```')[1]
-                if result.startswith('json'):
-                    result = result[4:]
-            
-            tone_data = json.loads(result.strip())
-            
-            tone_map = {
-                'OPTIMISTIC': ManagementTone.OPTIMISTIC,
-                'CONFIDENT': ManagementTone.CONFIDENT,
-                'NEUTRAL': ManagementTone.NEUTRAL,
-                'CAUTIOUS': ManagementTone.CAUTIOUS,
-                'CONCERNED': ManagementTone.CONCERNED
-            }
-            
-            return {
-                'tone': tone_map.get(tone_data['tone'], ManagementTone.NEUTRAL),
-                'explanation': tone_data['explanation']
-            }
-            
-        except Exception as e:
-            logger.error(f"Tone analysis error: {e}")
-            return {
-                'tone': ManagementTone.NEUTRAL,
-                'explanation': 'Analysis failed'
-            }
-    
-    # Question generation methods remain the same...
-    async def _generate_annual_questions(self, company_name: str, content: str) -> List[Dict]:
-        """Generate Q&A for annual reports"""
-        prompt = f"""Based on this {company_name} annual report, generate 4-5 key questions an investor would ask, with answers from the filing.
-
-Focus on:
-1. Annual performance vs prior year
-2. Geographic/segment performance
-3. Strategic initiatives and investments
-4. Outlook and guidance
-5. Major risks or challenges
-
-Content:
-{content[:3000]}
-
-Format as JSON array:
-[
-    {{
-        "question": "Clear, specific question",
-        "answer": "Factual answer based on filing (50-100 words)"
-    }}
-]"""
-
-        return await self._generate_qa_json(prompt)
-    
-    async def _generate_quarterly_questions(self, company_name: str, content: str) -> List[Dict]:
-        """Generate Q&A for quarterly reports"""
-        prompt = f"""Based on this {company_name} quarterly report, generate 3-4 key questions about:
-
-1. Quarterly performance vs expectations
-2. Growth drivers this quarter
-3. Margin and profitability trends
-4. Updated outlook or guidance
-
-Content:
-{content[:2500]}
-
-Format as JSON array:
-[
-    {{
-        "question": "Specific quarterly question",
-        "answer": "Answer from filing (50-100 words)"
-    }}
-]"""
-
-        return await self._generate_qa_json(prompt)
-    
-    async def _generate_8k_questions(self, company_name: str, content: str, event_type: str) -> List[Dict]:
-        """Generate Q&A for 8-K events"""
-        prompt = f"""Based on this {company_name} 8-K filing about {event_type}, generate 3-4 key questions:
-
-1. What exactly happened?
-2. When does it take effect?
-3. Why did this occur?
-4. What's the impact?
-
-Content:
-{content[:2000]}
-
-Format as JSON array with short, factual answers (30-70 words each)."""
-
-        return await self._generate_qa_json(prompt)
-    
-    async def _generate_ipo_questions(self, company_name: str, content: str) -> List[Dict]:
-        """Generate Q&A for IPO filings"""
-        prompt = f"""Based on this {company_name} S-1 IPO filing, generate 4-5 key investor questions:
-
-1. Why go public now?
-2. Is the business model proven?
-3. Path to profitability?
-4. Main risk factors?
-5. Valuation justification?
-
-Content:
-{content[:3000]}
-
-Format as JSON array focusing on IPO-specific concerns."""
-
-        return await self._generate_qa_json(prompt)
-    
-    async def _generate_qa_json(self, prompt: str) -> List[Dict]:
-        """Helper to generate Q&A in JSON format"""
-        try:
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a financial analyst. Generate clear Q&A without speculation."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=800,
-                temperature=0.3
-            )
-            
-            result = response.choices[0].message.content.strip()
-            
-            # Parse JSON
-            if result.startswith('```'):
-                result = result.split('```')[1]
-                if result.startswith('json'):
-                    result = result[4:]
-            
-            questions = json.loads(result.strip())
-            return questions[:5]  # Limit to 5
-            
-        except Exception as e:
-            logger.error(f"Q&A generation error: {e}")
-            return []
-    
     async def _generate_summary(self, company_name: str, filing_type: str, content: str) -> str:
-        """Generic summary generation (fallback)"""
-        prompt = f"""Create a summary of this {filing_type} filing from {company_name}.
+        """Generate generic summary"""
+        prompt = f"""Create a comprehensive summary of this {company_name} {filing_type} filing.
 
 Content:
 {content[:3000]}
 
-Write a clear summary (300-400 words) covering the key points."""
+Write a professional summary (300-400 words) covering key points and takeaways."""
 
         return await self._generate_text(prompt, max_tokens=1000)
-    
+
     async def _generate_questions(self, company_name: str, filing_type: str, content: str) -> List[Dict]:
-        """Generic question generation (fallback)"""
-        prompt = f"""Generate 3-4 key questions about this {filing_type} filing from {company_name}.
+        """Generate generic Q&A"""
+        prompt = f"""Generate 3 important questions investors might have about this {company_name} {filing_type}, with brief answers.
 
-Content:
-{content[:2000]}
+Content excerpt:
+{content[:1500]}
 
-Format as JSON array."""
+Format each as:
+Q: [Question]
+A: [Brief answer, 2-3 sentences]"""
 
-        return await self._generate_qa_json(prompt)
-    
-    def _extract_tags(self, summary: str) -> List[str]:
-        """
-        Generic tag extraction from summary
-        """
-        tags = []
+        response = await self._generate_text(prompt, max_tokens=400)
         
-        keyword_mapping = {
-            'revenue': '#Revenue',
-            'earnings': '#Earnings',
-            'growth': '#Growth',
-            'acquisition': '#M&A',
-            'dividend': '#Dividend',
-            'buyback': '#Buyback',
-            'guidance': '#Guidance',
-            'restructuring': '#Restructuring'
-        }
+        questions = []
+        if response:
+            qa_pairs = response.split('\n\n')
+            for pair in qa_pairs:
+                if 'Q:' in pair and 'A:' in pair:
+                    parts = pair.split('\nA:')
+                    if len(parts) == 2:
+                        question = parts[0].replace('Q:', '').strip()
+                        answer = parts[1].strip()
+                        questions.append({'question': question, 'answer': answer})
+        
+        return questions[:3]
+
+    def _generate_tags(self, filing_type: str, summary: str) -> List[str]:
+        """Generate generic tags"""
+        tags = [filing_type.replace('FORM_', '').replace('_', '-')]
         
         summary_lower = summary.lower()
-        for keyword, tag in keyword_mapping.items():
-            if keyword in summary_lower:
-                tags.append(tag)
         
-        # Ensure at least one tag
-        if not tags:
-            tags.append('#Update')
+        # Add some common tags based on content
+        if 'acquisition' in summary_lower:
+            tags.append('M&A')
+        if 'earnings' in summary_lower:
+            tags.append('Earnings')
+        if 'restructuring' in summary_lower:
+            tags.append('Restructuring')
         
-        return tags[:5]  # Limit to 5 tags
+        return tags[:5]
 
 
-# Create singleton instance
+# Initialize singleton
 ai_processor = AIProcessor()

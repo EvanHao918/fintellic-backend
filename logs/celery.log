@@ -1,13 +1,13 @@
  
  -------------- celery@Evans-MacBook-Air.local v5.3.4 (emerald-rush)
 --- ***** ----- 
--- ******* ---- macOS-13.2.1-arm64-arm-64bit 2025-07-14 10:49:57
+-- ******* ---- macOS-13.2.1-arm64-arm-64bit 2025-07-17 16:20:54
 - *** --- * --- 
 - ** ---------- [config]
-- ** ---------- .> app:         fintellic:0x106e34cd0
+- ** ---------- .> app:         fintellic:0x106774c50
 - ** ---------- .> transport:   redis://localhost:6379/0
 - ** ---------- .> results:     redis://localhost:6379/0
-- *** --- * --- .> concurrency: 8 (prefork)
+- *** --- * --- .> concurrency: 4 (prefork)
 -- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
 --- ***** ----- 
  -------------- [queues]
@@ -19,640 +19,435 @@
   . app.tasks.filing_tasks.process_pending_filings
   . app.tasks.filing_tasks.send_filing_notifications
 
-[2025-07-14 10:49:58,264: WARNING/MainProcess] /Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/celery/worker/consumer/consumer.py:507: CPendingDeprecationWarning: The broker_connection_retry configuration setting will no longer determine
+[2025-07-17 16:20:54,564: WARNING/MainProcess] /Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/celery/worker/consumer/consumer.py:507: CPendingDeprecationWarning: The broker_connection_retry configuration setting will no longer determine
 whether broker connection retries are made during startup in Celery 6.0 and above.
 If you wish to retain the existing behavior for retrying connections on startup,
 you should set broker_connection_retry_on_startup to True.
   warnings.warn(
 
-[2025-07-14 10:49:58,270: INFO/MainProcess] Connected to redis://localhost:6379/0
-[2025-07-14 10:49:58,270: WARNING/MainProcess] /Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/celery/worker/consumer/consumer.py:507: CPendingDeprecationWarning: The broker_connection_retry configuration setting will no longer determine
+[2025-07-17 16:20:54,581: INFO/MainProcess] Connected to redis://localhost:6379/0
+[2025-07-17 16:20:54,582: WARNING/MainProcess] /Users/evanhao/Documents/fintellic/venv/lib/python3.11/site-packages/celery/worker/consumer/consumer.py:507: CPendingDeprecationWarning: The broker_connection_retry configuration setting will no longer determine
 whether broker connection retries are made during startup in Celery 6.0 and above.
 If you wish to retain the existing behavior for retrying connections on startup,
 you should set broker_connection_retry_on_startup to True.
   warnings.warn(
 
-[2025-07-14 10:49:58,273: INFO/MainProcess] mingle: searching for neighbors
-[2025-07-14 10:49:59,281: INFO/MainProcess] mingle: all alone
-[2025-07-14 10:49:59,298: INFO/MainProcess] celery@Evans-MacBook-Air.local ready.
-[2025-07-14 11:03:59,611: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[43f91897-c79d-4abf-aee8-e55d17f494bf] received
-[2025-07-14 11:03:59,657: INFO/ForkPoolWorker-8] Starting processing for filing 4
-[2025-07-14 11:03:59,784: INFO/ForkPoolWorker-8] Downloading filing 0000789019-24-000789
-[2025-07-14 11:03:59,808: INFO/ForkPoolWorker-8] Starting download for MSFT 10-K (0000789019-24-000789)
-[2025-07-14 11:03:59,810: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/789019/000078901924000789/0000789019-24-000789-index.htm
-[2025-07-14 11:04:00,126: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/789019/000078901924000789/0000789019-24-000789-index.htm "HTTP/1.1 503 Service Unavailable"
-[2025-07-14 11:04:00,130: ERROR/ForkPoolWorker-8] Error downloading filing 0000789019-24-000789: HTTP 503 when accessing index page https://www.sec.gov/Archives/edgar/data/789019/000078901924000789/0000789019-24-000789-index.htm
-[2025-07-14 11:04:00,148: ERROR/ForkPoolWorker-8] Error processing filing 4: Failed to download filing 0000789019-24-000789
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 73, in process_filing_task
-    raise Exception(f"Failed to download filing {filing.accession_number}")
-Exception: Failed to download filing 0000789019-24-000789
-[2025-07-14 11:04:00,178: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[43f91897-c79d-4abf-aee8-e55d17f494bf] received
-[2025-07-14 11:04:00,183: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[43f91897-c79d-4abf-aee8-e55d17f494bf] retry: Retry in 60s: Exception('Failed to download filing 0000789019-24-000789')
-[2025-07-14 11:05:00,164: INFO/ForkPoolWorker-8] Starting processing for filing 4
-[2025-07-14 11:05:00,233: INFO/ForkPoolWorker-8] Successfully processed filing 4
-[2025-07-14 11:05:00,242: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[43f91897-c79d-4abf-aee8-e55d17f494bf] succeeded in 0.07845500000985339s: {'status': 'success', 'filing_id': 4, 'company': 'MSFT', 'type': '10-K'}
-[2025-07-14 11:14:19,854: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[c7ea3de9-2b37-4eac-af54-008cf4b5925a] received
-[2025-07-14 11:14:19,864: INFO/ForkPoolWorker-8] Starting processing for filing 44
-[2025-07-14 11:14:19,882: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[eaed6eb6-820a-403b-a45b-a5ef99a61736] received
-[2025-07-14 11:14:19,905: INFO/ForkPoolWorker-8] Downloading filing 0001213900-25-063483
-[2025-07-14 11:14:19,910: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[adff7288-a56f-4d49-a035-77db3c613aae] received
-[2025-07-14 11:14:19,921: INFO/ForkPoolWorker-8] Starting download for CTOR S-1 (0001213900-25-063483)
-[2025-07-14 11:14:19,922: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1851484/000121390025063483/0001213900-25-063483-index.htm
-[2025-07-14 11:14:20,038: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1851484/000121390025063483/0001213900-25-063483-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 11:14:20,039: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 11:14:20,061: INFO/ForkPoolWorker-8] Found primary document: ea0242842-s1_citius.htm
-[2025-07-14 11:14:20,062: INFO/ForkPoolWorker-8] Found primary document: ea0242842-s1_citius_htm.xml
-[2025-07-14 11:14:20,062: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/1851484/000121390025063483/ea0242842-s1_citius.htm
-[2025-07-14 11:14:20,125: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F1851484%2F000121390025063483%2Fea0242842-s1_citius.htm "HTTP/1.1 200 OK"
-[2025-07-14 11:14:20,126: INFO/ForkPoolWorker-8] ✅ Downloaded ea0242842-s1_citius.htm (6,356 bytes)
-[2025-07-14 11:14:20,136: INFO/ForkPoolWorker-8] Processing filing 0001213900-25-063483 with AI
-[2025-07-14 11:14:20,147: INFO/ForkPoolWorker-8] Starting AI processing for CTOR S-1
-[2025-07-14 11:14:20,149: INFO/ForkPoolWorker-8] Extracting text from ea0242842-s1_citius.htm
-[2025-07-14 11:14:20,150: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
-[2025-07-14 11:14:20,151: INFO/ForkPoolWorker-8] Processing S-1 IPO registration
-[2025-07-14 11:14:20,629: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 11:14:20,632: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 11:14:20,764: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 11:14:20,765: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 11:14:20,920: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 11:14:20,922: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 11:14:21,050: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 11:14:21,052: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 11:14:21,231: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 11:14:21,233: ERROR/ForkPoolWorker-8] IPO metrics extraction error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 11:14:21,250: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001213900-25-063483
-[2025-07-14 11:14:21,254: INFO/ForkPoolWorker-8] Successfully processed filing 44
-[2025-07-14 11:14:21,257: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[7cfea440-df8b-4a7e-baa0-0394255c3834] received
-[2025-07-14 11:14:21,258: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[c7ea3de9-2b37-4eac-af54-008cf4b5925a] succeeded in 1.394085207954049s: {'status': 'success', 'filing_id': 44, 'company': 'CTOR', 'type': 'S-1'}
-[2025-07-14 11:14:21,297: INFO/ForkPoolWorker-1] Would send notifications for filing 44
-[2025-07-14 11:14:21,330: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[7cfea440-df8b-4a7e-baa0-0394255c3834] succeeded in 0.03913695795927197s: {'status': 'notifications_sent'}
-[2025-07-14 11:14:25,980: INFO/ForkPoolWorker-8] Starting processing for filing 42
-[2025-07-14 11:14:26,044: INFO/ForkPoolWorker-8] Downloading filing 0001193125-25-158488
-[2025-07-14 11:14:26,069: INFO/ForkPoolWorker-8] Starting download for SNPS 8-K (0001193125-25-158488)
-[2025-07-14 11:14:26,070: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/883241/000119312525158488/0001193125-25-158488-index.htm
-[2025-07-14 11:14:26,266: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/883241/000119312525158488/0001193125-25-158488-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 11:14:26,267: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 11:14:26,276: INFO/ForkPoolWorker-8] Found primary document: d800809d8k.htm
-[2025-07-14 11:14:26,277: INFO/ForkPoolWorker-8] Found primary document: d800809d8k_htm.xml
-[2025-07-14 11:14:26,277: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/883241/000119312525158488/d800809d8k.htm
-[2025-07-14 11:14:26,346: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F883241%2F000119312525158488%2Fd800809d8k.htm "HTTP/1.1 200 OK"
-[2025-07-14 11:14:26,348: INFO/ForkPoolWorker-8] ✅ Downloaded d800809d8k.htm (6,356 bytes)
-[2025-07-14 11:14:26,361: INFO/ForkPoolWorker-8] Processing filing 0001193125-25-158488 with AI
-[2025-07-14 11:14:26,372: INFO/ForkPoolWorker-8] Starting AI processing for SNPS 8-K
-[2025-07-14 11:14:26,373: INFO/ForkPoolWorker-8] Extracting text from d800809d8k.htm
-[2025-07-14 11:14:26,374: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
-[2025-07-14 11:14:26,374: INFO/ForkPoolWorker-8] Processing 8-K current report
-[2025-07-14 11:14:26,528: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 11:14:26,530: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 11:14:26,630: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 11:14:26,631: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 11:14:26,752: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 11:14:26,753: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 11:14:26,863: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 11:14:26,865: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 11:14:26,955: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 11:14:26,956: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 11:14:26,973: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001193125-25-158488
-[2025-07-14 11:14:26,978: INFO/ForkPoolWorker-8] Successfully processed filing 42
-[2025-07-14 11:14:26,984: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[ef5bb370-1b28-46ec-a614-83a06948898f] received
-[2025-07-14 11:14:26,984: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[eaed6eb6-820a-403b-a45b-a5ef99a61736] succeeded in 1.0158964589936659s: {'status': 'success', 'filing_id': 42, 'company': 'SNPS', 'type': '8-K'}
-[2025-07-14 11:14:26,986: INFO/ForkPoolWorker-8] Would send notifications for filing 42
-[2025-07-14 11:14:26,988: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.send_filing_notifications[ef5bb370-1b28-46ec-a614-83a06948898f] succeeded in 0.001763082982506603s: {'status': 'notifications_sent'}
-[2025-07-14 11:14:31,869: INFO/ForkPoolWorker-8] Starting processing for filing 43
-[2025-07-14 11:14:31,893: INFO/ForkPoolWorker-8] Downloading filing 0000072331-25-000088
-[2025-07-14 11:14:31,911: INFO/ForkPoolWorker-8] Starting download for NDSN 8-K (0000072331-25-000088)
-[2025-07-14 11:14:31,913: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/72331/000007233125000088/0000072331-25-000088-index.htm
-[2025-07-14 11:14:32,048: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/72331/000007233125000088/0000072331-25-000088-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 11:14:32,050: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 11:14:32,056: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-14 11:14:32,068: INFO/ForkPoolWorker-8] Processing filing 0000072331-25-000088 with AI
-[2025-07-14 11:14:32,084: INFO/ForkPoolWorker-8] Starting AI processing for NDSN 8-K
-[2025-07-14 11:14:32,085: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0000072331/000007233125000088
-[2025-07-14 11:14:32,086: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-14 11:14:32,100: ERROR/ForkPoolWorker-8] Error processing filing 43: Failed to process filing 0000072331-25-000088 with AI
+[2025-07-17 16:20:54,584: INFO/MainProcess] mingle: searching for neighbors
+[2025-07-17 16:20:55,599: INFO/MainProcess] mingle: all alone
+[2025-07-17 16:20:55,615: INFO/MainProcess] celery@Evans-MacBook-Air.local ready.
+[2025-07-17 16:25:41,298: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a5529705-3943-4312-a946-f22c9a727a70] received
+[2025-07-17 16:25:41,312: INFO/ForkPoolWorker-2] Starting processing for filing 91
+[2025-07-17 16:25:41,366: INFO/ForkPoolWorker-2] Downloading filing 0001140361-25-026238
+[2025-07-17 16:25:41,393: INFO/ForkPoolWorker-2] Starting download for HBAN 8-K (0001140361-25-026238)
+[2025-07-17 16:25:41,546: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/49196/0001140361-25-026238/-index.htm "HTTP/1.1 200 OK"
+[2025-07-17 16:25:41,548: INFO/ForkPoolWorker-2] Successfully fetched index from: https://www.sec.gov/Archives/edgar/data/49196/0001140361-25-026238/-index.htm
+[2025-07-17 16:25:41,558: INFO/ForkPoolWorker-2] Downloading main document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/49196/000114036125026238/ef20052023_8k.htm
+[2025-07-17 16:25:41,638: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F49196%2F000114036125026238%2Fef20052023_8k.htm "HTTP/1.1 200 OK"
+[2025-07-17 16:25:41,640: INFO/ForkPoolWorker-2] ✅ Successfully downloaded ef20052023_8k.htm (6,356 bytes)
+[2025-07-17 16:25:41,665: INFO/ForkPoolWorker-2] Processing filing 0001140361-25-026238 with AI
+[2025-07-17 16:25:41,677: INFO/ForkPoolWorker-2] Starting AI processing for HBAN 8-K
+[2025-07-17 16:25:41,678: INFO/ForkPoolWorker-2] Extracting text from ef20052023_8k.htm
+[2025-07-17 16:25:41,679: WARNING/ForkPoolWorker-2] Extracted text too short (73 chars), trying alternative methods
+[2025-07-17 16:25:41,679: INFO/ForkPoolWorker-2] Processing 8-K current report
+[2025-07-17 16:25:48,434: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:25:49,354: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:25:52,322: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:25:57,243: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:26:05,224: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:26:08,609: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:26:08,672: INFO/ForkPoolWorker-2] ✅ AI processing completed for 0001140361-25-026238
+[2025-07-17 16:26:08,694: INFO/ForkPoolWorker-2] Successfully processed filing 91
+[2025-07-17 16:26:08,704: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[b3274798-77e5-4da5-b926-c2a2a413d14b] received
+[2025-07-17 16:26:08,714: INFO/ForkPoolWorker-4] Would send notifications for filing 91
+[2025-07-17 16:26:08,725: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[a5529705-3943-4312-a946-f22c9a727a70] succeeded in 27.41575608297717s: {'status': 'success', 'filing_id': 91, 'company': 'HBAN', 'type': '8-K'}
+[2025-07-17 16:26:08,740: INFO/ForkPoolWorker-4] Task app.tasks.filing_tasks.send_filing_notifications[b3274798-77e5-4da5-b926-c2a2a413d14b] succeeded in 0.027239167015068233s: {'status': 'notifications_sent'}
+[2025-07-17 16:26:48,064: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a1ea78a6-d535-4627-acd5-03b40559f772] received
+[2025-07-17 16:26:48,073: INFO/ForkPoolWorker-2] Starting processing for filing 92
+[2025-07-17 16:26:48,097: INFO/ForkPoolWorker-2] Downloading filing 0000320187-25-000047
+[2025-07-17 16:26:48,135: INFO/ForkPoolWorker-2] Starting download for NKE 10-K (0000320187-25-000047)
+[2025-07-17 16:26:48,275: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/320187/0000320187-25-000047/-index.htm "HTTP/1.1 200 OK"
+[2025-07-17 16:26:48,276: INFO/ForkPoolWorker-2] Successfully fetched index from: https://www.sec.gov/Archives/edgar/data/320187/0000320187-25-000047/-index.htm
+[2025-07-17 16:26:48,286: WARNING/ForkPoolWorker-2] Could not find main document in index, trying fallback methods
+[2025-07-17 16:26:48,353: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/320187/000032018725000047/10-k.htm "HTTP/1.1 404 Not Found"
+[2025-07-17 16:26:48,490: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/320187/000032018725000047/10-k.html "HTTP/1.1 404 Not Found"
+[2025-07-17 16:26:48,557: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/320187/000032018725000047/form10k.htm "HTTP/1.1 404 Not Found"
+[2025-07-17 16:26:48,652: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/320187/000032018725000047/nke-20250717.htm "HTTP/1.1 404 Not Found"
+[2025-07-17 16:26:48,746: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/320187/000032018725000047/10k.htm "HTTP/1.1 404 Not Found"
+[2025-07-17 16:26:48,845: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/320187/000032018725000047/primary_doc.htm "HTTP/1.1 404 Not Found"
+[2025-07-17 16:26:48,847: WARNING/ForkPoolWorker-2] Could not find main document, but saved index.htm
+[2025-07-17 16:26:48,862: INFO/ForkPoolWorker-2] Processing filing 0000320187-25-000047 with AI
+[2025-07-17 16:26:48,878: INFO/ForkPoolWorker-2] Starting AI processing for NKE 10-K
+[2025-07-17 16:26:48,880: WARNING/ForkPoolWorker-2] No filing documents found in data/filings/0000320187/000032018725000047
+[2025-07-17 16:26:48,881: ERROR/ForkPoolWorker-2] Error in AI processing: Text extraction failed: No filing documents found
+[2025-07-17 16:26:48,913: ERROR/ForkPoolWorker-2] Error processing filing 92: Failed to process filing 0000320187-25-000047 with AI
 Traceback (most recent call last):
   File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
     raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0000072331-25-000088 with AI
-[2025-07-14 11:14:32,109: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[adff7288-a56f-4d49-a035-77db3c613aae] received
-[2025-07-14 11:14:32,111: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[adff7288-a56f-4d49-a035-77db3c613aae] retry: Retry in 60s: Exception('Failed to process filing 0000072331-25-000088 with AI')
-[2025-07-14 11:15:32,112: INFO/ForkPoolWorker-8] Starting processing for filing 43
-[2025-07-14 11:15:32,124: INFO/ForkPoolWorker-8] Successfully processed filing 43
-[2025-07-14 11:15:32,128: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[adff7288-a56f-4d49-a035-77db3c613aae] succeeded in 0.016274375026114285s: {'status': 'success', 'filing_id': 43, 'company': 'NDSN', 'type': '8-K'}
-[2025-07-14 11:41:56,503: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a4be6ddc-f035-4cfb-86d4-a27509ee17e1] received
-[2025-07-14 11:41:56,513: INFO/ForkPoolWorker-8] Starting processing for filing 45
-[2025-07-14 11:41:56,534: INFO/ForkPoolWorker-8] Downloading filing 0001698530-25-000062
-[2025-07-14 11:41:56,550: INFO/ForkPoolWorker-8] Starting download for XCUR S-1 (0001698530-25-000062)
-[2025-07-14 11:41:56,554: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1698530/000169853025000062/0001698530-25-000062-index.htm
-[2025-07-14 11:41:56,650: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1698530/000169853025000062/0001698530-25-000062-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 11:41:56,651: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 11:41:56,658: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-14 11:41:56,667: INFO/ForkPoolWorker-8] Processing filing 0001698530-25-000062 with AI
-[2025-07-14 11:41:56,676: INFO/ForkPoolWorker-8] Starting AI processing for XCUR S-1
-[2025-07-14 11:41:56,677: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0001698530/000169853025000062
-[2025-07-14 11:41:56,677: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-14 11:41:56,685: ERROR/ForkPoolWorker-8] Error processing filing 45: Failed to process filing 0001698530-25-000062 with AI
+Exception: Failed to process filing 0000320187-25-000047 with AI
+[2025-07-17 16:26:48,936: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a1ea78a6-d535-4627-acd5-03b40559f772] received
+[2025-07-17 16:26:48,944: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[a1ea78a6-d535-4627-acd5-03b40559f772] retry: Retry in 60s: Exception('Failed to process filing 0000320187-25-000047 with AI')
+[2025-07-17 16:27:48,934: INFO/ForkPoolWorker-2] Starting processing for filing 92
+[2025-07-17 16:27:48,993: INFO/ForkPoolWorker-2] Successfully processed filing 92
+[2025-07-17 16:27:49,015: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[a1ea78a6-d535-4627-acd5-03b40559f772] succeeded in 0.08320900006219745s: {'status': 'success', 'filing_id': 92, 'company': 'NKE', 'type': '10-K'}
+[2025-07-17 16:37:01,567: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[0ee80e07-4c16-4c25-873d-fcf666ffb7d9] received
+[2025-07-17 16:37:01,570: INFO/ForkPoolWorker-2] Starting processing for filing 94
+[2025-07-17 16:37:01,581: INFO/ForkPoolWorker-2] Downloading filing 0001104659-25-068685
+[2025-07-17 16:37:01,594: INFO/ForkPoolWorker-2] Starting download for CBOE 8-K (0001104659-25-068685)
+[2025-07-17 16:37:01,734: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1374310/0001104659-25-068685/-index.htm "HTTP/1.1 200 OK"
+[2025-07-17 16:37:01,736: INFO/ForkPoolWorker-2] Successfully fetched index from: https://www.sec.gov/Archives/edgar/data/1374310/0001104659-25-068685/-index.htm
+[2025-07-17 16:37:01,764: INFO/ForkPoolWorker-2] Downloading main document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/1374310/000110465925068685/tm2521107d1_8k.htm
+[2025-07-17 16:37:01,840: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F1374310%2F000110465925068685%2Ftm2521107d1_8k.htm "HTTP/1.1 200 OK"
+[2025-07-17 16:37:01,844: INFO/ForkPoolWorker-2] ✅ Successfully downloaded tm2521107d1_8k.htm (6,356 bytes)
+[2025-07-17 16:37:01,860: INFO/ForkPoolWorker-2] Processing filing 0001104659-25-068685 with AI
+[2025-07-17 16:37:01,881: INFO/ForkPoolWorker-2] Starting AI processing for CBOE 8-K
+[2025-07-17 16:37:01,882: INFO/ForkPoolWorker-2] Extracting text from tm2521107d1_8k.htm
+[2025-07-17 16:37:01,883: WARNING/ForkPoolWorker-2] Extracted text too short (73 chars), trying alternative methods
+[2025-07-17 16:37:01,884: INFO/ForkPoolWorker-2] Processing 8-K current report
+[2025-07-17 16:37:08,297: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:37:08,954: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:37:12,047: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:37:16,147: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:37:22,700: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:37:27,512: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:37:27,592: INFO/ForkPoolWorker-2] ✅ AI processing completed for 0001104659-25-068685
+[2025-07-17 16:37:27,597: INFO/ForkPoolWorker-2] Successfully processed filing 94
+[2025-07-17 16:37:27,606: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[0ee80e07-4c16-4c25-873d-fcf666ffb7d9] succeeded in 26.036923500010744s: {'status': 'success', 'filing_id': 94, 'company': 'CBOE', 'type': '8-K'}
+[2025-07-17 17:07:14,469: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[bf879daa-e7e7-4a77-bc1e-7a35e9981937] received
+[2025-07-17 17:07:14,490: INFO/ForkPoolWorker-2] Starting processing for filing 96
+[2025-07-17 17:07:14,520: INFO/ForkPoolWorker-2] Downloading filing 0001467373-25-000190
+[2025-07-17 17:07:14,537: INFO/ForkPoolWorker-2] Starting download for ACN 10-K (0001467373-25-000190)
+[2025-07-17 17:07:14,692: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1467373/0001467373-25-000190/-index.htm "HTTP/1.1 200 OK"
+[2025-07-17 17:07:14,693: INFO/ForkPoolWorker-2] Successfully fetched index from: https://www.sec.gov/Archives/edgar/data/1467373/0001467373-25-000190/-index.htm
+[2025-07-17 17:07:14,700: WARNING/ForkPoolWorker-2] Could not find main document in index, trying fallback methods
+[2025-07-17 17:07:14,791: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/1467373/000146737325000190/10-k.htm "HTTP/1.1 404 Not Found"
+[2025-07-17 17:07:14,916: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/1467373/000146737325000190/10-k.html "HTTP/1.1 404 Not Found"
+[2025-07-17 17:07:15,039: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/1467373/000146737325000190/form10k.htm "HTTP/1.1 404 Not Found"
+[2025-07-17 17:07:15,128: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/1467373/000146737325000190/acn-20250717.htm "HTTP/1.1 404 Not Found"
+[2025-07-17 17:07:15,237: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/1467373/000146737325000190/10k.htm "HTTP/1.1 404 Not Found"
+[2025-07-17 17:07:15,352: INFO/ForkPoolWorker-2] HTTP Request: HEAD https://www.sec.gov/Archives/edgar/data/1467373/000146737325000190/primary_doc.htm "HTTP/1.1 404 Not Found"
+[2025-07-17 17:07:15,354: WARNING/ForkPoolWorker-2] Could not find main document, but saved index.htm
+[2025-07-17 17:07:15,380: INFO/ForkPoolWorker-2] Processing filing 0001467373-25-000190 with AI
+[2025-07-17 17:07:15,403: INFO/ForkPoolWorker-2] Starting AI processing for ACN 10-K
+[2025-07-17 17:07:15,405: WARNING/ForkPoolWorker-2] No filing documents found in data/filings/0001467373/000146737325000190
+[2025-07-17 17:07:15,406: ERROR/ForkPoolWorker-2] Error in AI processing: Text extraction failed: No filing documents found
+[2025-07-17 17:07:15,433: ERROR/ForkPoolWorker-2] Error processing filing 96: Failed to process filing 0001467373-25-000190 with AI
 Traceback (most recent call last):
   File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
     raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0001698530-25-000062 with AI
-[2025-07-14 11:41:56,709: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a4be6ddc-f035-4cfb-86d4-a27509ee17e1] received
-[2025-07-14 11:41:56,711: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[a4be6ddc-f035-4cfb-86d4-a27509ee17e1] retry: Retry in 60s: Exception('Failed to process filing 0001698530-25-000062 with AI')
-[2025-07-14 11:42:56,700: INFO/ForkPoolWorker-8] Starting processing for filing 45
-[2025-07-14 11:42:56,759: INFO/ForkPoolWorker-8] Successfully processed filing 45
-[2025-07-14 11:42:56,767: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[a4be6ddc-f035-4cfb-86d4-a27509ee17e1] succeeded in 0.07035983394598588s: {'status': 'success', 'filing_id': 45, 'company': 'XCUR', 'type': 'S-1'}
-[2025-07-14 16:09:27,759: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[c0eb1ffb-ba65-44f6-b537-b2ce3f03716b] received
-[2025-07-14 16:09:27,781: INFO/ForkPoolWorker-8] Starting processing for filing 46
-[2025-07-14 16:09:27,820: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[3c6146e5-f7ee-45df-b892-f536c89ca641] received
-[2025-07-14 16:09:27,837: INFO/ForkPoolWorker-8] Downloading filing 0001104659-25-067747
-[2025-07-14 16:09:27,860: INFO/ForkPoolWorker-8] Starting download for AMCR 10-K (0001104659-25-067747)
-[2025-07-14 16:09:27,862: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1748790/000110465925067747/0001104659-25-067747-index.htm
-[2025-07-14 16:09:28,044: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1748790/000110465925067747/0001104659-25-067747-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 16:09:28,045: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 16:09:28,057: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-14 16:09:28,080: INFO/ForkPoolWorker-8] Processing filing 0001104659-25-067747 with AI
-[2025-07-14 16:09:28,088: INFO/ForkPoolWorker-8] Starting AI processing for AMCR 10-K
-[2025-07-14 16:09:28,089: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0001748790/000110465925067747
-[2025-07-14 16:09:28,089: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-14 16:09:28,095: ERROR/ForkPoolWorker-8] Error processing filing 46: Failed to process filing 0001104659-25-067747 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0001104659-25-067747 with AI
-[2025-07-14 16:09:28,109: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[c0eb1ffb-ba65-44f6-b537-b2ce3f03716b] received
-[2025-07-14 16:09:28,112: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[c0eb1ffb-ba65-44f6-b537-b2ce3f03716b] retry: Retry in 60s: Exception('Failed to process filing 0001104659-25-067747 with AI')
-[2025-07-14 16:09:33,770: INFO/ForkPoolWorker-8] Starting processing for filing 47
-[2025-07-14 16:09:33,802: INFO/ForkPoolWorker-8] Downloading filing 0000950170-25-095576
-[2025-07-14 16:09:33,818: INFO/ForkPoolWorker-8] Starting download for PAYX 8-K (0000950170-25-095576)
-[2025-07-14 16:09:33,820: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/723531/000095017025095576/0000950170-25-095576-index.htm
-[2025-07-14 16:09:33,921: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/723531/000095017025095576/0000950170-25-095576-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 16:09:33,922: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 16:09:33,929: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-14 16:09:33,943: INFO/ForkPoolWorker-8] Processing filing 0000950170-25-095576 with AI
-[2025-07-14 16:09:33,956: INFO/ForkPoolWorker-8] Starting AI processing for PAYX 8-K
-[2025-07-14 16:09:33,957: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0000723531/000095017025095576
-[2025-07-14 16:09:33,957: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-14 16:09:33,968: ERROR/ForkPoolWorker-8] Error processing filing 47: Failed to process filing 0000950170-25-095576 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0000950170-25-095576 with AI
-[2025-07-14 16:09:33,974: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[3c6146e5-f7ee-45df-b892-f536c89ca641] received
-[2025-07-14 16:09:33,981: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[3c6146e5-f7ee-45df-b892-f536c89ca641] retry: Retry in 60s: Exception('Failed to process filing 0000950170-25-095576 with AI')
-[2025-07-14 16:10:28,111: INFO/ForkPoolWorker-8] Starting processing for filing 46
-[2025-07-14 16:10:28,176: INFO/ForkPoolWorker-8] Successfully processed filing 46
-[2025-07-14 16:10:28,183: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[c0eb1ffb-ba65-44f6-b537-b2ce3f03716b] succeeded in 0.07336141599807888s: {'status': 'success', 'filing_id': 46, 'company': 'AMCR', 'type': '10-K'}
-[2025-07-14 16:10:34,107: INFO/ForkPoolWorker-8] Starting processing for filing 47
-[2025-07-14 16:10:34,127: INFO/ForkPoolWorker-8] Successfully processed filing 47
-[2025-07-14 16:10:34,133: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[3c6146e5-f7ee-45df-b892-f536c89ca641] succeeded in 0.025343957997392863s: {'status': 'success', 'filing_id': 47, 'company': 'PAYX', 'type': '8-K'}
-[2025-07-14 16:19:42,330: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[20a31317-83c0-4155-a142-4c6c6c17c9d2] received
-[2025-07-14 16:19:42,336: INFO/ForkPoolWorker-8] Starting processing for filing 48
-[2025-07-14 16:19:42,356: INFO/ForkPoolWorker-8] Downloading filing 0001193125-25-158742
-[2025-07-14 16:19:42,390: INFO/ForkPoolWorker-8] Starting download for MAR 8-K (0001193125-25-158742)
-[2025-07-14 16:19:42,393: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1048286/000119312525158742/0001193125-25-158742-index.htm
-[2025-07-14 16:19:42,487: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1048286/000119312525158742/0001193125-25-158742-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 16:19:42,488: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 16:19:42,496: INFO/ForkPoolWorker-8] Found primary document: d858138d8k.htm
-[2025-07-14 16:19:42,496: INFO/ForkPoolWorker-8] Found primary document: d858138d8k_htm.xml
-[2025-07-14 16:19:42,497: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/1048286/000119312525158742/d858138d8k.htm
-[2025-07-14 16:19:42,546: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F1048286%2F000119312525158742%2Fd858138d8k.htm "HTTP/1.1 200 OK"
-[2025-07-14 16:19:42,548: INFO/ForkPoolWorker-8] ✅ Downloaded d858138d8k.htm (6,356 bytes)
-[2025-07-14 16:19:42,575: INFO/ForkPoolWorker-8] Processing filing 0001193125-25-158742 with AI
-[2025-07-14 16:19:42,585: INFO/ForkPoolWorker-8] Starting AI processing for MAR 8-K
-[2025-07-14 16:19:42,587: INFO/ForkPoolWorker-8] Extracting text from d858138d8k.htm
-[2025-07-14 16:19:42,589: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
-[2025-07-14 16:19:42,590: INFO/ForkPoolWorker-8] Processing 8-K current report
-[2025-07-14 16:19:42,774: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 16:19:42,781: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 16:19:43,121: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 16:19:43,126: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 16:19:43,263: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 16:19:43,265: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 16:19:43,413: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 16:19:43,416: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 16:19:43,534: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 16:19:43,537: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 16:19:43,566: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001193125-25-158742
-[2025-07-14 16:19:43,576: INFO/ForkPoolWorker-8] Successfully processed filing 48
-[2025-07-14 16:19:43,578: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[78dbf9d9-4d19-4741-8201-a8b2adb69d25] received
-[2025-07-14 16:19:43,583: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[20a31317-83c0-4155-a142-4c6c6c17c9d2] succeeded in 1.2475359590025619s: {'status': 'success', 'filing_id': 48, 'company': 'MAR', 'type': '8-K'}
-[2025-07-14 16:19:43,609: INFO/ForkPoolWorker-1] Would send notifications for filing 48
-[2025-07-14 16:19:43,642: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[78dbf9d9-4d19-4741-8201-a8b2adb69d25] succeeded in 0.03786420897813514s: {'status': 'notifications_sent'}
-[2025-07-14 16:32:05,651: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[4bdb9ce2-26ba-4716-a414-1db8fa521b88] received
-[2025-07-14 16:32:05,687: INFO/ForkPoolWorker-8] Starting processing for filing 49
-[2025-07-14 16:32:05,725: INFO/ForkPoolWorker-8] Downloading filing 0000945841-25-000117
-[2025-07-14 16:32:05,744: INFO/ForkPoolWorker-8] Starting download for POOL 8-K (0000945841-25-000117)
-[2025-07-14 16:32:05,746: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/945841/000094584125000117/0000945841-25-000117-index.htm
-[2025-07-14 16:32:05,858: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/945841/000094584125000117/0000945841-25-000117-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 16:32:05,859: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 16:32:05,868: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-14 16:32:05,880: INFO/ForkPoolWorker-8] Processing filing 0000945841-25-000117 with AI
-[2025-07-14 16:32:05,890: INFO/ForkPoolWorker-8] Starting AI processing for POOL 8-K
-[2025-07-14 16:32:05,891: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0000945841/000094584125000117
-[2025-07-14 16:32:05,891: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-14 16:32:05,898: ERROR/ForkPoolWorker-8] Error processing filing 49: Failed to process filing 0000945841-25-000117 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0000945841-25-000117 with AI
-[2025-07-14 16:32:05,909: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[4bdb9ce2-26ba-4716-a414-1db8fa521b88] received
-[2025-07-14 16:32:05,913: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[4bdb9ce2-26ba-4716-a414-1db8fa521b88] retry: Retry in 60s: Exception('Failed to process filing 0000945841-25-000117 with AI')
-[2025-07-14 16:33:05,914: INFO/ForkPoolWorker-8] Starting processing for filing 49
-[2025-07-14 16:33:05,980: INFO/ForkPoolWorker-8] Successfully processed filing 49
-[2025-07-14 16:33:05,989: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[4bdb9ce2-26ba-4716-a414-1db8fa521b88] succeeded in 0.07722450001165271s: {'status': 'success', 'filing_id': 49, 'company': 'POOL', 'type': '8-K'}
-[2025-07-14 16:44:35,352: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[783cc5f4-c668-401e-b355-7a9b235f02e2] received
-[2025-07-14 16:44:35,359: INFO/ForkPoolWorker-8] Starting processing for filing 50
-[2025-07-14 16:44:35,377: INFO/ForkPoolWorker-8] Downloading filing 0000026172-25-000025
-[2025-07-14 16:44:35,407: INFO/ForkPoolWorker-8] Starting download for CMI 8-K (0000026172-25-000025)
-[2025-07-14 16:44:35,409: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/26172/000002617225000025/0000026172-25-000025-index.htm
-[2025-07-14 16:44:35,508: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/26172/000002617225000025/0000026172-25-000025-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 16:44:35,509: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 16:44:35,517: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-14 16:44:35,530: INFO/ForkPoolWorker-8] Processing filing 0000026172-25-000025 with AI
-[2025-07-14 16:44:35,540: INFO/ForkPoolWorker-8] Starting AI processing for CMI 8-K
-[2025-07-14 16:44:35,542: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0000026172/000002617225000025
-[2025-07-14 16:44:35,542: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-14 16:44:35,556: ERROR/ForkPoolWorker-8] Error processing filing 50: Failed to process filing 0000026172-25-000025 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0000026172-25-000025 with AI
-[2025-07-14 16:44:35,566: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[783cc5f4-c668-401e-b355-7a9b235f02e2] received
-[2025-07-14 16:44:35,567: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[783cc5f4-c668-401e-b355-7a9b235f02e2] retry: Retry in 60s: Exception('Failed to process filing 0000026172-25-000025 with AI')
-[2025-07-14 16:45:35,567: INFO/ForkPoolWorker-8] Starting processing for filing 50
-[2025-07-14 16:45:35,638: INFO/ForkPoolWorker-8] Successfully processed filing 50
-[2025-07-14 16:45:35,648: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[783cc5f4-c668-401e-b355-7a9b235f02e2] succeeded in 0.08141512499423698s: {'status': 'success', 'filing_id': 50, 'company': 'CMI', 'type': '8-K'}
-[2025-07-14 17:02:15,315: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[579af56d-2421-4b63-8fb2-b30fa79c0fe6] received
-[2025-07-14 17:02:15,318: INFO/ForkPoolWorker-8] Starting processing for filing 51
-[2025-07-14 17:02:15,329: INFO/ForkPoolWorker-8] Downloading filing 0001104659-25-067786
-[2025-07-14 17:02:15,342: INFO/ForkPoolWorker-8] Starting download for NEM 8-K (0001104659-25-067786)
-[2025-07-14 17:02:15,343: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1164727/000110465925067786/0001104659-25-067786-index.htm
-[2025-07-14 17:02:15,440: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1164727/000110465925067786/0001104659-25-067786-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 17:02:15,441: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 17:02:15,446: INFO/ForkPoolWorker-8] Found primary document: tm2520685d1_8k.htm
-[2025-07-14 17:02:15,446: INFO/ForkPoolWorker-8] Found primary document: tm2520685d1_8k_htm.xml
-[2025-07-14 17:02:15,447: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/1164727/000110465925067786/tm2520685d1_8k.htm
-[2025-07-14 17:02:15,495: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F1164727%2F000110465925067786%2Ftm2520685d1_8k.htm "HTTP/1.1 200 OK"
-[2025-07-14 17:02:15,497: INFO/ForkPoolWorker-8] ✅ Downloaded tm2520685d1_8k.htm (6,356 bytes)
-[2025-07-14 17:02:15,509: INFO/ForkPoolWorker-8] Processing filing 0001104659-25-067786 with AI
-[2025-07-14 17:02:15,518: INFO/ForkPoolWorker-8] Starting AI processing for NEM 8-K
-[2025-07-14 17:02:15,520: INFO/ForkPoolWorker-8] Extracting text from tm2520685d1_8k.htm
-[2025-07-14 17:02:15,522: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
-[2025-07-14 17:02:15,522: INFO/ForkPoolWorker-8] Processing 8-K current report
-[2025-07-14 17:02:15,751: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:02:15,753: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:02:15,876: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:02:15,877: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:02:16,332: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:02:16,335: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:02:16,478: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:02:16,479: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:02:16,603: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:02:16,605: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:02:16,620: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001104659-25-067786
-[2025-07-14 17:02:16,625: INFO/ForkPoolWorker-8] Successfully processed filing 51
-[2025-07-14 17:02:16,626: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[c2377907-6f8d-4b05-818d-e053b8c66e7a] received
-[2025-07-14 17:02:16,628: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[579af56d-2421-4b63-8fb2-b30fa79c0fe6] succeeded in 1.3105457920464687s: {'status': 'success', 'filing_id': 51, 'company': 'NEM', 'type': '8-K'}
-[2025-07-14 17:02:16,647: INFO/ForkPoolWorker-1] Would send notifications for filing 51
-[2025-07-14 17:02:16,675: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[c2377907-6f8d-4b05-818d-e053b8c66e7a] succeeded in 0.03200541704427451s: {'status': 'notifications_sent'}
-[2025-07-14 17:05:18,327: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[2f12351e-eb4f-4139-acff-001060a8d0f3] received
-[2025-07-14 17:05:18,330: INFO/ForkPoolWorker-8] Starting processing for filing 52
-[2025-07-14 17:05:18,342: INFO/ForkPoolWorker-8] Downloading filing 0001193125-25-158796
-[2025-07-14 17:05:18,354: INFO/ForkPoolWorker-8] Starting download for WAT 8-K (0001193125-25-158796)
-[2025-07-14 17:05:18,355: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1000697/000119312525158796/0001193125-25-158796-index.htm
-[2025-07-14 17:05:18,452: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1000697/000119312525158796/0001193125-25-158796-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 17:05:18,453: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 17:05:18,462: INFO/ForkPoolWorker-8] Found primary document: d865176d8k.htm
-[2025-07-14 17:05:18,462: INFO/ForkPoolWorker-8] Found primary document: d865176d8k_htm.xml
-[2025-07-14 17:05:18,462: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/1000697/000119312525158796/d865176d8k.htm
-[2025-07-14 17:05:18,551: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F1000697%2F000119312525158796%2Fd865176d8k.htm "HTTP/1.1 200 OK"
-[2025-07-14 17:05:18,553: INFO/ForkPoolWorker-8] ✅ Downloaded d865176d8k.htm (6,356 bytes)
-[2025-07-14 17:05:18,575: INFO/ForkPoolWorker-8] Processing filing 0001193125-25-158796 with AI
-[2025-07-14 17:05:18,584: INFO/ForkPoolWorker-8] Starting AI processing for WAT 8-K
-[2025-07-14 17:05:18,585: INFO/ForkPoolWorker-8] Extracting text from d865176d8k.htm
-[2025-07-14 17:05:18,587: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
-[2025-07-14 17:05:18,587: INFO/ForkPoolWorker-8] Processing 8-K current report
-[2025-07-14 17:05:18,768: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:05:18,771: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:05:18,854: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:05:18,857: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:05:19,850: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:05:19,851: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:05:19,995: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:05:19,995: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:05:20,149: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:05:20,150: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:05:20,168: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001193125-25-158796
-[2025-07-14 17:05:20,172: INFO/ForkPoolWorker-8] Successfully processed filing 52
-[2025-07-14 17:05:20,173: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[6eefa4e7-aa95-4a85-9ffb-7d9239115615] received
-[2025-07-14 17:05:20,176: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[2f12351e-eb4f-4139-acff-001060a8d0f3] succeeded in 1.8466943749808706s: {'status': 'success', 'filing_id': 52, 'company': 'WAT', 'type': '8-K'}
-[2025-07-14 17:05:20,180: INFO/ForkPoolWorker-1] Would send notifications for filing 52
-[2025-07-14 17:05:20,187: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[6eefa4e7-aa95-4a85-9ffb-7d9239115615] succeeded in 0.008603291993495077s: {'status': 'notifications_sent'}
-[2025-07-14 17:06:19,549: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[91114311-21f7-41c3-a048-e4d73294ee49] received
-[2025-07-14 17:06:19,553: INFO/ForkPoolWorker-8] Starting processing for filing 53
-[2025-07-14 17:06:19,568: INFO/ForkPoolWorker-8] Downloading filing 0001213900-25-063772
-[2025-07-14 17:06:19,586: INFO/ForkPoolWorker-8] Starting download for GITS S-1 (0001213900-25-063772)
-[2025-07-14 17:06:19,588: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1911545/000121390025063772/0001213900-25-063772-index.htm
-[2025-07-14 17:06:19,674: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1911545/000121390025063772/0001213900-25-063772-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 17:06:19,675: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 17:06:19,680: INFO/ForkPoolWorker-8] Found primary document: ea0248624-s1_global.htm
-[2025-07-14 17:06:19,681: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/Archives/edgar/data/1911545/000121390025063772/ea0248624-s1_global.htm
-[2025-07-14 17:06:19,740: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1911545/000121390025063772/ea0248624-s1_global.htm "HTTP/1.1 200 OK"
-[2025-07-14 17:06:19,754: INFO/ForkPoolWorker-8] ✅ Downloaded ea0248624-s1_global.htm (397,435 bytes)
-[2025-07-14 17:06:19,767: INFO/ForkPoolWorker-8] Processing filing 0001213900-25-063772 with AI
-[2025-07-14 17:06:19,780: INFO/ForkPoolWorker-8] Starting AI processing for GITS S-1
-[2025-07-14 17:06:19,781: INFO/ForkPoolWorker-8] Extracting text from ea0248624-s1_global.htm
-[2025-07-14 17:06:20,082: INFO/ForkPoolWorker-8] Processing S-1 IPO registration
-[2025-07-14 17:06:20,083: INFO/ForkPoolWorker-8] Truncating content from 50000 to 45000 chars
-[2025-07-14 17:06:20,278: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:06:20,279: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:06:20,387: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:06:20,388: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:06:20,475: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:06:20,477: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:06:20,604: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:06:20,608: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:06:20,706: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:06:20,708: ERROR/ForkPoolWorker-8] IPO metrics extraction error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:06:20,742: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001213900-25-063772
-[2025-07-14 17:06:20,745: INFO/ForkPoolWorker-8] Successfully processed filing 53
-[2025-07-14 17:06:20,746: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[ce494884-213c-46ae-9b3f-4f91ec289d8e] received
-[2025-07-14 17:06:20,748: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[91114311-21f7-41c3-a048-e4d73294ee49] succeeded in 1.195550500007812s: {'status': 'success', 'filing_id': 53, 'company': 'GITS', 'type': 'S-1'}
-[2025-07-14 17:06:20,750: INFO/ForkPoolWorker-1] Would send notifications for filing 53
-[2025-07-14 17:06:20,757: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[ce494884-213c-46ae-9b3f-4f91ec289d8e] succeeded in 0.006894583057146519s: {'status': 'notifications_sent'}
-[2025-07-14 17:07:20,338: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[0daf78eb-8d9b-460b-ae33-2fe9f2d2a7f7] received
-[2025-07-14 17:07:20,343: INFO/ForkPoolWorker-8] Starting processing for filing 54
-[2025-07-14 17:07:20,357: INFO/ForkPoolWorker-8] Downloading filing 0001193125-25-158797
-[2025-07-14 17:07:20,371: INFO/ForkPoolWorker-8] Starting download for BDX 8-K (0001193125-25-158797)
-[2025-07-14 17:07:20,373: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/10795/000119312525158797/0001193125-25-158797-index.htm
-[2025-07-14 17:07:20,449: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/10795/000119312525158797/0001193125-25-158797-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 17:07:20,449: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 17:07:20,454: INFO/ForkPoolWorker-8] Found primary document: d822749d8k.htm
-[2025-07-14 17:07:20,454: INFO/ForkPoolWorker-8] Found primary document: d822749d8k_htm.xml
-[2025-07-14 17:07:20,454: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/10795/000119312525158797/d822749d8k.htm
-[2025-07-14 17:07:20,543: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F10795%2F000119312525158797%2Fd822749d8k.htm "HTTP/1.1 200 OK"
-[2025-07-14 17:07:20,544: INFO/ForkPoolWorker-8] ✅ Downloaded d822749d8k.htm (6,356 bytes)
-[2025-07-14 17:07:20,565: INFO/ForkPoolWorker-8] Processing filing 0001193125-25-158797 with AI
-[2025-07-14 17:07:20,574: INFO/ForkPoolWorker-8] Starting AI processing for BDX 8-K
-[2025-07-14 17:07:20,575: INFO/ForkPoolWorker-8] Extracting text from d822749d8k.htm
-[2025-07-14 17:07:20,575: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
-[2025-07-14 17:07:20,576: INFO/ForkPoolWorker-8] Processing 8-K current report
-[2025-07-14 17:07:20,709: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:07:20,710: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:07:20,820: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:07:20,821: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:07:20,938: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:07:20,940: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:07:21,060: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:07:21,062: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:07:21,150: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:07:21,153: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:07:21,169: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001193125-25-158797
-[2025-07-14 17:07:21,174: INFO/ForkPoolWorker-8] Successfully processed filing 54
-[2025-07-14 17:07:21,175: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[8760d8a6-097d-45d2-83b8-b682b027f36c] received
-[2025-07-14 17:07:21,178: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[0daf78eb-8d9b-460b-ae33-2fe9f2d2a7f7] succeeded in 0.8358040839666501s: {'status': 'success', 'filing_id': 54, 'company': 'BDX', 'type': '8-K'}
-[2025-07-14 17:07:21,178: INFO/ForkPoolWorker-1] Would send notifications for filing 54
-[2025-07-14 17:07:21,183: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[8760d8a6-097d-45d2-83b8-b682b027f36c] succeeded in 0.005065708013717085s: {'status': 'notifications_sent'}
-[2025-07-14 17:26:44,213: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[5cf8cc15-d63f-455e-96b1-ef246ed0c579] received
-[2025-07-14 17:26:44,217: INFO/ForkPoolWorker-8] Starting processing for filing 55
-[2025-07-14 17:26:44,243: INFO/ForkPoolWorker-8] Downloading filing 0001079973-25-001147
-[2025-07-14 17:26:44,258: INFO/ForkPoolWorker-8] Starting download for DUOT S-1 (0001079973-25-001147)
-[2025-07-14 17:26:44,261: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1396536/000107997325001147/0001079973-25-001147-index.htm
-[2025-07-14 17:26:44,333: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1396536/000107997325001147/0001079973-25-001147-index.htm "HTTP/1.1 200 OK"
-[2025-07-14 17:26:44,333: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-14 17:26:44,341: INFO/ForkPoolWorker-8] Found primary document: duos_s1.htm
-[2025-07-14 17:26:44,341: INFO/ForkPoolWorker-8] Found primary document: duos_s1_htm.xml
-[2025-07-14 17:26:44,341: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/1396536/000107997325001147/duos_s1.htm
-[2025-07-14 17:26:44,403: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F1396536%2F000107997325001147%2Fduos_s1.htm "HTTP/1.1 200 OK"
-[2025-07-14 17:26:44,404: INFO/ForkPoolWorker-8] ✅ Downloaded duos_s1.htm (6,356 bytes)
-[2025-07-14 17:26:44,424: INFO/ForkPoolWorker-8] Processing filing 0001079973-25-001147 with AI
-[2025-07-14 17:26:44,434: INFO/ForkPoolWorker-8] Starting AI processing for DUOT S-1
-[2025-07-14 17:26:44,435: INFO/ForkPoolWorker-8] Extracting text from duos_s1.htm
-[2025-07-14 17:26:44,436: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
-[2025-07-14 17:26:44,436: INFO/ForkPoolWorker-8] Processing S-1 IPO registration
-[2025-07-14 17:26:44,614: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:26:44,617: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:26:44,752: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:26:44,755: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:26:44,898: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:26:44,901: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:26:45,039: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:26:45,042: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:26:45,493: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-14 17:26:45,495: ERROR/ForkPoolWorker-8] IPO metrics extraction error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-14 17:26:45,511: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001079973-25-001147
-[2025-07-14 17:26:45,515: INFO/ForkPoolWorker-8] Successfully processed filing 55
-[2025-07-14 17:26:45,516: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[0f4dae1d-e71d-412b-abbd-d19a102bbe3c] received
-[2025-07-14 17:26:45,520: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[5cf8cc15-d63f-455e-96b1-ef246ed0c579] succeeded in 1.3038476249785163s: {'status': 'success', 'filing_id': 55, 'company': 'DUOT', 'type': 'S-1'}
-[2025-07-14 17:26:45,521: INFO/ForkPoolWorker-1] Would send notifications for filing 55
-[2025-07-14 17:26:45,547: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[0f4dae1d-e71d-412b-abbd-d19a102bbe3c] succeeded in 0.027635417005512863s: {'status': 'notifications_sent'}
-[2025-07-15 07:08:03,092: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[55f348e3-a5b2-4b00-a8d0-899adb1f9c7b] received
-[2025-07-15 07:08:03,129: INFO/ForkPoolWorker-8] Starting processing for filing 56
-[2025-07-15 07:08:03,163: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a14dcc71-71cd-4b87-a0a9-acaa272b8e0c] received
-[2025-07-15 07:08:03,166: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[d2b27da7-a95d-45dc-9f36-b58bd3bd8fc0] received
-[2025-07-15 07:08:03,168: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[60f725af-903e-4807-985d-0c1b7353c10b] received
-[2025-07-15 07:08:03,169: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[dda31e3a-f5f4-4b0a-9417-31a0cbf4f1b3] received
-[2025-07-15 07:08:03,189: INFO/ForkPoolWorker-8] Downloading filing 0000072971-25-000170
-[2025-07-15 07:08:03,228: INFO/ForkPoolWorker-8] Starting download for WFC 8-K (0000072971-25-000170)
-[2025-07-15 07:08:03,232: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/72971/000007297125000170/0000072971-25-000170-index.htm
-[2025-07-15 07:08:03,325: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/72971/000007297125000170/0000072971-25-000170-index.htm "HTTP/1.1 200 OK"
-[2025-07-15 07:08:03,326: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-15 07:08:03,334: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-15 07:08:03,342: INFO/ForkPoolWorker-8] Processing filing 0000072971-25-000170 with AI
-[2025-07-15 07:08:03,351: INFO/ForkPoolWorker-8] Starting AI processing for WFC 8-K
-[2025-07-15 07:08:03,352: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0000072971/000007297125000170
-[2025-07-15 07:08:03,353: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-15 07:08:03,370: ERROR/ForkPoolWorker-8] Error processing filing 56: Failed to process filing 0000072971-25-000170 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0000072971-25-000170 with AI
-[2025-07-15 07:08:03,417: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[55f348e3-a5b2-4b00-a8d0-899adb1f9c7b] received
-[2025-07-15 07:08:03,423: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[55f348e3-a5b2-4b00-a8d0-899adb1f9c7b] retry: Retry in 60s: Exception('Failed to process filing 0000072971-25-000170 with AI')
-[2025-07-15 07:23:10,098: INFO/ForkPoolWorker-8] Starting processing for filing 57
-[2025-07-15 07:23:10,117: INFO/ForkPoolWorker-8] Downloading filing 0000950170-25-095711
-[2025-07-15 07:23:10,168: INFO/ForkPoolWorker-8] Starting download for BLK 8-K (0000950170-25-095711)
-[2025-07-15 07:23:10,172: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/2012383/000095017025095711/0000950170-25-095711-index.htm
-[2025-07-15 07:23:10,298: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/2012383/000095017025095711/0000950170-25-095711-index.htm "HTTP/1.1 200 OK"
-[2025-07-15 07:23:10,299: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-15 07:23:10,304: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-15 07:23:10,311: INFO/ForkPoolWorker-8] Processing filing 0000950170-25-095711 with AI
-[2025-07-15 07:23:10,320: INFO/ForkPoolWorker-8] Starting AI processing for BLK 8-K
-[2025-07-15 07:23:10,320: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0002012383/000095017025095711
-[2025-07-15 07:23:10,320: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-15 07:23:10,326: ERROR/ForkPoolWorker-8] Error processing filing 57: Failed to process filing 0000950170-25-095711 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0000950170-25-095711 with AI
-[2025-07-15 07:23:10,330: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a14dcc71-71cd-4b87-a0a9-acaa272b8e0c] received
-[2025-07-15 07:23:10,331: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[a14dcc71-71cd-4b87-a0a9-acaa272b8e0c] retry: Retry in 60s: Exception('Failed to process filing 0000950170-25-095711 with AI')
-[2025-07-15 07:40:50,051: INFO/ForkPoolWorker-8] Starting processing for filing 58
-[2025-07-15 07:40:50,061: INFO/ForkPoolWorker-8] Downloading filing 0001001250-25-000090
-[2025-07-15 07:40:50,074: INFO/ForkPoolWorker-8] Starting download for EL 8-K (0001001250-25-000090)
-[2025-07-15 07:40:50,075: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1001250/000100125025000090/0001001250-25-000090-index.htm
-[2025-07-15 07:40:50,188: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1001250/000100125025000090/0001001250-25-000090-index.htm "HTTP/1.1 200 OK"
-[2025-07-15 07:40:50,188: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-15 07:40:50,192: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-15 07:40:50,202: INFO/ForkPoolWorker-8] Processing filing 0001001250-25-000090 with AI
-[2025-07-15 07:40:50,213: INFO/ForkPoolWorker-8] Starting AI processing for EL 8-K
-[2025-07-15 07:40:50,213: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0001001250/000100125025000090
-[2025-07-15 07:40:50,213: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-15 07:40:50,223: ERROR/ForkPoolWorker-8] Error processing filing 58: Failed to process filing 0001001250-25-000090 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0001001250-25-000090 with AI
-[2025-07-15 07:40:50,226: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[d2b27da7-a95d-45dc-9f36-b58bd3bd8fc0] received
-[2025-07-15 07:40:50,228: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[d2b27da7-a95d-45dc-9f36-b58bd3bd8fc0] retry: Retry in 60s: Exception('Failed to process filing 0001001250-25-000090 with AI')
-[2025-07-15 07:53:34,481: INFO/ForkPoolWorker-8] Starting processing for filing 59
-[2025-07-15 07:53:34,561: INFO/ForkPoolWorker-8] Downloading filing 0000019617-25-000518
-[2025-07-15 07:53:34,607: INFO/ForkPoolWorker-8] Starting download for JPM 8-K (0000019617-25-000518)
-[2025-07-15 07:53:34,609: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/19617/000001961725000518/0000019617-25-000518-index.htm
-[2025-07-15 07:53:34,981: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/19617/000001961725000518/0000019617-25-000518-index.htm "HTTP/1.1 200 OK"
-[2025-07-15 07:53:34,982: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-15 07:53:34,997: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-15 07:53:35,013: INFO/ForkPoolWorker-8] Processing filing 0000019617-25-000518 with AI
-[2025-07-15 07:53:35,030: INFO/ForkPoolWorker-8] Starting AI processing for JPM 8-K
-[2025-07-15 07:53:35,031: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0000019617/000001961725000518
-[2025-07-15 07:53:35,032: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-15 07:53:35,047: ERROR/ForkPoolWorker-8] Error processing filing 59: Failed to process filing 0000019617-25-000518 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0000019617-25-000518 with AI
-[2025-07-15 07:53:35,061: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[60f725af-903e-4807-985d-0c1b7353c10b] received
-[2025-07-15 07:53:35,061: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[60f725af-903e-4807-985d-0c1b7353c10b] retry: Retry in 60s: Exception('Failed to process filing 0000019617-25-000518 with AI')
-[2025-07-15 07:53:40,476: INFO/ForkPoolWorker-8] Starting processing for filing 60
-[2025-07-15 07:53:40,485: INFO/ForkPoolWorker-8] Downloading filing 0001390777-25-000100
-[2025-07-15 07:53:40,510: INFO/ForkPoolWorker-8] Starting download for BK 8-K (0001390777-25-000100)
-[2025-07-15 07:53:40,511: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1390777/000139077725000100/0001390777-25-000100-index.htm
-[2025-07-15 07:53:40,610: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1390777/000139077725000100/0001390777-25-000100-index.htm "HTTP/1.1 200 OK"
-[2025-07-15 07:53:40,610: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-15 07:53:40,620: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-15 07:53:40,626: INFO/ForkPoolWorker-8] Processing filing 0001390777-25-000100 with AI
-[2025-07-15 07:53:40,634: INFO/ForkPoolWorker-8] Starting AI processing for BK 8-K
-[2025-07-15 07:53:40,636: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0001390777/000139077725000100
-[2025-07-15 07:53:40,636: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-15 07:53:40,642: ERROR/ForkPoolWorker-8] Error processing filing 60: Failed to process filing 0001390777-25-000100 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0001390777-25-000100 with AI
-[2025-07-15 07:53:40,646: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[dda31e3a-f5f4-4b0a-9417-31a0cbf4f1b3] received
-[2025-07-15 07:53:40,646: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[dda31e3a-f5f4-4b0a-9417-31a0cbf4f1b3] retry: Retry in 60s: Exception('Failed to process filing 0001390777-25-000100 with AI')
-[2025-07-15 09:35:16,804: INFO/ForkPoolWorker-8] Starting processing for filing 56
-[2025-07-15 09:35:16,905: INFO/ForkPoolWorker-8] Successfully processed filing 56
-[2025-07-15 09:35:16,911: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[55f348e3-a5b2-4b00-a8d0-899adb1f9c7b] succeeded in 0.10781266703270376s: {'status': 'success', 'filing_id': 56, 'company': 'WFC', 'type': '8-K'}
-[2025-07-15 09:35:22,467: INFO/ForkPoolWorker-8] Starting processing for filing 57
-[2025-07-15 09:35:22,484: INFO/ForkPoolWorker-8] Successfully processed filing 57
-[2025-07-15 09:35:22,488: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[a14dcc71-71cd-4b87-a0a9-acaa272b8e0c] succeeded in 0.020716415951028466s: {'status': 'success', 'filing_id': 57, 'company': 'BLK', 'type': '8-K'}
-[2025-07-15 09:48:06,464: INFO/ForkPoolWorker-8] Starting processing for filing 58
-[2025-07-15 09:48:06,505: INFO/ForkPoolWorker-8] Successfully processed filing 58
-[2025-07-15 09:48:06,514: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[d2b27da7-a95d-45dc-9f36-b58bd3bd8fc0] succeeded in 0.05099333298858255s: {'status': 'success', 'filing_id': 58, 'company': 'EL', 'type': '8-K'}
-[2025-07-15 10:05:59,210: INFO/ForkPoolWorker-8] Starting processing for filing 59
-[2025-07-15 10:05:59,225: INFO/ForkPoolWorker-8] Successfully processed filing 59
-[2025-07-15 10:05:59,230: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[60f725af-903e-4807-985d-0c1b7353c10b] succeeded in 0.019474791013635695s: {'status': 'success', 'filing_id': 59, 'company': 'JPM', 'type': '8-K'}
-[2025-07-15 10:23:43,149: INFO/ForkPoolWorker-8] Starting processing for filing 60
-[2025-07-15 10:23:43,172: INFO/ForkPoolWorker-8] Successfully processed filing 60
-[2025-07-15 10:23:43,180: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[dda31e3a-f5f4-4b0a-9417-31a0cbf4f1b3] succeeded in 0.03097750002052635s: {'status': 'success', 'filing_id': 60, 'company': 'BK', 'type': '8-K'}
-[2025-07-15 16:11:56,614: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[8369e819-1ed1-4855-936a-b182ed3013d9] received
-[2025-07-15 16:11:56,650: INFO/ForkPoolWorker-8] Starting processing for filing 61
-[2025-07-15 16:11:56,709: INFO/ForkPoolWorker-8] Downloading filing 0000029989-25-000025
-[2025-07-15 16:11:56,741: INFO/ForkPoolWorker-8] Starting download for OMC 8-K (0000029989-25-000025)
-[2025-07-15 16:11:56,745: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/29989/000002998925000025/0000029989-25-000025-index.htm
-[2025-07-15 16:11:56,902: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/29989/000002998925000025/0000029989-25-000025-index.htm "HTTP/1.1 200 OK"
-[2025-07-15 16:11:56,903: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-15 16:11:56,915: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-15 16:11:56,926: INFO/ForkPoolWorker-8] Processing filing 0000029989-25-000025 with AI
-[2025-07-15 16:11:56,939: INFO/ForkPoolWorker-8] Starting AI processing for OMC 8-K
-[2025-07-15 16:11:56,941: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0000029989/000002998925000025
-[2025-07-15 16:11:56,942: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-15 16:11:56,951: ERROR/ForkPoolWorker-8] Error processing filing 61: Failed to process filing 0000029989-25-000025 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0000029989-25-000025 with AI
-[2025-07-15 16:11:56,969: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[8369e819-1ed1-4855-936a-b182ed3013d9] received
-[2025-07-15 16:11:56,974: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[8369e819-1ed1-4855-936a-b182ed3013d9] retry: Retry in 60s: Exception('Failed to process filing 0000029989-25-000025 with AI')
-[2025-07-15 16:12:56,970: INFO/ForkPoolWorker-8] Starting processing for filing 61
-[2025-07-15 16:12:57,013: INFO/ForkPoolWorker-8] Successfully processed filing 61
-[2025-07-15 16:12:57,019: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[8369e819-1ed1-4855-936a-b182ed3013d9] succeeded in 0.05072116700466722s: {'status': 'success', 'filing_id': 61, 'company': 'OMC', 'type': '8-K'}
-[2025-07-15 16:16:27,924: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[104d3457-3448-4fb1-967a-c0279df3ce75] received
-[2025-07-15 16:16:27,927: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[4b1250d4-77f7-4171-a43e-1ec6e740135c] received
-[2025-07-15 16:16:27,929: INFO/ForkPoolWorker-8] Starting processing for filing 62
-[2025-07-15 16:16:27,951: INFO/ForkPoolWorker-8] Downloading filing 0001267238-25-000039
-[2025-07-15 16:16:27,970: INFO/ForkPoolWorker-8] Starting download for AIZ 8-K (0001267238-25-000039)
-[2025-07-15 16:16:27,973: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1267238/000126723825000039/0001267238-25-000039-index.htm
-[2025-07-15 16:16:28,071: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1267238/000126723825000039/0001267238-25-000039-index.htm "HTTP/1.1 200 OK"
-[2025-07-15 16:16:28,072: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-15 16:16:28,079: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-15 16:16:28,109: INFO/ForkPoolWorker-8] Processing filing 0001267238-25-000039 with AI
-[2025-07-15 16:16:28,119: INFO/ForkPoolWorker-8] Starting AI processing for AIZ 8-K
-[2025-07-15 16:16:28,120: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0001267238/000126723825000039
-[2025-07-15 16:16:28,120: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-15 16:16:28,132: ERROR/ForkPoolWorker-8] Error processing filing 62: Failed to process filing 0001267238-25-000039 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0001267238-25-000039 with AI
-[2025-07-15 16:16:28,141: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[104d3457-3448-4fb1-967a-c0279df3ce75] received
-[2025-07-15 16:16:28,141: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[104d3457-3448-4fb1-967a-c0279df3ce75] retry: Retry in 60s: Exception('Failed to process filing 0001267238-25-000039 with AI')
-[2025-07-15 16:16:33,928: INFO/ForkPoolWorker-8] Starting processing for filing 63
-[2025-07-15 16:16:33,951: INFO/ForkPoolWorker-8] Downloading filing 0001437749-25-022724
-[2025-07-15 16:16:33,973: INFO/ForkPoolWorker-8] Starting download for JBHT 8-K (0001437749-25-022724)
-[2025-07-15 16:16:33,977: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/728535/000143774925022724/0001437749-25-022724-index.htm
-[2025-07-15 16:16:34,088: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/728535/000143774925022724/0001437749-25-022724-index.htm "HTTP/1.1 200 OK"
-[2025-07-15 16:16:34,089: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-15 16:16:34,097: INFO/ForkPoolWorker-8] Found primary document: jbht20250714_8k.htm
-[2025-07-15 16:16:34,097: INFO/ForkPoolWorker-8] Found primary document: jbht20250714_8k_htm.xml
-[2025-07-15 16:16:34,098: INFO/ForkPoolWorker-8] Downloading primary document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/728535/000143774925022724/jbht20250714_8k.htm
-[2025-07-15 16:16:34,151: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F728535%2F000143774925022724%2Fjbht20250714_8k.htm "HTTP/1.1 200 OK"
-[2025-07-15 16:16:34,156: INFO/ForkPoolWorker-8] ✅ Downloaded jbht20250714_8k.htm (6,356 bytes)
-[2025-07-15 16:16:34,170: INFO/ForkPoolWorker-8] Processing filing 0001437749-25-022724 with AI
-[2025-07-15 16:16:34,186: INFO/ForkPoolWorker-8] Starting AI processing for JBHT 8-K
-[2025-07-15 16:16:34,187: INFO/ForkPoolWorker-8] Extracting text from jbht20250714_8k.htm
-[2025-07-15 16:16:34,190: WARNING/ForkPoolWorker-8] Extracted text too short (73 chars), trying alternative methods
-[2025-07-15 16:16:34,191: INFO/ForkPoolWorker-8] Processing 8-K current report
-[2025-07-15 16:16:34,933: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-15 16:16:34,936: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-15 16:16:35,038: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-15 16:16:35,041: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-15 16:16:35,561: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-15 16:16:35,562: ERROR/ForkPoolWorker-8] Tone analysis error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-15 16:16:35,708: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-15 16:16:35,711: ERROR/ForkPoolWorker-8] Q&A generation error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-15 16:16:36,189: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
-[2025-07-15 16:16:36,193: ERROR/ForkPoolWorker-8] OpenAI API error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************MjUA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
-[2025-07-15 16:16:36,217: INFO/ForkPoolWorker-8] ✅ AI processing completed for 0001437749-25-022724
-[2025-07-15 16:16:36,222: INFO/ForkPoolWorker-8] Successfully processed filing 63
-[2025-07-15 16:16:36,224: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[1a156597-9cdd-4c42-824b-d7bf1476f1f1] received
-[2025-07-15 16:16:36,227: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[4b1250d4-77f7-4171-a43e-1ec6e740135c] succeeded in 2.2985874169971794s: {'status': 'success', 'filing_id': 63, 'company': 'JBHT', 'type': '8-K'}
-[2025-07-15 16:16:36,246: INFO/ForkPoolWorker-1] Would send notifications for filing 63
-[2025-07-15 16:16:36,265: INFO/ForkPoolWorker-1] Task app.tasks.filing_tasks.send_filing_notifications[1a156597-9cdd-4c42-824b-d7bf1476f1f1] succeeded in 0.021769916987977922s: {'status': 'notifications_sent'}
-[2025-07-15 16:17:28,143: INFO/ForkPoolWorker-8] Starting processing for filing 62
-[2025-07-15 16:17:28,181: INFO/ForkPoolWorker-8] Successfully processed filing 62
-[2025-07-15 16:17:28,188: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[104d3457-3448-4fb1-967a-c0279df3ce75] succeeded in 0.045775084057822824s: {'status': 'success', 'filing_id': 62, 'company': 'AIZ', 'type': '8-K'}
-[2025-07-15 16:21:57,089: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[1d254e9b-be49-4896-beb3-9f85501dcce1] received
-[2025-07-15 16:21:57,094: INFO/ForkPoolWorker-8] Starting processing for filing 64
-[2025-07-15 16:21:57,110: INFO/ForkPoolWorker-8] Downloading filing 0001137774-25-000095
-[2025-07-15 16:21:57,124: INFO/ForkPoolWorker-8] Starting download for PRU 8-K (0001137774-25-000095)
-[2025-07-15 16:21:57,126: INFO/ForkPoolWorker-8] Checking index page: https://www.sec.gov/Archives/edgar/data/1137774/000113777425000095/0001137774-25-000095-index.htm
-[2025-07-15 16:21:57,204: INFO/ForkPoolWorker-8] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1137774/000113777425000095/0001137774-25-000095-index.htm "HTTP/1.1 200 OK"
-[2025-07-15 16:21:57,205: INFO/ForkPoolWorker-8] ✅ Found index page
-[2025-07-15 16:21:57,213: WARNING/ForkPoolWorker-8] No primary document found in index page
-[2025-07-15 16:21:57,237: INFO/ForkPoolWorker-8] Processing filing 0001137774-25-000095 with AI
-[2025-07-15 16:21:57,245: INFO/ForkPoolWorker-8] Starting AI processing for PRU 8-K
-[2025-07-15 16:21:57,246: WARNING/ForkPoolWorker-8] No filing documents found in data/filings/0001137774/000113777425000095
-[2025-07-15 16:21:57,246: ERROR/ForkPoolWorker-8] Error in AI processing: Text extraction failed: No filing documents found
-[2025-07-15 16:21:57,256: ERROR/ForkPoolWorker-8] Error processing filing 64: Failed to process filing 0001137774-25-000095 with AI
-Traceback (most recent call last):
-  File "/Users/evanhao/Documents/fintellic/fintellic-backend/app/tasks/filing_tasks.py", line 85, in process_filing_task
-    raise Exception(f"Failed to process filing {filing.accession_number} with AI")
-Exception: Failed to process filing 0001137774-25-000095 with AI
-[2025-07-15 16:21:57,262: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[1d254e9b-be49-4896-beb3-9f85501dcce1] received
-[2025-07-15 16:21:57,263: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[1d254e9b-be49-4896-beb3-9f85501dcce1] retry: Retry in 60s: Exception('Failed to process filing 0001137774-25-000095 with AI')
-[2025-07-15 16:22:57,267: INFO/ForkPoolWorker-8] Starting processing for filing 64
-[2025-07-15 16:22:57,329: INFO/ForkPoolWorker-8] Successfully processed filing 64
-[2025-07-15 16:22:57,335: INFO/ForkPoolWorker-8] Task app.tasks.filing_tasks.process_filing_task[1d254e9b-be49-4896-beb3-9f85501dcce1] succeeded in 0.07054429198615253s: {'status': 'success', 'filing_id': 64, 'company': 'PRU', 'type': '8-K'}
+Exception: Failed to process filing 0001467373-25-000190 with AI
+[2025-07-17 17:07:15,452: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[bf879daa-e7e7-4a77-bc1e-7a35e9981937] received
+[2025-07-17 17:07:15,455: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[bf879daa-e7e7-4a77-bc1e-7a35e9981937] retry: Retry in 60s: Exception('Failed to process filing 0001467373-25-000190 with AI')
+[2025-07-17 17:11:59,885: INFO/ForkPoolWorker-2] Starting processing for filing 96
+[2025-07-17 17:11:59,916: INFO/ForkPoolWorker-2] Successfully processed filing 96
+[2025-07-17 17:11:59,919: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[bf879daa-e7e7-4a77-bc1e-7a35e9981937] succeeded in 0.03469045809470117s: {'status': 'success', 'filing_id': 96, 'company': 'ACN', 'type': '10-K'}
+[2025-07-17 17:16:28,612: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[5b1dfbc9-5dc6-4368-926e-b59a1e976e37] received
+[2025-07-17 17:16:28,620: INFO/ForkPoolWorker-2] Starting processing for filing 98
+[2025-07-17 17:16:28,640: ERROR/ForkPoolWorker-2] Filing 98 not found
+[2025-07-17 17:16:28,664: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[5b1dfbc9-5dc6-4368-926e-b59a1e976e37] succeeded in 0.04582054098136723s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:17:29,843: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[e391a3c2-2115-4461-8ca2-9c8deff6b87d] received
+[2025-07-17 17:17:29,852: INFO/ForkPoolWorker-2] Starting processing for filing 99
+[2025-07-17 17:17:29,865: ERROR/ForkPoolWorker-2] Filing 99 not found
+[2025-07-17 17:17:29,867: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[e391a3c2-2115-4461-8ca2-9c8deff6b87d] succeeded in 0.015183292096480727s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:19:32,428: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[c11de7d3-b997-41cc-9dd6-fc905b53bbfd] received
+[2025-07-17 17:19:32,432: INFO/ForkPoolWorker-2] Starting processing for filing 101
+[2025-07-17 17:19:32,444: ERROR/ForkPoolWorker-2] Filing 101 not found
+[2025-07-17 17:19:32,446: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[c11de7d3-b997-41cc-9dd6-fc905b53bbfd] succeeded in 0.014027750003151596s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:20:33,716: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a965fb9b-437a-4cd3-bbf5-ff9c38fbbd0b] received
+[2025-07-17 17:20:33,719: INFO/ForkPoolWorker-2] Starting processing for filing 102
+[2025-07-17 17:20:33,746: ERROR/ForkPoolWorker-2] Filing 102 not found
+[2025-07-17 17:20:33,747: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[a965fb9b-437a-4cd3-bbf5-ff9c38fbbd0b] succeeded in 0.028469708049669862s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:21:34,925: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[1f61819e-45df-4851-ad5e-663e401d778e] received
+[2025-07-17 17:21:34,931: INFO/ForkPoolWorker-2] Starting processing for filing 105
+[2025-07-17 17:21:34,946: ERROR/ForkPoolWorker-2] Filing 105 not found
+[2025-07-17 17:21:34,952: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[1f61819e-45df-4851-ad5e-663e401d778e] succeeded in 0.022501999977976084s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:22:36,211: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[c237505e-4431-4312-ad8e-601347b0bcef] received
+[2025-07-17 17:22:36,214: INFO/ForkPoolWorker-2] Starting processing for filing 107
+[2025-07-17 17:22:36,224: ERROR/ForkPoolWorker-2] Filing 107 not found
+[2025-07-17 17:22:36,226: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[c237505e-4431-4312-ad8e-601347b0bcef] succeeded in 0.012015665997751057s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:23:37,912: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[f003f514-d12c-4817-af1c-ad2d5597be34] received
+[2025-07-17 17:23:37,930: INFO/ForkPoolWorker-2] Starting processing for filing 109
+[2025-07-17 17:23:37,945: ERROR/ForkPoolWorker-2] Filing 109 not found
+[2025-07-17 17:23:37,947: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[f003f514-d12c-4817-af1c-ad2d5597be34] succeeded in 0.018477333011105657s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:24:39,215: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[0d3e3368-b4ba-4713-83fa-00ba08cfd462] received
+[2025-07-17 17:24:39,218: INFO/ForkPoolWorker-2] Starting processing for filing 110
+[2025-07-17 17:24:39,242: ERROR/ForkPoolWorker-2] Filing 110 not found
+[2025-07-17 17:24:39,244: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[0d3e3368-b4ba-4713-83fa-00ba08cfd462] succeeded in 0.026535333949141204s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:25:40,341: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a47189e6-def7-4ce0-935e-ebbabc2e3e22] received
+[2025-07-17 17:25:40,346: INFO/ForkPoolWorker-2] Starting processing for filing 113
+[2025-07-17 17:25:40,368: ERROR/ForkPoolWorker-2] Filing 113 not found
+[2025-07-17 17:25:40,371: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[a47189e6-def7-4ce0-935e-ebbabc2e3e22] succeeded in 0.02550912497099489s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:26:41,539: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[236f1824-926e-4868-9a1f-c000e50de614] received
+[2025-07-17 17:26:41,548: INFO/ForkPoolWorker-2] Starting processing for filing 115
+[2025-07-17 17:26:41,563: ERROR/ForkPoolWorker-2] Filing 115 not found
+[2025-07-17 17:26:41,566: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[236f1824-926e-4868-9a1f-c000e50de614] succeeded in 0.018257749965414405s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:30:58,929: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[e5f58201-eb90-4990-82a9-40abbf2b7a7d] received
+[2025-07-17 17:30:58,933: INFO/ForkPoolWorker-2] Starting processing for filing 117
+[2025-07-17 17:30:58,956: ERROR/ForkPoolWorker-2] Filing 117 not found
+[2025-07-17 17:30:58,958: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[e5f58201-eb90-4990-82a9-40abbf2b7a7d] succeeded in 0.025048207957297564s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:32:31,256: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[5abb42a3-7aea-4719-b31c-89ac46ab81fd] received
+[2025-07-17 17:32:31,263: INFO/ForkPoolWorker-2] Starting processing for filing 119
+[2025-07-17 17:32:31,281: ERROR/ForkPoolWorker-2] Filing 119 not found
+[2025-07-17 17:32:31,292: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[5abb42a3-7aea-4719-b31c-89ac46ab81fd] succeeded in 0.03053766710218042s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:35:01,522: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[8ef9b5b7-2705-46a1-b475-bcb32637a26c] received
+[2025-07-17 17:35:01,542: INFO/ForkPoolWorker-2] Starting processing for filing 121
+[2025-07-17 17:35:01,557: ERROR/ForkPoolWorker-2] Filing 121 not found
+[2025-07-17 17:35:01,559: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[8ef9b5b7-2705-46a1-b475-bcb32637a26c] succeeded in 0.02308666706085205s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:36:14,289: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[310571cc-68b6-4e4e-a5c8-1bb8e35aa417] received
+[2025-07-17 17:36:14,292: INFO/ForkPoolWorker-2] Starting processing for filing 122
+[2025-07-17 17:36:14,317: ERROR/ForkPoolWorker-2] Filing 122 not found
+[2025-07-17 17:36:14,319: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[310571cc-68b6-4e4e-a5c8-1bb8e35aa417] succeeded in 0.026760416920296848s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:39:03,641: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[20647b08-a413-4049-a242-92344e0af036] received
+[2025-07-17 17:39:03,649: INFO/ForkPoolWorker-2] Starting processing for filing 125
+[2025-07-17 17:39:03,665: ERROR/ForkPoolWorker-2] Filing 125 not found
+[2025-07-17 17:39:03,667: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[20647b08-a413-4049-a242-92344e0af036] succeeded in 0.01924241695087403s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:41:33,221: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[357ea8db-d547-4d7d-b785-a06b0dfc6ee3] received
+[2025-07-17 17:41:33,244: INFO/ForkPoolWorker-2] Starting processing for filing 126
+[2025-07-17 17:41:33,263: ERROR/ForkPoolWorker-2] Filing 126 not found
+[2025-07-17 17:41:33,265: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[357ea8db-d547-4d7d-b785-a06b0dfc6ee3] succeeded in 0.021893917000852525s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:43:40,037: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[9bcdacd9-99e1-4d0c-84e3-cdb60cc17d1f] received
+[2025-07-17 17:43:40,040: INFO/ForkPoolWorker-2] Starting processing for filing 129
+[2025-07-17 17:43:40,063: ERROR/ForkPoolWorker-2] Filing 129 not found
+[2025-07-17 17:43:40,064: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[9bcdacd9-99e1-4d0c-84e3-cdb60cc17d1f] succeeded in 0.024187291972339153s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:44:41,175: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[54f491e4-71c9-4973-bdb9-42d93f1c0d41] received
+[2025-07-17 17:44:41,180: INFO/ForkPoolWorker-2] Starting processing for filing 131
+[2025-07-17 17:44:41,194: ERROR/ForkPoolWorker-2] Filing 131 not found
+[2025-07-17 17:44:41,196: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[54f491e4-71c9-4973-bdb9-42d93f1c0d41] succeeded in 0.01663029205519706s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:45:42,314: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[6c197362-7ce8-46e1-9349-0d6b19377e4a] received
+[2025-07-17 17:45:42,321: INFO/ForkPoolWorker-2] Starting processing for filing 133
+[2025-07-17 17:45:42,350: ERROR/ForkPoolWorker-2] Filing 133 not found
+[2025-07-17 17:45:42,352: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[6c197362-7ce8-46e1-9349-0d6b19377e4a] succeeded in 0.03384533303324133s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:46:43,600: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[61ce14b7-3348-4121-bbda-429cc6130f4c] received
+[2025-07-17 17:46:43,604: INFO/ForkPoolWorker-2] Starting processing for filing 134
+[2025-07-17 17:46:43,623: ERROR/ForkPoolWorker-2] Filing 134 not found
+[2025-07-17 17:46:43,625: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[61ce14b7-3348-4121-bbda-429cc6130f4c] succeeded in 0.022298833006061614s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:47:44,784: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[9886dce7-49d8-44c4-a458-d2865232c29c] received
+[2025-07-17 17:47:44,791: INFO/ForkPoolWorker-2] Starting processing for filing 137
+[2025-07-17 17:47:44,807: ERROR/ForkPoolWorker-2] Filing 137 not found
+[2025-07-17 17:47:44,810: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[9886dce7-49d8-44c4-a458-d2865232c29c] succeeded in 0.020182000007480383s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:48:46,184: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[1640fa54-8421-4d72-aa25-56ae651cada5] received
+[2025-07-17 17:48:46,190: INFO/ForkPoolWorker-2] Starting processing for filing 139
+[2025-07-17 17:48:46,203: ERROR/ForkPoolWorker-2] Filing 139 not found
+[2025-07-17 17:48:46,205: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[1640fa54-8421-4d72-aa25-56ae651cada5] succeeded in 0.016045124968513846s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:49:48,677: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[431b740b-5411-4705-947f-d68bceaa7cd0] received
+[2025-07-17 17:49:48,679: INFO/ForkPoolWorker-2] Starting processing for filing 141
+[2025-07-17 17:49:48,707: ERROR/ForkPoolWorker-2] Filing 141 not found
+[2025-07-17 17:49:48,710: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[431b740b-5411-4705-947f-d68bceaa7cd0] succeeded in 0.03117237496189773s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:50:50,343: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[8aca6303-a852-47ee-b971-c5793cae19b9] received
+[2025-07-17 17:50:50,344: INFO/ForkPoolWorker-2] Starting processing for filing 143
+[2025-07-17 17:50:50,368: ERROR/ForkPoolWorker-2] Filing 143 not found
+[2025-07-17 17:50:50,369: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[8aca6303-a852-47ee-b971-c5793cae19b9] succeeded in 0.02439200005028397s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:51:51,943: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[14959773-016a-4141-ac55-39f65cb2ba15] received
+[2025-07-17 17:51:51,945: INFO/ForkPoolWorker-2] Starting processing for filing 145
+[2025-07-17 17:51:51,954: ERROR/ForkPoolWorker-2] Filing 145 not found
+[2025-07-17 17:51:51,955: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[14959773-016a-4141-ac55-39f65cb2ba15] succeeded in 0.010064416914246976s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:52:53,072: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[ab238927-17ee-4e2c-a117-9deb2a82c2f0] received
+[2025-07-17 17:52:53,077: INFO/ForkPoolWorker-2] Starting processing for filing 147
+[2025-07-17 17:52:53,110: ERROR/ForkPoolWorker-2] Filing 147 not found
+[2025-07-17 17:52:53,112: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[ab238927-17ee-4e2c-a117-9deb2a82c2f0] succeeded in 0.03571608301717788s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:53:54,176: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[9ad5067e-1ec0-4816-8202-1ec0daa108b2] received
+[2025-07-17 17:53:54,181: INFO/ForkPoolWorker-2] Starting processing for filing 149
+[2025-07-17 17:53:54,213: ERROR/ForkPoolWorker-2] Filing 149 not found
+[2025-07-17 17:53:54,215: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[9ad5067e-1ec0-4816-8202-1ec0daa108b2] succeeded in 0.03539058403111994s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:54:55,320: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[95a84521-c0f5-4991-8cc4-bf2299d45d1f] received
+[2025-07-17 17:54:55,325: INFO/ForkPoolWorker-2] Starting processing for filing 151
+[2025-07-17 17:54:55,354: ERROR/ForkPoolWorker-2] Filing 151 not found
+[2025-07-17 17:54:55,356: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[95a84521-c0f5-4991-8cc4-bf2299d45d1f] succeeded in 0.03181075002066791s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:55:56,514: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[0f99de20-a54d-4301-b351-99748899bc4f] received
+[2025-07-17 17:55:56,515: INFO/ForkPoolWorker-2] Starting processing for filing 152
+[2025-07-17 17:55:56,524: ERROR/ForkPoolWorker-2] Filing 152 not found
+[2025-07-17 17:55:56,525: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[0f99de20-a54d-4301-b351-99748899bc4f] succeeded in 0.009944958030246198s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:56:57,731: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[53c525c0-2a60-4eb9-af20-0b1d6241b699] received
+[2025-07-17 17:56:57,736: INFO/ForkPoolWorker-2] Starting processing for filing 155
+[2025-07-17 17:56:57,755: ERROR/ForkPoolWorker-2] Filing 155 not found
+[2025-07-17 17:56:57,757: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[53c525c0-2a60-4eb9-af20-0b1d6241b699] succeeded in 0.02212212502490729s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:57:59,156: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[e70399b6-8840-4cbc-8225-fa95e334155e] received
+[2025-07-17 17:57:59,169: INFO/ForkPoolWorker-2] Starting processing for filing 157
+[2025-07-17 17:57:59,189: ERROR/ForkPoolWorker-2] Filing 157 not found
+[2025-07-17 17:57:59,191: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[e70399b6-8840-4cbc-8225-fa95e334155e] succeeded in 0.025191124994307756s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:59:21,626: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[ab821b71-a984-43a4-9c2c-23682bfb9758] received
+[2025-07-17 17:59:21,632: INFO/ForkPoolWorker-2] Starting processing for filing 159
+[2025-07-17 17:59:21,656: ERROR/ForkPoolWorker-2] Filing 159 not found
+[2025-07-17 17:59:21,658: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[ab821b71-a984-43a4-9c2c-23682bfb9758] succeeded in 0.026684500044211745s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 18:17:28,121: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[e0db34fe-a32d-4bb5-bd4d-23379c51157b] received
+[2025-07-17 18:17:28,128: INFO/ForkPoolWorker-2] Would send notifications for filing 160
+[2025-07-17 18:17:28,133: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.send_filing_notifications[e0db34fe-a32d-4bb5-bd4d-23379c51157b] succeeded in 0.006644709035754204s: {'status': 'notifications_sent'}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  [2025-07-17 16:33:42,260: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[c49033bb-f29a-479e-812e-bc30e90230d3] received
+[2025-07-17 16:33:42,313: INFO/ForkPoolWorker-2] Starting processing for filing 93
+[2025-07-17 16:33:42,367: INFO/ForkPoolWorker-2] Downloading filing 0000016918-25-000104
+[2025-07-17 16:33:42,383: INFO/ForkPoolWorker-2] Starting download for STZ 8-K (0000016918-25-000104)
+[2025-07-17 16:33:42,597: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/16918/0000016918-25-000104/-index.htm "HTTP/1.1 200 OK"
+[2025-07-17 16:33:42,598: INFO/ForkPoolWorker-2] Successfully fetched index from: https://www.sec.gov/Archives/edgar/data/16918/0000016918-25-000104/-index.htm
+[2025-07-17 16:33:42,603: INFO/ForkPoolWorker-2] Downloading main document from: https://www.sec.gov/Archives/edgar/data/16918/000001691825000104/stzex101_71520258k.htm
+[2025-07-17 16:33:42,710: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/16918/000001691825000104/stzex101_71520258k.htm "HTTP/1.1 200 OK"
+[2025-07-17 16:33:42,714: INFO/ForkPoolWorker-2] ✅ Successfully downloaded stzex101_71520258k.htm (121,980 bytes)
+[2025-07-17 16:33:42,738: INFO/ForkPoolWorker-2] Processing filing 0000016918-25-000104 with AI
+[2025-07-17 16:33:42,747: INFO/ForkPoolWorker-2] Starting AI processing for STZ 8-K
+[2025-07-17 16:33:42,749: INFO/ForkPoolWorker-2] Extracting text from stzex101_71520258k.htm
+[2025-07-17 16:33:42,771: INFO/ForkPoolWorker-2] Processing 8-K current report
+[2025-07-17 16:33:42,771: INFO/ForkPoolWorker-2] Truncated content to 48000 chars
+[2025-07-17 16:33:50,125: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:33:51,040: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:33:54,226: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:33:57,697: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:34:05,743: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:34:09,187: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 16:34:09,274: INFO/ForkPoolWorker-2] ✅ AI processing completed for 0000016918-25-000104
+[2025-07-17 16:34:09,291: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[fd0917e9-e243-4d5b-a790-08aae44720ce] received
+[2025-07-17 16:34:09,291: INFO/ForkPoolWorker-2] Successfully processed filing 93
+[2025-07-17 16:34:09,330: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[c49033bb-f29a-479e-812e-bc30e90230d3] succeeded in 27.02322566602379s: {'status': 'success', 'filing_id': 93, 'company': 'STZ', 'type': '8-K'}
+[2025-07-17 16:34:09,326: INFO/ForkPoolWorker-4] Would send notifications for filing 93
+[2025-07-17 16:34:09,345: INFO/ForkPoolWorker-4] Task app.tasks.filing_tasks.send_filing_notifications[fd0917e9-e243-4d5b-a790-08aae44720ce] succeeded in 0.030392165994271636s: {'status': 'notifications_sent'}
+[2025-07-17 16:37:27,599: INFO/MainProcess] Task app.tasks.filing_tasks.send_filing_notifications[ebc0c521-a466-40f4-840e-b5a6b0c34aca] received
+[2025-07-17 16:37:27,606: INFO/ForkPoolWorker-2] Would send notifications for filing 94
+[2025-07-17 16:37:27,611: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.send_filing_notifications[ebc0c521-a466-40f4-840e-b5a6b0c34aca] succeeded in 0.005141417030245066s: {'status': 'notifications_sent'}
+[2025-07-17 17:07:14,441: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[5aeba2d4-9c09-4039-b482-d211a5092e5d] received
+[2025-07-17 17:07:14,447: INFO/ForkPoolWorker-2] Starting processing for filing 95
+[2025-07-17 17:07:14,478: ERROR/ForkPoolWorker-2] Filing 95 not found
+[2025-07-17 17:07:14,481: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[5aeba2d4-9c09-4039-b482-d211a5092e5d] succeeded in 0.03452312492299825s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:11:59,891: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[c2ca08d5-3f98-4124-b5fe-31a8a2c0b741] received
+[2025-07-17 17:11:59,894: INFO/ForkPoolWorker-2] Starting processing for filing 97
+[2025-07-17 17:11:59,921: ERROR/ForkPoolWorker-2] Filing 97 not found
+[2025-07-17 17:11:59,923: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[c2ca08d5-3f98-4124-b5fe-31a8a2c0b741] succeeded in 0.0286024579545483s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:18:31,072: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[cba580e0-9094-48b4-8c82-ce28c0f8edd4] received
+[2025-07-17 17:18:31,081: INFO/ForkPoolWorker-2] Starting processing for filing 100
+[2025-07-17 17:18:31,122: ERROR/ForkPoolWorker-2] Filing 100 not found
+[2025-07-17 17:18:31,131: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[cba580e0-9094-48b4-8c82-ce28c0f8edd4] succeeded in 0.051455833949148655s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:20:33,720: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[766382da-a470-4f42-824c-f552e6609afe] received
+[2025-07-17 17:20:33,722: INFO/ForkPoolWorker-2] Starting processing for filing 103
+[2025-07-17 17:20:33,746: ERROR/ForkPoolWorker-2] Filing 103 not found
+[2025-07-17 17:20:33,748: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[766382da-a470-4f42-824c-f552e6609afe] succeeded in 0.025626457994803786s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:21:34,906: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[7fdbd0cf-ea1e-478f-90b5-1b6a31aa85f2] received
+[2025-07-17 17:21:34,926: INFO/ForkPoolWorker-2] Starting processing for filing 104
+[2025-07-17 17:21:34,964: ERROR/ForkPoolWorker-2] Filing 104 not found
+[2025-07-17 17:21:34,967: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[7fdbd0cf-ea1e-478f-90b5-1b6a31aa85f2] succeeded in 0.04109487496316433s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:22:36,194: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[5bf62adc-5c77-4e44-bf6a-a623aa46ae68] received
+[2025-07-17 17:22:36,210: INFO/ForkPoolWorker-2] Starting processing for filing 106
+[2025-07-17 17:22:36,222: ERROR/ForkPoolWorker-2] Filing 106 not found
+[2025-07-17 17:22:36,224: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[5bf62adc-5c77-4e44-bf6a-a623aa46ae68] succeeded in 0.014569416991434991s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:23:37,905: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[7cbc358d-b482-4feb-8f37-41e30d1ee3c0] received
+[2025-07-17 17:23:37,910: INFO/ForkPoolWorker-2] Starting processing for filing 108
+[2025-07-17 17:23:37,942: ERROR/ForkPoolWorker-2] Filing 108 not found
+[2025-07-17 17:23:37,944: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[7cbc358d-b482-4feb-8f37-41e30d1ee3c0] succeeded in 0.03475837502628565s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:24:39,218: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a92d942f-e625-42a4-928b-c92910552d92] received
+[2025-07-17 17:24:39,221: INFO/ForkPoolWorker-2] Starting processing for filing 111
+[2025-07-17 17:24:39,244: ERROR/ForkPoolWorker-2] Filing 111 not found
+[2025-07-17 17:24:39,246: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[a92d942f-e625-42a4-928b-c92910552d92] succeeded in 0.025601083994843066s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:25:40,336: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[bbc7ab67-755b-490e-b57e-aeb2fbe67dc4] received
+[2025-07-17 17:25:40,341: INFO/ForkPoolWorker-2] Starting processing for filing 112
+[2025-07-17 17:25:40,369: ERROR/ForkPoolWorker-2] Filing 112 not found
+[2025-07-17 17:25:40,371: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[bbc7ab67-755b-490e-b57e-aeb2fbe67dc4] succeeded in 0.03045066597405821s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:26:41,519: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[1ea0f15e-550b-4e58-b7ff-c4b42243c3df] received
+[2025-07-17 17:26:41,526: INFO/ForkPoolWorker-2] Starting processing for filing 114
+[2025-07-17 17:26:41,557: ERROR/ForkPoolWorker-2] Filing 114 not found
+[2025-07-17 17:26:41,560: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[1ea0f15e-550b-4e58-b7ff-c4b42243c3df] succeeded in 0.035366499912925065s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:30:58,924: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[1523e207-0321-4a94-8ec0-d3629671cdab] received
+[2025-07-17 17:30:58,929: INFO/ForkPoolWorker-2] Starting processing for filing 116
+[2025-07-17 17:30:58,956: ERROR/ForkPoolWorker-2] Filing 116 not found
+[2025-07-17 17:30:58,958: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[1523e207-0321-4a94-8ec0-d3629671cdab] succeeded in 0.029802875011228025s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:32:31,248: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[f105aacd-f1b6-4b32-b8c6-1fc72e6156c3] received
+[2025-07-17 17:32:31,255: INFO/ForkPoolWorker-2] Starting processing for filing 118
+[2025-07-17 17:32:31,275: ERROR/ForkPoolWorker-2] Filing 118 not found
+[2025-07-17 17:32:31,278: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[f105aacd-f1b6-4b32-b8c6-1fc72e6156c3] succeeded in 0.023864875081926584s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:35:01,517: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[f1fb1f30-b653-4aee-8442-dbc985c58eee] received
+[2025-07-17 17:35:01,523: INFO/ForkPoolWorker-2] Starting processing for filing 120
+[2025-07-17 17:35:01,557: ERROR/ForkPoolWorker-2] Filing 120 not found
+[2025-07-17 17:35:01,559: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[f1fb1f30-b653-4aee-8442-dbc985c58eee] succeeded in 0.037512124981731176s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:36:14,293: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[d7b9d86f-f4d1-4308-986c-3b9292a4ba3e] received
+[2025-07-17 17:36:14,296: INFO/ForkPoolWorker-2] Starting processing for filing 123
+[2025-07-17 17:36:14,320: ERROR/ForkPoolWorker-2] Filing 123 not found
+[2025-07-17 17:36:14,321: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[d7b9d86f-f4d1-4308-986c-3b9292a4ba3e] succeeded in 0.0255264590959996s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:39:03,626: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[e0084ebf-779e-4adb-b67b-71c3028aab00] received
+[2025-07-17 17:39:03,629: INFO/ForkPoolWorker-2] Starting processing for filing 124
+[2025-07-17 17:39:03,656: ERROR/ForkPoolWorker-2] Filing 124 not found
+[2025-07-17 17:39:03,657: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[e0084ebf-779e-4adb-b67b-71c3028aab00] succeeded in 0.028386291000060737s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:41:33,244: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[04b9e5d7-00d6-4808-a791-a6f7d259f7fd] received
+[2025-07-17 17:41:33,251: INFO/ForkPoolWorker-2] Starting processing for filing 127
+[2025-07-17 17:41:33,266: ERROR/ForkPoolWorker-2] Filing 127 not found
+[2025-07-17 17:41:33,277: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[04b9e5d7-00d6-4808-a791-a6f7d259f7fd] succeeded in 0.026135166990570724s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:43:40,036: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a539ab88-e0a6-4ec6-ac89-d2e3280b9aee] received
+[2025-07-17 17:43:40,040: INFO/ForkPoolWorker-2] Starting processing for filing 128
+[2025-07-17 17:43:40,064: ERROR/ForkPoolWorker-2] Filing 128 not found
+[2025-07-17 17:43:40,065: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[a539ab88-e0a6-4ec6-ac89-d2e3280b9aee] succeeded in 0.025419124984182417s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:44:41,171: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[2f4ab91f-b412-42ca-94db-789e2c607b8a] received
+[2025-07-17 17:44:41,177: INFO/ForkPoolWorker-2] Starting processing for filing 130
+[2025-07-17 17:44:41,194: ERROR/ForkPoolWorker-2] Filing 130 not found
+[2025-07-17 17:44:41,196: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[2f4ab91f-b412-42ca-94db-789e2c607b8a] succeeded in 0.01981095806695521s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:45:42,309: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[fd284284-4a8b-46bd-907c-b9d4eb5e05c7] received
+[2025-07-17 17:45:42,315: INFO/ForkPoolWorker-2] Starting processing for filing 132
+[2025-07-17 17:45:42,348: ERROR/ForkPoolWorker-2] Filing 132 not found
+[2025-07-17 17:45:42,350: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[fd284284-4a8b-46bd-907c-b9d4eb5e05c7] succeeded in 0.03625879203900695s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:46:43,603: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[5bb31e38-552b-4219-bdc9-c7687a421813] received
+[2025-07-17 17:46:43,606: INFO/ForkPoolWorker-2] Starting processing for filing 135
+[2025-07-17 17:46:43,629: ERROR/ForkPoolWorker-2] Filing 135 not found
+[2025-07-17 17:46:43,631: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[5bb31e38-552b-4219-bdc9-c7687a421813] succeeded in 0.02508720802143216s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:47:44,763: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[473fcefe-9868-4a4c-8d59-9e38d0face3a] received
+[2025-07-17 17:47:44,784: INFO/ForkPoolWorker-2] Starting processing for filing 136
+[2025-07-17 17:47:44,805: ERROR/ForkPoolWorker-2] Filing 136 not found
+[2025-07-17 17:47:44,808: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[473fcefe-9868-4a4c-8d59-9e38d0face3a] succeeded in 0.025489874999038875s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:48:46,166: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[80843d36-8e6d-471d-b36a-0cd965f0c202] received
+[2025-07-17 17:48:46,183: INFO/ForkPoolWorker-2] Starting processing for filing 138
+[2025-07-17 17:48:46,201: ERROR/ForkPoolWorker-2] Filing 138 not found
+[2025-07-17 17:48:46,203: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[80843d36-8e6d-471d-b36a-0cd965f0c202] succeeded in 0.026076750014908612s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:49:48,672: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[a6c5f0b9-8070-4481-af3d-69419284bfe9] received
+[2025-07-17 17:49:48,674: INFO/ForkPoolWorker-2] Starting processing for filing 140
+[2025-07-17 17:49:48,702: ERROR/ForkPoolWorker-2] Filing 140 not found
+[2025-07-17 17:49:48,704: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[a6c5f0b9-8070-4481-af3d-69419284bfe9] succeeded in 0.030564375105313957s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:50:50,339: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[7d1540ae-be51-433d-951e-6851928f5c52] received
+[2025-07-17 17:50:50,340: INFO/ForkPoolWorker-2] Starting processing for filing 142
+[2025-07-17 17:50:50,350: ERROR/ForkPoolWorker-2] Filing 142 not found
+[2025-07-17 17:50:50,351: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[7d1540ae-be51-433d-951e-6851928f5c52] succeeded in 0.011372625012882054s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:51:51,939: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[2de98163-22e8-4e12-86bd-86a2a61b7301] received
+[2025-07-17 17:51:51,941: INFO/ForkPoolWorker-2] Starting processing for filing 144
+[2025-07-17 17:51:51,952: ERROR/ForkPoolWorker-2] Filing 144 not found
+[2025-07-17 17:51:51,953: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[2de98163-22e8-4e12-86bd-86a2a61b7301] succeeded in 0.01289295800961554s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:52:53,066: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[5b5f086f-2f6e-4f01-90a5-c06e0db0aa4b] received
+[2025-07-17 17:52:53,071: INFO/ForkPoolWorker-2] Starting processing for filing 146
+[2025-07-17 17:52:53,105: ERROR/ForkPoolWorker-2] Filing 146 not found
+[2025-07-17 17:52:53,108: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[5b5f086f-2f6e-4f01-90a5-c06e0db0aa4b] succeeded in 0.03722333302721381s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:53:54,171: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[33525d5a-2546-469d-b486-fe2d527cb8be] received
+[2025-07-17 17:53:54,176: INFO/ForkPoolWorker-2] Starting processing for filing 148
+[2025-07-17 17:53:54,213: ERROR/ForkPoolWorker-2] Filing 148 not found
+[2025-07-17 17:53:54,215: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[33525d5a-2546-469d-b486-fe2d527cb8be] succeeded in 0.039979042019695044s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:54:55,297: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[b290908d-1a8a-422a-941b-cabc8afe9b5d] received
+[2025-07-17 17:54:55,320: INFO/ForkPoolWorker-2] Starting processing for filing 150
+[2025-07-17 17:54:55,338: ERROR/ForkPoolWorker-2] Filing 150 not found
+[2025-07-17 17:54:55,343: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[b290908d-1a8a-422a-941b-cabc8afe9b5d] succeeded in 0.02506074996199459s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:55:56,517: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[aa51700d-cd4d-43f2-a310-48a961f529e0] received
+[2025-07-17 17:55:56,519: INFO/ForkPoolWorker-2] Starting processing for filing 153
+[2025-07-17 17:55:56,526: ERROR/ForkPoolWorker-2] Filing 153 not found
+[2025-07-17 17:55:56,527: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[aa51700d-cd4d-43f2-a310-48a961f529e0] succeeded in 0.008337790961377323s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:56:57,727: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[37157d96-c1b2-4240-99af-c862b5b7b7c9] received
+[2025-07-17 17:56:57,731: INFO/ForkPoolWorker-2] Starting processing for filing 154
+[2025-07-17 17:56:57,755: ERROR/ForkPoolWorker-2] Filing 154 not found
+[2025-07-17 17:56:57,757: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[37157d96-c1b2-4240-99af-c862b5b7b7c9] succeeded in 0.026456500054337084s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:57:59,151: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[8984cd68-28e1-44a8-bc75-e4f9a835f26a] received
+[2025-07-17 17:57:59,157: INFO/ForkPoolWorker-2] Starting processing for filing 156
+[2025-07-17 17:57:59,187: ERROR/ForkPoolWorker-2] Filing 156 not found
+[2025-07-17 17:57:59,190: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[8984cd68-28e1-44a8-bc75-e4f9a835f26a] succeeded in 0.03402337501756847s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 17:59:21,622: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[924828ab-567c-46f9-8171-6663b049e9fc] received
+[2025-07-17 17:59:21,628: INFO/ForkPoolWorker-2] Starting processing for filing 158
+[2025-07-17 17:59:21,655: ERROR/ForkPoolWorker-2] Filing 158 not found
+[2025-07-17 17:59:21,658: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[924828ab-567c-46f9-8171-6663b049e9fc] succeeded in 0.030635208007879555s: {'status': 'error', 'message': 'Filing not found'}
+[2025-07-17 18:17:06,532: INFO/MainProcess] Task app.tasks.filing_tasks.process_filing_task[78b1f0d4-a4a3-4dab-a20d-194c1643aa10] received
+[2025-07-17 18:17:06,537: INFO/ForkPoolWorker-2] Starting processing for filing 160
+[2025-07-17 18:17:06,580: INFO/ForkPoolWorker-2] Downloading filing 0001104659-25-068734
+[2025-07-17 18:17:06,608: INFO/ForkPoolWorker-2] Starting download for PFG 8-K (0001104659-25-068734)
+[2025-07-17 18:17:06,739: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.sec.gov/Archives/edgar/data/1126328/0001104659-25-068734/-index.htm "HTTP/1.1 200 OK"
+[2025-07-17 18:17:06,741: INFO/ForkPoolWorker-2] Successfully fetched index from: https://www.sec.gov/Archives/edgar/data/1126328/0001104659-25-068734/-index.htm
+[2025-07-17 18:17:06,751: INFO/ForkPoolWorker-2] Downloading main document from: https://www.sec.gov/ix?doc=/Archives/edgar/data/1126328/000110465925068734/tm2521160d1_8k.htm
+[2025-07-17 18:17:06,813: INFO/ForkPoolWorker-2] HTTP Request: GET https://www.sec.gov/ix?doc=%2FArchives%2Fedgar%2Fdata%2F1126328%2F000110465925068734%2Ftm2521160d1_8k.htm "HTTP/1.1 200 OK"
+[2025-07-17 18:17:06,815: INFO/ForkPoolWorker-2] ✅ Successfully downloaded tm2521160d1_8k.htm (6,356 bytes)
+[2025-07-17 18:17:06,838: INFO/ForkPoolWorker-2] Processing filing 0001104659-25-068734 with AI
+[2025-07-17 18:17:06,846: INFO/ForkPoolWorker-2] Starting AI processing for PFG 8-K
+[2025-07-17 18:17:06,849: INFO/ForkPoolWorker-2] Extracting text from tm2521160d1_8k.htm
+[2025-07-17 18:17:06,850: WARNING/ForkPoolWorker-2] Extracted text too short (73 chars), trying alternative methods
+[2025-07-17 18:17:06,851: INFO/ForkPoolWorker-2] Processing 8-K current report
+[2025-07-17 18:17:12,282: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 18:17:12,990: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 18:17:16,603: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 18:17:19,776: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 18:17:25,205: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 18:17:28,024: INFO/ForkPoolWorker-2] HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-07-17 18:17:28,104: INFO/ForkPoolWorker-2] ✅ AI processing completed for 0001104659-25-068734
+[2025-07-17 18:17:28,120: INFO/ForkPoolWorker-2] Successfully processed filing 160
+[2025-07-17 18:17:28,127: INFO/ForkPoolWorker-2] Task app.tasks.filing_tasks.process_filing_task[78b1f0d4-a4a3-4dab-a20d-194c1643aa10] succeeded in 21.59173074993305s: {'status': 'success', 'filing_id': 160, 'company': 'PFG', 'type': '8-K'}

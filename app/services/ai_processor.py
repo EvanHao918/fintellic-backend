@@ -621,51 +621,48 @@ A: [Brief answer, 2-3 sentences]"""
         
         return questions[:3]
 
-    # 在 app/services/ai_processor.py 的 _extract_structured_financial_data 方法中
-# 找到这部分代码并替换
+    async def _extract_structured_financial_data(self, filing_type: str, content: str, full_text: str) -> Dict:
+        """Extract structured financial data from filing"""
+        prompt = f"""Extract key financial metrics from this {filing_type} filing. Look for:
 
-async def _extract_structured_financial_data(self, filing_type: str, content: str, full_text: str) -> Dict:
-    """Extract structured financial data from filing"""
-    prompt = f"""Extract key financial metrics from this {filing_type} filing. Look for:
+        - Revenue (current period and YoY change)
+        - Net income/loss
+        - EPS (earnings per share)
+        - Gross margin
+        - Operating margin
+        - Cash and cash equivalents
+        - Debt levels
 
-- Revenue (current period and YoY change)
-- Net income/loss
-- EPS (earnings per share)
-- Gross margin
-- Operating margin
-- Cash and cash equivalents
-- Debt levels
+        Content:
+        {content[:3000]}
 
-Content:
-{content[:3000]}
+        Return as JSON with available metrics. Use null for missing data.
+        Format numbers as integers (no decimals for millions/billions).
 
-Return as JSON with available metrics. Use null for missing data.
-Format numbers as integers (no decimals for millions/billions).
+        Example format:
+        {{
+            "revenue": 95000000000,
+            "revenue_yoy_change": 8.5,
+            "net_income": 20000000000,
+            "eps": 5.67,
+            "gross_margin": 43.2,
+            "operating_margin": 29.8,
+            "cash": 30000000000,
+            "total_debt": 120000000000
+        }}"""
 
-Example format:
-{{
-  "revenue": 95000000000,
-  "revenue_yoy_change": 8.5,
-  "net_income": 20000000000,
-  "eps": 5.67,
-  "gross_margin": 43.2,
-  "operating_margin": 29.8,
-  "cash": 30000000000,
-  "total_debt": 120000000000
-}}"""
-
-    response = await self._generate_text(prompt, max_tokens=300)
-    
-    try:
-        # Extract JSON from response
-        json_start = response.find('{')
-        json_end = response.rfind('}') + 1
-        if json_start >= 0 and json_end > json_start:
-            return json.loads(response[json_start:json_end])
-    except:
-        logger.error("Failed to parse financial data JSON")
-    
-    return {}
+        response = await self._generate_text(prompt, max_tokens=300)
+        
+        try:
+            # Extract JSON from response
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response[json_start:json_end])
+        except:
+            logger.error("Failed to parse financial data JSON")
+        
+        return {}
 
     def _generate_10k_tags(self, summary: str) -> List[str]:
         """Generate tags for 10-K filing"""

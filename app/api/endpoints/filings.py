@@ -14,7 +14,6 @@ from app.models.company import Company
 from app.models import UserVote
 from app.services.view_tracking import ViewTrackingService
 from app.schemas.filing import FilingBrief, FilingDetail, FilingList
-from app.schemas.company import CompanyBrief
 from app.core.cache import cache, FilingCache, StatsCache, CACHE_TTL
 
 router = APIRouter()
@@ -27,11 +26,12 @@ async def get_filings(
     form_type: Optional[str] = Query(None, description="Filter by form type (10-K, 10-Q, 8-K, S-1)"),
     ticker: Optional[str] = Query(None, description="Filter by company ticker"),
     db: Session = Depends(deps.get_db),
-    current_user = Depends(deps.get_current_user)
+    current_user = Depends(deps.get_current_user_optional)  # 改为可选认证
 ):
     """
     Get list of filings with optional filters
     Results are cached for 5 minutes
+    Authentication is optional - public endpoint
     """
     # Generate cache key
     cache_key = FilingCache.get_filing_list_key(skip, limit, form_type, ticker)
@@ -78,12 +78,12 @@ async def get_filings(
             filing_date=filing.filing_date,
             accession_number=filing.accession_number,
             file_url=filing.primary_doc_url or "",
-            company=CompanyBrief(
-                id=filing.company.id,
-                name=filing.company.name,
-                ticker=filing.company.ticker,
-                cik=filing.company.cik
-            ),
+            company={
+                "id": filing.company.id,
+                "name": filing.company.name,
+                "ticker": filing.company.ticker,
+                "cik": filing.company.cik
+            },
             one_liner=filing.ai_summary[:100] + "..." if filing.ai_summary else None,
             sentiment=filing.management_tone.value if filing.management_tone else None,
             tags=filing.key_tags or [],
@@ -111,7 +111,7 @@ async def get_filing(
     filing_id: int,
     include_charts: bool = Query(True, description="Include chart data in response"),
     db: Session = Depends(deps.get_db),
-    current_user = Depends(deps.get_current_user)
+    current_user = Depends(deps.get_current_user)  # 详情页仍需要认证
 ):
     """
     Get specific filing by ID with differentiated display support
@@ -203,7 +203,12 @@ async def get_filing(
         "accession_number": filing.accession_number,
         "file_url": filing.primary_doc_url or "",
         "cik": filing.company.cik,
-        "company": CompanyBrief.from_orm(filing.company),
+        "company": {
+            "id": filing.company.id,
+            "name": filing.company.name,
+            "ticker": filing.company.ticker,
+            "cik": filing.company.cik
+        },
         "status": filing.status.value,
         "ai_summary": filing.ai_summary,
         "one_liner": filing.ai_summary[:100] + "..." if filing.ai_summary else None,
@@ -331,11 +336,12 @@ async def get_popular_filings(
     period: str = "day",  # day, week, month
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(deps.get_db),
-    current_user = Depends(deps.get_current_user)
+    current_user = Depends(deps.get_current_user_optional)  # 改为可选认证
 ):
     """
     Get popular filings based on view count
     Results are cached for 10 minutes
+    Authentication is optional - public endpoint
     """
     # Validate period
     if period not in ["day", "week", "month"]:

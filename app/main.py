@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 
@@ -41,7 +42,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS with specific settings
+# Configure CORS with specific settings - MUST BE FIRST MIDDLEWARE
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -58,6 +59,47 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600,
 )
+
+# Add custom exception handler to ensure CORS headers are always added
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Global exception handler that ensures CORS headers are added to error responses
+    """
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    
+    # Create error response
+    response = JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
+    
+    # Add CORS headers manually for error responses
+    origin = request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    
+    return response
+
+# Add specific handler for authentication errors
+@app.exception_handler(401)
+async def unauthorized_exception_handler(request: Request, exc):
+    """
+    Handle 401 errors with proper CORS headers
+    """
+    response = JSONResponse(
+        status_code=401,
+        content={"detail": "Not authenticated"}
+    )
+    
+    # Add CORS headers
+    origin = request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    
+    return response
 
 # Root endpoint
 @app.get("/")

@@ -20,10 +20,11 @@ async def get_companies(
     limit: int = Query(50, ge=1, le=100, description="Number of items to return"),
     search: Optional[str] = Query(None, description="Search by name or ticker"),
     db: Session = Depends(get_db),
-    current_user = Depends(deps.get_current_active_user)
+    current_user = Depends(deps.get_current_user_optional)  # 改为可选认证
 ):
     """
     Get list of S&P 500 companies
+    Public endpoint - no authentication required
     """
     try:
         # Build query
@@ -80,10 +81,11 @@ async def get_companies(
 async def get_company_detail(
     ticker: str,
     db: Session = Depends(get_db),
-    current_user = Depends(deps.get_current_active_user)
+    current_user = Depends(deps.get_current_user_optional)  # 改为可选认证
 ):
     """
     Get detailed information about a specific company
+    Public endpoint - no authentication required
     """
     try:
         company = db.query(Company).filter(
@@ -145,10 +147,11 @@ async def get_company_filings(
     limit: int = Query(20, ge=1, le=100),
     filing_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user = Depends(deps.get_current_active_user)
+    current_user = Depends(deps.get_current_user_optional)  # 改为可选认证
 ):
     """
     Get filings for a specific company
+    Public endpoint - no authentication required
     """
     try:
         # First check if company exists

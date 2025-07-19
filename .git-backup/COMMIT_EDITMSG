@@ -1,0 +1,13 @@
+fix: Resolve CORS issue by implementing optional authentication
+
+- Changed filings list endpoint to use optional authentication
+- Changed companies endpoints to use optional authentication
+- Fixed Pydantic validation error - company field expects dict not object
+- Added global exception handlers to ensure CORS headers on errors
+
+Known issue:
+- Multiple companies showing identical 10-Q data (UAL, TRV)
+- Likely caused by AI processing template pollution or caching issues
+- Requires investigation and fix in next iteration
+
+TODO: Fix duplicate filing data issue before production release

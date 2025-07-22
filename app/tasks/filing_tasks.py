@@ -8,7 +8,7 @@ from celery import Task
 import asyncio
 
 from app.core.celery_app import celery_app
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, ThreadSafeSession, get_task_db
 from app.models.filing import Filing, ProcessingStatus
 from app.services.filing_downloader import filing_downloader
 from app.services.ai_processor import ai_processor
@@ -18,19 +18,17 @@ logger = logging.getLogger(__name__)
 
 class FilingTask(Task):
     """Base task with database session management"""
-    _db = None
-
-    @property
-    def db(self):
-        if self._db is None:
-            self._db = SessionLocal()
-        return self._db
-
-    def after_return(self, status, retval, task_id, args, kwargs, einfo):
-        """Clean up database session after task completion"""
-        if self._db is not None:
-            self._db.close()
-            self._db = None
+    
+    def get_db(self):
+        """Get a thread-safe database session"""
+        # 使用线程安全的 session
+        return ThreadSafeSession()
+    
+    def close_db(self, db):
+        """Close and clean up the database session"""
+        if db:
+            db.close()
+            ThreadSafeSession.remove()  # 清理线程本地会话
 
 
 @celery_app.task(base=FilingTask, bind=True, max_retries=3)
@@ -45,11 +43,15 @@ def process_filing_task(self, filing_id: int):
     Args:
         filing_id: Database ID of the filing to process
     """
+    db = None
     try:
         logger.info(f"Starting processing for filing {filing_id}")
         
+        # 使用线程安全的数据库会话
+        db = self.get_db()
+        
         # Get filing from database
-        filing = self.db.query(Filing).filter(Filing.id == filing_id).first()
+        filing = db.query(Filing).filter(Filing.id == filing_id).first()
         
         if not filing:
             logger.error(f"Filing {filing_id} not found")
@@ -64,9 +66,12 @@ def process_filing_task(self, filing_id: int):
             if filing.status == ProcessingStatus.PENDING:
                 logger.info(f"Downloading filing {filing.accession_number}")
                 
+                # Commit current state before async operation
+                db.commit()
+                
                 # Run async download_filing
                 success = loop.run_until_complete(
-                    filing_downloader.download_filing(self.db, filing)
+                    filing_downloader.download_filing(db, filing)
                 )
                 
                 if not success:
@@ -76,9 +81,12 @@ def process_filing_task(self, filing_id: int):
             if filing.status in [ProcessingStatus.PARSING, ProcessingStatus.DOWNLOADING]:
                 logger.info(f"Processing filing {filing.accession_number} with AI")
                 
+                # Commit current state before async operation
+                db.commit()
+                
                 # Run async AI processing
                 success = loop.run_until_complete(
-                    ai_processor.process_filing(self.db, filing)
+                    ai_processor.process_filing(db, filing)
                 )
                 
                 if not success:
@@ -96,7 +104,7 @@ def process_filing_task(self, filing_id: int):
         return {
             "status": "success",
             "filing_id": filing_id,
-            "company": filing.company.ticker,
+            "company": filing.company.ticker if filing.company else "Unknown",
             "type": filing.filing_type.value
         }
         
@@ -104,14 +112,24 @@ def process_filing_task(self, filing_id: int):
         logger.error(f"Error processing filing {filing_id}: {e}", exc_info=True)
         
         # Update filing status to failed
-        filing = self.db.query(Filing).filter(Filing.id == filing_id).first()
-        if filing:
-            filing.status = ProcessingStatus.FAILED
-            filing.error_message = str(e)
-            self.db.commit()
+        if db:
+            try:
+                filing = db.query(Filing).filter(Filing.id == filing_id).first()
+                if filing:
+                    filing.status = ProcessingStatus.FAILED
+                    filing.error_message = str(e)[:500]  # Limit error message length
+                    db.commit()
+            except Exception as update_error:
+                logger.error(f"Failed to update filing status: {update_error}")
+                db.rollback()
         
         # Retry with exponential backoff
         raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+    
+    finally:
+        # Always clean up the database session
+        if db:
+            self.close_db(db)
 
 
 @celery_app.task(base=FilingTask)
@@ -121,21 +139,26 @@ def process_pending_filings():
     This task can be scheduled to run periodically
     """
     try:
-        # Get all pending filings
-        pending_filings = SessionLocal().query(Filing).filter(
-            Filing.status == ProcessingStatus.PENDING
-        ).all()
-        
-        logger.info(f"Found {len(pending_filings)} pending filings")
-        
-        # Queue each filing for processing
-        for filing in pending_filings:
-            process_filing_task.delay(filing.id)
-        
-        return {
-            "status": "success",
-            "queued": len(pending_filings)
-        }
+        # 使用上下文管理器确保会话清理
+        with get_task_db() as db:
+            # Get all pending filings
+            pending_filings = db.query(Filing).filter(
+                Filing.status == ProcessingStatus.PENDING
+            ).limit(50).all()  # 限制批处理数量
+            
+            logger.info(f"Found {len(pending_filings)} pending filings")
+            
+            # Queue each filing for processing
+            filing_ids = []
+            for filing in pending_filings:
+                process_filing_task.delay(filing.id)
+                filing_ids.append(filing.id)
+            
+            return {
+                "status": "success",
+                "queued": len(pending_filings),
+                "filing_ids": filing_ids
+            }
         
     except Exception as e:
         logger.error(f"Error queuing pending filings: {e}")

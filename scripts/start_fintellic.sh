@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Fintellic Backend Startup Script - Improved Version
-# Optimized for current system architecture
+# Fintellic Backend Startup Script - Fixed Version
+# Optimized for macOS with Celery thread pool
 
 # Colors for output
 RED='\033[0;31m'
@@ -22,6 +22,9 @@ DATA_DIR="$PROJECT_DIR/data/filings"
 mkdir -p "$LOG_DIR"
 mkdir -p "$PID_DIR"
 mkdir -p "$DATA_DIR"
+
+# Fix macOS fork issue for Celery
+export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
 
 echo -e "${BLUE}========================================"
 echo "   Starting Fintellic Backend Services"
@@ -159,12 +162,37 @@ else:
     print('⚠️  OpenAI API Key not set (AI analysis will fail)')
 "
 
-# 6. Start Celery Worker
+# 6. Start Celery Worker (Fixed for macOS)
 if ! check_service "Celery Worker" "$PID_DIR/celery.pid"; then
-    start_service "Celery Worker" \
-        "celery -A app.core.celery_app worker --loglevel=info --concurrency=4" \
-        "$PID_DIR/celery.pid" \
-        "$LOG_DIR/celery.log"
+    echo -e "${BLUE}Starting Celery Worker...${NC}"
+    
+    # Change to project directory
+    cd "$PROJECT_DIR"
+    
+    # Start Celery with thread pool to avoid macOS fork issues
+    celery -A app.core.celery_app worker \
+        --loglevel=info \
+        --pool=threads \
+        --concurrency=4 \
+        > "$LOG_DIR/celery.log" 2>&1 &
+    
+    CELERY_PID=$!
+    echo $CELERY_PID > "$PID_DIR/celery.pid"
+    
+    sleep 3
+    
+    if ps -p $CELERY_PID > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ Celery Worker started successfully (PID: $CELERY_PID)${NC}"
+        
+        # Check if worker is actually ready
+        if grep -q "celery@" "$LOG_DIR/celery.log" 2>/dev/null; then
+            echo -e "${GREEN}   Worker is ready and accepting tasks${NC}"
+        fi
+    else
+        echo -e "${RED}❌ Failed to start Celery Worker${NC}"
+        echo "Check logs at: $LOG_DIR/celery.log"
+        rm -f "$PID_DIR/celery.pid"
+    fi
 fi
 
 # 7. Start FastAPI Server (with integrated scheduler)
@@ -186,6 +214,16 @@ else
     echo -e "${RED}❌ API is not responding${NC}"
 fi
 
+# Check Celery worker status
+if [ -f "$PID_DIR/celery.pid" ]; then
+    CELERY_PID=$(cat "$PID_DIR/celery.pid")
+    if ps -p $CELERY_PID > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ Celery Worker is running${NC}"
+    else
+        echo -e "${RED}❌ Celery Worker is not running${NC}"
+    fi
+fi
+
 # Summary
 echo ""
 echo -e "${GREEN}========================================${NC}"
@@ -201,6 +239,7 @@ echo "🚀 Features:"
 echo "   - Auto-scanning every minute"
 echo "   - Redis caching enabled"
 echo "   - S&P 500 + NASDAQ 100 monitoring"
+echo "   - Thread pool for macOS compatibility"
 echo ""
 echo "📁 Locations:"
 echo "   - Logs: $LOG_DIR/"
@@ -208,9 +247,10 @@ echo "   - Data: $DATA_DIR/"
 echo "   - PIDs: $PID_DIR/"
 echo ""
 echo "🛠️ Useful Commands:"
-echo "   - Monitor: python monitor_system.py"
+echo "   - Monitor: python scripts/check_filing_status.py"
 echo "   - Stop: ./scripts/stop_fintellic.sh"
 echo "   - Trigger scan: curl -X POST http://localhost:8000/api/v1/scan/trigger"
+echo "   - View logs: tail -f $LOG_DIR/celery.log"
 echo ""
 
 # Show recent activity
@@ -218,3 +258,11 @@ echo -e "${CYAN}📈 Recent Activity:${NC}"
 recent_filings=$(find "$DATA_DIR" -type f -name "*.htm*" -mtime -1 2>/dev/null | wc -l | tr -d ' ')
 echo "   - New filings (24h): $recent_filings"
 
+# Show pending tasks
+if command -v redis-cli > /dev/null 2>&1; then
+    pending_tasks=$(redis-cli llen celery 2>/dev/null || echo "0")
+    echo "   - Pending tasks: $pending_tasks"
+fi
+
+echo ""
+echo -e "${CYAN}💡 Note: Using thread pool for Celery to avoid macOS fork issues${NC}"

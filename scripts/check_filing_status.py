@@ -82,7 +82,7 @@ def check_content_quality(db: Session):
         elif len(filing.ai_summary) < 100:
             quality_issues['short_summary'].append(filing)
         
-        if not filing.questions:
+        if not filing.key_questions:
             quality_issues['no_questions'].append(filing)
         
         # 检查专门字段

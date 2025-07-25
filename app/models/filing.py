@@ -94,36 +94,36 @@ class Filing(Base):
     
     # 10-K Specific Fields
     auditor_opinion = Column(Text)  # Auditor's opinion text
-    three_year_financials = Column(JSON)  # 3-year financial trend data
-    business_segments = Column(JSON)  # Business segment breakdown
-    risk_summary = Column(JSON)  # Categorized risk factors
+    three_year_financials = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
+    business_segments = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
+    risk_summary = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
     growth_drivers = Column(Text)  # GPT: Growth analysis
     management_outlook = Column(Text)  # GPT: Management outlook
     strategic_adjustments = Column(Text)  # GPT: Strategic changes
-    market_impact_10k = Column(Text)  # GPT: 10-K 潜在市场影响 ✨ NEW
+    market_impact_10k = Column(Text)  # GPT: 10-K 潜在市场影响
     
     # 10-Q Specific Fields
-    expectations_comparison = Column(JSON)  # Actual vs expected metrics
-    cost_structure = Column(JSON)  # Cost breakdown analysis
-    guidance_update = Column(JSON)  # Guidance changes
+    expectations_comparison = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
+    cost_structure = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
+    guidance_update = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
     growth_decline_analysis = Column(Text)  # GPT: Growth/decline drivers
     management_tone_analysis = Column(Text)  # GPT: Tone analysis
     beat_miss_analysis = Column(Text)  # GPT: Beat/miss reasons
-    market_impact_10q = Column(Text)  # GPT: 10-Q 潜在市场影响 ✨ NEW
+    market_impact_10q = Column(Text)  # GPT: 10-Q 潜在市场影响
     
     # 8-K Specific Fields
     item_type = Column(String(10))  # e.g., "5.02", "1.01"
-    items = Column(JSON)  # Array of reported items
-    event_timeline = Column(JSON)  # Event dates and timeline
+    items = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
+    event_timeline = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
     event_nature_analysis = Column(Text)  # GPT: Event nature
     market_impact_analysis = Column(Text)  # GPT: Market impact
     key_considerations = Column(Text)  # GPT: Key points
     
     # S-1 Specific Fields
-    ipo_details = Column(JSON)  # IPO pricing, underwriters, proceeds
+    ipo_details = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
     company_overview = Column(Text)  # Business description
-    financial_summary = Column(JSON)  # Pre-IPO financials
-    risk_categories = Column(JSON)  # Categorized risks
+    financial_summary = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
+    risk_categories = Column(Text)  # ✅ CHANGED FROM JSON TO TEXT
     growth_path_analysis = Column(Text)  # GPT: Growth path
     competitive_moat_analysis = Column(Text)  # GPT: Competitive advantage
     

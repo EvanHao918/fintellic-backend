@@ -1,5 +1,6 @@
 """
 Filing schemas for API requests and responses
+FIXED: All fields now properly defined as strings where appropriate
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -45,18 +46,18 @@ class Filing10KDetail(FilingBase):
     fiscal_year: Optional[str] = None
     period_end_date: Optional[datetime] = None
     
-    # 10-K specific
+    # 10-K specific - ALL STRING
     auditor_opinion: Optional[str] = None
-    three_year_financials: Optional[Dict[str, Any]] = None
-    business_segments: Optional[List[Dict[str, Any]]] = None
-    risk_summary: Optional[Dict[str, List[str]]] = None
+    three_year_financials: Optional[str] = None
+    business_segments: Optional[str] = None
+    risk_summary: Optional[str] = None
     growth_drivers: Optional[str] = None
     management_outlook: Optional[str] = None
     strategic_adjustments: Optional[str] = None
-    market_impact_10k: Optional[str] = None  # ✨ NEW - GPT: 潜在市场影响
+    market_impact_10k: Optional[str] = None
     
-    # Financial highlights
-    financial_highlights: Optional[Dict[str, Any]] = None
+    # Financial highlights - NOW STRING
+    financial_highlights: Optional[str] = None  # ✅ CHANGED TO STRING
     
     # Interaction stats
     vote_counts: Dict[str, int] = Field(default_factory=lambda: {"bullish": 0, "neutral": 0, "bearish": 0})
@@ -77,17 +78,17 @@ class Filing10QDetail(FilingBase):
     fiscal_quarter: Optional[str] = None
     period_end_date: Optional[datetime] = None
     
-    # 10-Q specific
-    expectations_comparison: Optional[Dict[str, Any]] = None
-    cost_structure: Optional[Dict[str, Any]] = None
-    guidance_update: Optional[Dict[str, Any]] = None
+    # 10-Q specific - ALL STRING
+    expectations_comparison: Optional[str] = None
+    cost_structure: Optional[str] = None
+    guidance_update: Optional[str] = None
     growth_decline_analysis: Optional[str] = None
     management_tone_analysis: Optional[str] = None
     beat_miss_analysis: Optional[str] = None
-    market_impact_10q: Optional[str] = None  # ✨ NEW - GPT: 潜在市场影响
+    market_impact_10q: Optional[str] = None
     
-    # Core metrics
-    core_metrics: Optional[Dict[str, Any]] = None
+    # Core metrics - NOW STRING
+    core_metrics: Optional[str] = None  # ✅ CHANGED TO STRING
     
     # Interaction stats
     vote_counts: Dict[str, int] = Field(default_factory=lambda: {"bullish": 0, "neutral": 0, "bearish": 0})
@@ -106,10 +107,10 @@ class Filing8KDetail(FilingBase):
     # Common fields
     ai_summary: Optional[str] = None
     
-    # 8-K specific
+    # 8-K specific - ALL STRING
     item_type: Optional[str] = None
-    items: Optional[List[Dict[str, str]]] = None
-    event_timeline: Optional[Dict[str, Any]] = None
+    items: Optional[str] = None
+    event_timeline: Optional[str] = None
     event_nature_analysis: Optional[str] = None
     market_impact_analysis: Optional[str] = None
     key_considerations: Optional[str] = None
@@ -135,13 +136,16 @@ class FilingS1Detail(FilingBase):
     # Common fields
     ai_summary: Optional[str] = None
     
-    # S-1 specific
-    ipo_details: Optional[Dict[str, Any]] = None
+    # S-1 specific - ALL STRING
+    ipo_details: Optional[str] = None
     company_overview: Optional[str] = None
-    financial_summary: Optional[Dict[str, Any]] = None
-    risk_categories: Optional[Dict[str, List[str]]] = None
+    financial_summary: Optional[str] = None
+    risk_categories: Optional[str] = None
     growth_path_analysis: Optional[str] = None
     competitive_moat_analysis: Optional[str] = None
+    
+    # Financial highlights - STRING
+    financial_highlights: Optional[str] = None  # ✅ ADDED
     
     # Interaction stats
     vote_counts: Dict[str, int] = Field(default_factory=lambda: {"bullish": 0, "neutral": 0, "bearish": 0})
@@ -170,22 +174,19 @@ class FilingDetail(FilingBase):
     questions_answers: List[Dict[str, str]] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
     
-    # Financial metrics (for 10-K and 10-Q)
-    financial_metrics: Optional[Dict[str, Any]] = None
+    # Financial metrics - NOW STRING
+    financial_metrics: Optional[str] = None  # ✅ CHANGED TO STRING
     
     # Event info (for 8-K)
     event_type: Optional[str] = None
-    event_details: Optional[Dict[str, Any]] = None
-    
-    # IPO info (for S-1)
-    ipo_details: Optional[Dict[str, Any]] = None
+    event_details: Optional[Dict[str, Any]] = None  # Keep as Dict for backward compatibility
     
     # Differentiated display fields (existing)
     specific_data: Optional[Dict[str, Any]] = Field(default={}, description="Type-specific structured data")
     chart_data: Optional[Dict[str, Any]] = Field(default=None, description="Pre-processed chart data")
     
     # Special fields for 10-Q
-    earnings_comparison: Optional[Dict[str, Any]] = Field(default=None, description="Actual vs expected earnings data")
+    earnings_comparison: Optional[str] = Field(default=None, description="Actual vs expected earnings data")
     
     # ==================== NEW FIELDS FOR DIFFERENTIATED DISPLAY (Day 19) ====================
     
@@ -194,39 +195,41 @@ class FilingDetail(FilingBase):
     fiscal_quarter: Optional[str] = None
     period_end_date: Optional[datetime] = None
     
-    # 10-K specific fields
+    # 10-K specific fields - ALL STRING
     auditor_opinion: Optional[str] = None
-    three_year_financials: Optional[Dict[str, Any]] = None
-    business_segments: Optional[List[Dict[str, Any]]] = None
-    risk_summary: Optional[Dict[str, List[str]]] = None
+    three_year_financials: Optional[str] = None
+    business_segments: Optional[str] = None
+    risk_summary: Optional[str] = None
     growth_drivers: Optional[str] = None
     management_outlook: Optional[str] = None
     strategic_adjustments: Optional[str] = None
-    market_impact_10k: Optional[str] = None  # ✨ NEW
+    market_impact_10k: Optional[str] = None
+    financial_highlights: Optional[str] = None  # ✅ ADDED FOR 10-K
     
-    # 10-Q specific fields
-    expectations_comparison: Optional[Dict[str, Any]] = None
-    cost_structure: Optional[Dict[str, Any]] = None
-    guidance_update: Optional[Dict[str, Any]] = None
+    # 10-Q specific fields - ALL STRING
+    expectations_comparison: Optional[str] = None
+    cost_structure: Optional[str] = None
+    guidance_update: Optional[str] = None
     growth_decline_analysis: Optional[str] = None
     management_tone_analysis: Optional[str] = None
     beat_miss_analysis: Optional[str] = None
-    core_metrics: Optional[Dict[str, Any]] = None
-    market_impact_10q: Optional[str] = None  # ✨ NEW
+    core_metrics: Optional[str] = None  # ✅ CHANGED TO STRING
+    market_impact_10q: Optional[str] = None
     
-    # 8-K specific fields
+    # 8-K specific fields - ALL STRING
     item_type: Optional[str] = None
-    items: Optional[List[Dict[str, str]]] = None
-    event_timeline: Optional[Dict[str, Any]] = None
+    items: Optional[str] = None
+    event_timeline: Optional[str] = None
     event_nature_analysis: Optional[str] = None
     market_impact_analysis: Optional[str] = None
     key_considerations: Optional[str] = None
     event_summary: Optional[str] = None
     
-    # S-1 specific fields
+    # S-1 specific fields - ALL STRING  
+    ipo_details: Optional[str] = None  # ✅ NOW ONLY ONE DEFINITION AS STRING
     company_overview: Optional[str] = None
-    financial_summary: Optional[Dict[str, Any]] = None
-    risk_categories: Optional[Dict[str, List[str]]] = None
+    financial_summary: Optional[str] = None
+    risk_categories: Optional[str] = None
     growth_path_analysis: Optional[str] = None
     competitive_moat_analysis: Optional[str] = None
     

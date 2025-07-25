@@ -1,6 +1,7 @@
 # app/api/endpoints/filings.py
 """
 Filing-related API endpoints with caching support and view tracking
+FIXED: All financial_metrics and core_metrics now expect text narratives, not JSON
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -219,7 +220,8 @@ async def get_filing(
         "opportunities": extract_opportunities(filing),
         "questions_answers": filing.key_questions or [],
         "tags": filing.key_tags or [],
-        "financial_metrics": filing.financial_highlights,
+        # FIXED: financial_metrics now expects text narrative, not JSON
+        "financial_metrics": filing.financial_highlights,  # This is now text
         "processed_at": filing.processing_completed_at,
         "created_at": filing.created_at,
         "updated_at": filing.updated_at,
@@ -234,7 +236,7 @@ async def get_filing(
             "views_today": view_check["views_today"]
         },
         # Existing differentiated fields
-        "specific_data": filing.get_specific_data if filing.filing_specific_data else {},
+        "specific_data": filing.filing_specific_data if filing.filing_specific_data else {},
         "chart_data": filing.chart_data if include_charts and filing.chart_data else None,
     }
     
@@ -257,6 +259,7 @@ async def get_filing(
             "growth_drivers": filing.growth_drivers,
             "management_outlook": filing.management_outlook,
             "strategic_adjustments": filing.strategic_adjustments,
+            "market_impact_10k": filing.market_impact_10k,
             "financial_highlights": filing.financial_highlights
         })
     
@@ -268,9 +271,9 @@ async def get_filing(
             "growth_decline_analysis": filing.growth_decline_analysis,
             "management_tone_analysis": filing.management_tone_analysis,
             "beat_miss_analysis": filing.beat_miss_analysis,
-            "core_metrics": extract_core_metrics(filing),
-            # Special handling for earnings comparison
-            "earnings_comparison": filing.expectations_comparison  # Use same data
+            "market_impact_10q": filing.market_impact_10q,
+            # FIXED: core_metrics now uses financial_highlights which is text
+            "core_metrics": filing.financial_highlights  # This is now text (financial snapshot)
         })
     
     elif filing_type == "8-K":
@@ -296,7 +299,8 @@ async def get_filing(
             "financial_summary": filing.financial_summary,
             "risk_categories": filing.risk_categories,
             "growth_path_analysis": filing.growth_path_analysis,
-            "competitive_moat_analysis": filing.competitive_moat_analysis
+            "competitive_moat_analysis": filing.competitive_moat_analysis,
+            "financial_highlights": filing.financial_highlights
         })
     
     # Cache the result without view_limit_info and user_vote (since they're user-specific)
@@ -417,20 +421,6 @@ async def get_popular_filings(
 
 
 # Helper functions
-def extract_core_metrics(filing: Filing) -> Dict[str, Any]:
-    """Extract core metrics from financial_highlights for 10-Q"""
-    if not filing.financial_highlights:
-        return None
-    
-    highlights = filing.financial_highlights
-    return {
-        "revenue": highlights.get("revenue"),
-        "net_income": highlights.get("net_income"),
-        "eps": highlights.get("eps"),
-        "operating_margin": highlights.get("operating_margin")
-    }
-
-
 def extract_event_summary(filing: Filing) -> str:
     """Extract event summary from AI summary for 8-K"""
     # Use first paragraph of AI summary as event summary

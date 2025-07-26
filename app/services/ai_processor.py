@@ -7,6 +7,7 @@ Enhanced with structured financial data extraction
 Day 20: Added market impact analysis for 10-K and 10-Q
 FIXED: All extraction functions now return text narratives instead of JSON
 UPDATE: 10-Q now generates financial snapshot instead of structured metrics
+OPTIMIZED: 10-Q analysis functions now have clear boundaries to avoid content overlap
 """
 import os
 import json
@@ -203,7 +204,7 @@ Write a professional summary (400-500 words) that helps investors understand the
     async def _process_10q(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
         """
         Process 10-Q quarterly report with focus on trends and changes
-        UPDATED: Now generates financial snapshot instead of structured metrics
+        OPTIMIZED: Clear boundaries between analysis functions to avoid content overlap
         """
         logger.info("Processing 10-Q quarterly report")
         
@@ -237,16 +238,37 @@ Write a concise but comprehensive summary (300-400 words) that helps investors u
         # Generate quarterly Q&A
         questions = await self._generate_quarterly_questions(filing.company.name, content)
         
-        # NEW: Generate financial snapshot for 10-Q (replaces structured financial data)
+        # Generate financial snapshot for 10-Q (the core metrics narrative)
         financial_snapshot = await self._generate_financial_snapshot_10q(content, summary)
         
         # Generate tags
         tags = self._generate_10q_tags(summary)
         
-        # Generate market impact analysis for 10-Q
-        market_impact_10q = await self._generate_market_impact_10q(filing.company.name, summary, financial_snapshot)
+        # OPTIMIZED: Generate differentiated analysis with clear boundaries
+        # 1. Expectations comparison - pure numerical analysis
+        expectations_comparison = await self._extract_expectations_comparison_optimized(content, summary)
         
-        # Store all fields including differentiated display fields
+        # 2. Cost structure - operational efficiency focus
+        cost_structure = await self._extract_cost_structure_optimized(content, full_text)
+        
+        # 3. Guidance update - forward looking statements only
+        guidance_update = await self._extract_guidance_update_optimized(content)
+        
+        # 4. Growth/decline drivers - business segment analysis
+        growth_decline_analysis = await self._generate_growth_decline_analysis_optimized(summary, content)
+        
+        # 5. Management tone - linguistic analysis
+        management_tone_analysis = await self._generate_management_tone_analysis_optimized(content, tone_data)
+        
+        # 6. Beat/miss analysis - root cause analysis
+        beat_miss_analysis = await self._generate_beat_miss_analysis_optimized(summary, content, expectations_comparison)
+        
+        # 7. Market impact - forward looking implications
+        market_impact_10q = await self._generate_market_impact_10q_optimized(
+            filing.company.name, summary, financial_snapshot, expectations_comparison
+        )
+        
+        # Store all fields
         result = {
             'summary': summary,
             'feed_summary': feed_summary,
@@ -255,17 +277,18 @@ Write a concise but comprehensive summary (300-400 words) that helps investors u
             'questions': questions,
             'tags': tags,
             'financial_data': financial_snapshot,  # This is the financial snapshot text
-            # Differentiated display fields for 10-Q - ALL NOW TEXT
-            'expectations_comparison': await self._extract_expectations_comparison(content, summary),
-            'cost_structure': await self._extract_cost_structure(content, full_text),
-            'guidance_update': await self._extract_guidance_update(content),
-            'growth_decline_analysis': await self._generate_growth_decline_analysis(summary, content),
-            'management_tone_analysis': await self._generate_management_tone_analysis(content, tone_data),
-            'beat_miss_analysis': await self._generate_beat_miss_analysis(summary, content),
+            # Differentiated display fields for 10-Q
+            'expectations_comparison': expectations_comparison,
+            'cost_structure': cost_structure,
+            'guidance_update': guidance_update,
+            'growth_decline_analysis': growth_decline_analysis,
+            'management_tone_analysis': management_tone_analysis,
+            'beat_miss_analysis': beat_miss_analysis,
             'market_impact_10q': market_impact_10q
         }
         
-        # Update filing with differentiated fields
+        # Store in filing model
+        filing.core_metrics = financial_snapshot  # Store financial snapshot in core_metrics field
         filing.expectations_comparison = result.get('expectations_comparison')
         filing.cost_structure = result.get('cost_structure')
         filing.guidance_update = result.get('guidance_update')
@@ -275,6 +298,187 @@ Write a concise but comprehensive summary (300-400 words) that helps investors u
         filing.market_impact_10q = result.get('market_impact_10q')
         
         return result
+
+    # ====================== OPTIMIZED 10-Q ANALYSIS FUNCTIONS ======================
+    
+    async def _extract_expectations_comparison_optimized(self, content: str, summary: str) -> str:
+        """Extract ONLY numerical performance vs consensus - no analysis"""
+        prompt = f"""Extract ONLY the numerical comparison between actual results and market expectations from this quarterly filing.
+
+Content:
+{content[:2000]}
+
+Summary context:
+{summary[:500]}
+
+STRICT REQUIREMENTS:
+1. ONLY extract numbers that are explicitly compared to "consensus", "estimates", "expectations", or "analysts expected"
+2. Focus on these metrics if mentioned:
+   - Revenue: actual vs consensus
+   - EPS: actual vs consensus  
+   - Operating income: actual vs expected
+   - Segment performance vs expectations
+3. Present as factual comparisons: "Revenue of $X vs consensus $Y"
+4. If no explicit comparisons exist, state: "The filing does not provide explicit comparisons with market expectations."
+5. DO NOT analyze reasons or implications
+
+Write 150-200 words of pure numerical comparisons. No interpretation."""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _extract_cost_structure_optimized(self, content: str, full_text: str) -> str:
+        """Extract cost and efficiency metrics - no overlap with expectations"""
+        prompt = f"""Analyze the cost structure and operational efficiency from this quarterly report.
+
+Content:
+{content[:2000]}
+
+STRICT REQUIREMENTS:
+1. Focus ONLY on cost categories and efficiency metrics:
+   - COGS as % of revenue (if stated)
+   - SG&A trends
+   - R&D spending levels
+   - Operating leverage changes
+   - Margin analysis (gross, operating)
+2. Compare to prior periods if data provided
+3. DO NOT discuss revenue performance or expectations
+4. DO NOT analyze why costs changed - just report the changes
+5. If limited cost data provided, acknowledge this
+
+Write 150-200 words focused purely on cost structure and margins."""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _extract_guidance_update_optimized(self, content: str) -> str:
+        """Extract ONLY forward guidance - no historical analysis"""
+        prompt = f"""Extract ONLY guidance and forward-looking statements from this filing.
+
+Content:
+{content[:2000]}
+
+STRICT REQUIREMENTS:
+1. Look for explicit mentions of:
+   - "guidance", "outlook", "expect", "forecast", "anticipate"
+   - Future quarter/year projections
+   - Management targets or ranges
+2. State whether guidance was raised/lowered/maintained/withdrawn
+3. Include specific numbers or ranges if provided
+4. Note key assumptions mentioned
+5. If NO guidance provided, state: "The report does not provide updated guidance."
+6. DO NOT discuss past performance
+
+Write 100-150 words focused only on forward-looking statements."""
+
+        return await self._generate_text(prompt, max_tokens=250)
+
+    async def _generate_growth_decline_analysis_optimized(self, summary: str, content: str) -> str:
+        """Analyze business drivers by segment and geography - no financial metrics"""
+        prompt = f"""Analyze the operational drivers of growth or decline by business segment and geography.
+
+Summary:
+{summary[:1000]}
+
+Content excerpt:
+{content[:1000]}
+
+STRICT REQUIREMENTS:
+1. Focus on BUSINESS factors only:
+   - Which segments/products grew or declined
+   - Geographic performance variations
+   - Volume vs pricing dynamics
+   - Customer/market dynamics
+   - Operational factors (capacity, efficiency)
+2. DO NOT repeat revenue numbers or percentages
+3. DO NOT discuss expectations or guidance
+4. Focus on the "what" and "where", not financial outcomes
+
+Write 150-200 words on operational performance drivers only."""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _generate_management_tone_analysis_optimized(self, content: str, tone_data: Dict) -> str:
+        """Analyze linguistic tone and confidence - no performance discussion"""
+        prompt = f"""Analyze management's tone and confidence level based on their language in this filing.
+
+Initial tone assessment: {tone_data.get('tone', 'NEUTRAL')}
+
+Content excerpt:
+{content[:1500]}
+
+STRICT REQUIREMENTS:
+1. Focus on LANGUAGE analysis:
+   - Quote specific phrases that indicate confidence/caution
+   - Count positive vs negative descriptors
+   - Analyze certainty of language (definitive vs hedged)
+   - Compare tone to typical quarterly reports
+2. DO NOT discuss actual performance numbers
+3. DO NOT analyze business results
+4. Focus purely on HOW things are said, not WHAT is said
+
+Write 150-200 words of linguistic analysis only."""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _generate_beat_miss_analysis_optimized(self, summary: str, content: str, expectations_data: str) -> str:
+        """Analyze root causes for variance - assume reader knows the numbers"""
+        prompt = f"""Analyze the ROOT CAUSES behind the company's performance relative to expectations.
+
+The reader already knows the numerical variances from this data:
+{expectations_data[:200]}
+
+Summary for context:
+{summary[:500]}
+
+Content excerpt:
+{content[:1000]}
+
+STRICT REQUIREMENTS:
+1. Focus ONLY on explaining WHY variances occurred:
+   - Identify top 3 factors management cites
+   - Classify as structural (ongoing) vs temporary (one-time)
+   - Note which factors were within vs outside company control
+2. DO NOT repeat any numbers or variances
+3. DO NOT describe what happened - explain WHY it happened
+4. Assess likelihood these factors persist next quarter
+
+Write 150-200 words of pure causal analysis."""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _generate_market_impact_10q_optimized(self, company_name: str, summary: str, 
+                                                    financial_snapshot: str, expectations_data: str) -> str:
+        """Analyze market implications - forward looking only"""
+        prompt = f"""You are a senior equity analyst. Based on this {company_name} quarterly report, analyze potential market implications.
+
+Key context (reader already knows this):
+- Financial snapshot: {financial_snapshot[:200]}
+- Expectations variance: {expectations_data[:200]}
+
+Summary for additional context:
+{summary[:300]}
+
+ANALYSIS REQUIREMENTS:
+1. Focus on FORWARD implications only:
+   - Which investor types may find this report attractive/concerning
+   - Key metrics analysts will likely revise
+   - Catalyst events to monitor from the filing
+   - Peer comparison implications
+   
+2. Apply market experience carefully:
+   - Use phrases like "historically", "typically", "market participants often"
+   - Balance both constructive and cautious perspectives
+   - Acknowledge uncertainty with "may", "could", "potentially"
+   
+3. DO NOT:
+   - Recap what happened this quarter
+   - Repeat performance numbers
+   - Make specific price predictions
+
+Write 250-300 words of forward-looking market analysis in a measured, professional tone."""
+
+        return await self._generate_text(prompt, max_tokens=600)
+
+    # ====================== EXISTING HELPER METHODS (UNCHANGED) ======================
 
     async def _process_8k(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
         """
@@ -955,143 +1159,6 @@ Requirements:
 - Use soft expressions like "may", "could", "worth noting"
 - Avoid predicting specific price movements
 - Focus on fundamental analysis
-- Keep it 200-300 words"""
-
-        return await self._generate_text(prompt, max_tokens=600)
-
-    async def _extract_expectations_comparison(self, content: str, summary: str) -> str:
-        """Extract actual vs expected metrics for 10-Q - NOW RETURNS TEXT"""
-        prompt = f"""Analyze how the company performed versus market expectations in this quarterly report.
-
-Content:
-{content[:2000]}
-
-Summary:
-{summary[:1000]}
-
-Write a narrative summary (150-200 words) describing:
-1. How actual results compared to consensus estimates
-2. Key metrics that beat or missed expectations
-3. Revenue and EPS performance vs guidance
-4. Market reaction drivers
-5. Management's explanation for variances
-
-Present as a cohesive analysis, not raw data."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _extract_cost_structure(self, content: str, full_text: str) -> str:
-        """Extract cost structure breakdown for 10-Q - NOW RETURNS TEXT"""
-        prompt = f"""Analyze the cost structure from this quarterly report.
-
-Content:
-{content[:2000]}
-
-Write a narrative summary (150-200 words) describing:
-1. Major cost categories as percentage of revenue
-2. Year-over-year changes in cost structure
-3. Operating leverage trends
-4. R&D and SG&A spending patterns
-5. Margin improvement or pressure areas
-
-Focus on trends and insights, not just numbers."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _extract_guidance_update(self, content: str) -> str:
-        """Extract guidance updates from 10-Q - NOW RETURNS TEXT"""
-        prompt = f"""Analyze any guidance updates from this quarterly report.
-
-Content:
-{content[:2000]}
-
-Write a narrative summary (100-150 words) covering:
-1. Whether guidance was raised, lowered, or maintained
-2. New guidance ranges for key metrics
-3. Key assumptions and drivers
-4. Changes from previous guidance
-5. Management confidence level
-
-If no guidance update, state that clearly."""
-
-        return await self._generate_text(prompt, max_tokens=250)
-
-    async def _generate_growth_decline_analysis(self, summary: str, content: str) -> str:
-        """Analyze growth or decline drivers for 10-Q"""
-        prompt = f"""Based on this quarterly report summary and content, analyze what drove growth or decline this quarter.
-
-Summary:
-{summary[:1000]}
-
-Content excerpt:
-{content[:1000]}
-
-Provide a concise analysis (150-200 words) of:
-1. Key growth or decline drivers
-2. Segment performance
-3. Geographic variations
-4. One-time vs recurring factors"""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_management_tone_analysis(self, content: str, tone_data: Dict) -> str:
-        """Detailed analysis of management tone for 10-Q"""
-        prompt = f"""Provide a detailed analysis of management's tone and messaging in this quarterly report.
-
-Current tone assessment: {tone_data.get('tone', 'NEUTRAL')}
-Explanation: {tone_data.get('explanation', '')}
-
-Content excerpt:
-{content[:1500]}
-
-Analyze:
-1. Confidence level in guidance
-2. Discussion of challenges vs opportunities
-3. Change in tone from previous quarters (if mentioned)
-4. Key phrases that indicate sentiment
-
-Provide concise analysis (150-200 words)."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_beat_miss_analysis(self, summary: str, content: str) -> str:
-        """Analyze reasons for beating or missing expectations"""
-        prompt = f"""Based on this quarterly report, analyze why the company beat or missed expectations.
-
-Summary:
-{summary[:1000]}
-
-Content excerpt:
-{content[:1000]}
-
-Provide a concise analysis (150-200 words) of:
-1. Specific factors that led to outperformance or underperformance
-2. Whether these factors are likely to persist
-3. Management's explanation
-4. Market's likely interpretation"""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_market_impact_10q(self, company_name: str, summary: str, financial_narrative: str) -> str:
-        """Generate market impact analysis for 10-Q"""
-        prompt = f"""You are a senior financial analyst. Based on this {company_name} quarterly report (10-Q), analyze the potential short-term market impact.
-
-Summary content:
-{summary}
-
-Financial performance:
-{financial_narrative}
-
-Please analyze:
-1. Performance vs market expectations
-2. Points that may trigger short-term market reactions
-3. Market implications of guidance adjustments
-4. Quarterly performance compared to industry peers
-
-Requirements:
-- Use soft expressions like "may", "could", "worth noting"
-- Avoid predicting specific price movements
-- Focus on short-term performance drivers
 - Keep it 200-300 words"""
 
         return await self._generate_text(prompt, max_tokens=600)

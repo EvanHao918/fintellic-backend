@@ -8,6 +8,7 @@ Day 20: Added market impact analysis for 10-K and 10-Q
 FIXED: All extraction functions now return text narratives instead of JSON
 UPDATE: 10-Q now generates financial snapshot instead of structured metrics
 OPTIMIZED: 10-Q analysis functions now have clear boundaries to avoid content overlap
+UPDATE: 8-K processing optimized for better value extraction
 """
 import os
 import json
@@ -478,11 +479,12 @@ Write 250-300 words of forward-looking market analysis in a measured, profession
 
         return await self._generate_text(prompt, max_tokens=600)
 
-    # ====================== EXISTING HELPER METHODS (UNCHANGED) ======================
+    # ====================== OPTIMIZED 8-K PROCESSING ======================
 
     async def _process_8k(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
         """
         Process 8-K current report with focus on specific events
+        OPTIMIZED: Better prompts for value extraction
         """
         logger.info("Processing 8-K current report")
         
@@ -519,14 +521,11 @@ Write a clear, factual summary (200-300 words) that helps investors quickly unde
         # Generate event-specific Q&A
         questions = await self._generate_8k_questions(filing.company.name, content, event_type)
         
-        # Extract event-specific narrative
-        event_narrative = await self._extract_event_narrative(event_type, content)
-        
         # Generate event-specific tags
         tags = self._generate_8k_tags(summary, event_type)
         
-        # Extract structured 8-K data - NOW RETURNS TEXT
-        structured_data = await self._extract_8k_structured_data(content, event_type)
+        # Extract structured 8-K data - OPTIMIZED PROMPTS
+        structured_data = await self._extract_8k_structured_data_optimized(content, event_type, summary)
         
         result = {
             'summary': summary,
@@ -536,14 +535,15 @@ Write a clear, factual summary (200-300 words) that helps investors quickly unde
             'questions': questions,
             'tags': tags,
             'event_type': event_type,
-            'financial_data': event_narrative,  # Event narrative instead of metrics
+            'financial_data': None,  # Not used for 8-K
             # Differentiated display fields for 8-K
             'item_type': structured_data.get('item_type'),
-            'items': structured_data.get('items'),
-            'event_timeline': structured_data.get('event_timeline'),
-            'event_nature_analysis': await self._generate_event_nature_analysis(event_type, summary),
-            'market_impact_analysis': await self._generate_8k_market_impact(filing.company.name, event_type, summary),
-            'key_considerations': await self._generate_key_considerations(event_type, summary)
+            'items': structured_data.get('items'),  # What Happened
+            'market_impact_analysis': structured_data.get('market_impact'),  # Potential Market Impact
+            'key_considerations': structured_data.get('key_considerations'),  # What to Watch
+            # These will be hidden in frontend but kept for backward compatibility
+            'event_timeline': None,
+            'event_nature_analysis': None
         }
         
         # Update filing with differentiated fields
@@ -556,6 +556,91 @@ Write a clear, factual summary (200-300 words) that helps investors quickly unde
         
         return result
 
+    async def _extract_8k_structured_data_optimized(self, content: str, event_type: str, summary: str) -> Dict:
+        """
+        Extract structured data specific to 8-K filings with OPTIMIZED prompts
+        Following the new 3-field structure: What Happened, Potential Market Impact, What to Watch
+        """
+        # Extract Item number
+        item_pattern = r'Item\s+(\d+\.\d+)'
+        item_match = re.search(item_pattern, content, re.IGNORECASE)
+        item_type = item_match.group(1) if item_match else None
+        
+        # 1. What Happened (items field) - 精炼事实陈述
+        items_prompt = f"""Based on this 8-K filing, provide a concise summary of what was disclosed.
+
+Event type: {event_type}
+Content excerpt:
+{content[:1500]}
+
+Write a factual summary (100-150 words) covering:
+- The specific event or transaction announced
+- Key terms, amounts, or dates mentioned
+- Parties involved and their roles
+- Any conditions or contingencies noted
+
+Style: Write like a financial journalist's lead paragraph - precise, informative, and focused on material facts only. No interpretation or speculation.
+
+Example: "The company announced the appointment of Jane Smith as Chief Financial Officer, effective September 1, 2025. Smith previously served as CFO at ABC Corporation and brings 20 years of financial leadership experience. Current CFO John Doe will remain through August 31 to ensure transition. The company initiated an external search process three months ago with assistance from executive search firm XYZ."
+"""
+
+        items_text = await self._generate_text(items_prompt, max_tokens=200)
+        
+        # 2. Potential Market Impact - 专业分析师视角
+        market_impact_prompt = f"""You are a senior equity analyst. Based on this {filing.company.name} 8-K filing, analyze the potential market implications.
+
+Event summary:
+{summary[:500]}
+
+Content for context:
+{content[:1000]}
+
+Provide balanced analysis (200-250 words) covering:
+1. How this event may influence market perception of the company
+2. Potential impacts on key financial metrics or business operations  
+3. Factors that could amplify or mitigate the impact
+4. Relevant considerations for different stakeholder groups
+
+Style requirements:
+- Use measured language: "may", "could", "potentially", "likely"
+- Acknowledge both positive and cautionary aspects
+- Focus on first and second-order effects
+- Avoid definitive predictions or recommendations
+
+Write in the style of institutional research - professional, balanced, and focused on implications rather than advice."""
+
+        market_impact_text = await self._generate_text(market_impact_prompt, max_tokens=400)
+        
+        # 3. What to Watch (key_considerations字段) - 前瞻性观察点
+        key_considerations_prompt = f"""Based on this {event_type} announcement, identify key developments to monitor going forward.
+
+Event summary:
+{summary[:300]}
+
+List 4-5 specific items to track (150-200 words total), such as:
+- Concrete milestones or deadlines mentioned
+- Required follow-up disclosures
+- Execution dependencies or conditions
+- Related events that typically follow
+- Metrics that will indicate success/failure
+
+Style: Write as forward-looking observation points, not recommendations. Use bullet points with 1-2 sentences each explaining why each item matters.
+
+Example format:
+• Successor announcement timeline - Companies typically name permanent replacements within 60-90 days; extended searches may signal difficulty attracting candidates
+• Integration milestones - Watch for 100-day plan disclosure and initial synergy quantification in next quarterly filing"""
+
+        key_considerations_text = await self._generate_text(key_considerations_prompt, max_tokens=300)
+        
+        return {
+            'item_type': item_type,
+            'items': items_text,  # What Happened
+            'market_impact': market_impact_text,  # Potential Market Impact
+            'key_considerations': key_considerations_text  # What to Watch
+        }
+
+    # ====================== EXISTING S-1 PROCESSING (UNCHANGED) ======================
+    
     async def _process_s1(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
         """
         Process S-1 IPO registration with focus on business model and risks
@@ -680,23 +765,6 @@ Example: "The company delivered robust financial performance with revenue reachi
 Make it narrative and insightful, focusing on the story behind the numbers."""
 
         return await self._generate_text(prompt, max_tokens=300)
-
-    async def _extract_event_narrative(self, event_type: str, content: str) -> str:
-        """Extract event narrative for 8-K instead of metrics"""
-        prompt = f"""Create a brief financial/business impact narrative for this {event_type} event.
-
-Content excerpt:
-{content[:1500]}
-
-Write a concise narrative (100-150 words) that explains:
-1. The financial or business significance of this event
-2. Any quantitative impacts mentioned (deal size, costs, etc.)
-3. Strategic implications for the company
-4. Timeline and implementation details
-
-Focus on the business impact rather than just describing what happened."""
-
-        return await self._generate_text(prompt, max_tokens=200)
 
     # ====================== HELPER METHODS ======================
 
@@ -1162,89 +1230,6 @@ Requirements:
 - Keep it 200-300 words"""
 
         return await self._generate_text(prompt, max_tokens=600)
-
-    async def _extract_8k_structured_data(self, content: str, event_type: str) -> Dict:
-        """Extract structured data specific to 8-K filings - NOW RETURNS TEXT FOR ITEMS AND TIMELINE"""
-        # Extract Item number
-        item_pattern = r'Item\s+(\d+\.\d+)'
-        item_match = re.search(item_pattern, content, re.IGNORECASE)
-        item_type = item_match.group(1) if item_match else None
-        
-        # Generate text description for items
-        items_prompt = f"""Based on this 8-K filing with Item {item_type or 'Unknown'}, describe what was reported.
-
-Event type: {event_type}
-Content excerpt:
-{content[:1000]}
-
-Write a brief description (50-100 words) of the reported items and their significance."""
-
-        items_text = await self._generate_text(items_prompt, max_tokens=150)
-        
-        # Generate text description for timeline
-        timeline_prompt = f"""Analyze the timeline of events in this 8-K filing.
-
-Content excerpt:
-{content[:1000]}
-
-Write a brief timeline narrative (50-100 words) describing when key events occurred or will occur."""
-
-        timeline_text = await self._generate_text(timeline_prompt, max_tokens=150)
-        
-        return {
-            'item_type': item_type,
-            'items': items_text,
-            'event_timeline': timeline_text
-        }
-
-    async def _generate_event_nature_analysis(self, event_type: str, summary: str) -> str:
-        """Analyze the nature and significance of 8-K event"""
-        prompt = f"""Analyze the nature and significance of this {event_type} event.
-
-Summary:
-{summary}
-
-Provide a concise analysis (100-150 words) covering:
-1. Type and nature of the event
-2. Materiality to the company
-3. Typical market interpretation of such events
-4. Required regulatory disclosure aspects"""
-
-        return await self._generate_text(prompt, max_tokens=250)
-
-    async def _generate_8k_market_impact(self, company_name: str, event_type: str, summary: str) -> str:
-        """Generate market impact analysis for 8-K events"""
-        prompt = f"""Analyze the potential market impact of this {company_name} {event_type} announcement.
-
-Summary:
-{summary}
-
-Provide a balanced analysis (150-200 words) of:
-1. Immediate market reaction expectations
-2. Longer-term implications
-3. Impact on specific stakeholder groups
-4. Comparison to similar events in the industry
-
-Use soft language like "may", "could", "potentially". Avoid specific price predictions."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_key_considerations(self, event_type: str, summary: str) -> str:
-        """Generate key considerations for investors regarding 8-K event"""
-        prompt = f"""Based on this {event_type} announcement, what are the key considerations for investors?
-
-Summary:
-{summary}
-
-List 3-4 key points investors should consider, such as:
-- Impact on operations
-- Financial implications
-- Strategic changes
-- Timeline of effects
-
-Be concise and factual (100-150 words total)."""
-
-        return await self._generate_text(prompt, max_tokens=250)
 
     async def _extract_ipo_details(self, content: str, full_text: str) -> str:
         """Extract IPO details from S-1 - NOW RETURNS TEXT"""

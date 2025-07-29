@@ -9,6 +9,7 @@ FIXED: All extraction functions now return text narratives instead of JSON
 UPDATE: 10-Q now generates financial snapshot instead of structured metrics
 OPTIMIZED: 10-Q analysis functions now have clear boundaries to avoid content overlap
 UPDATE: 8-K processing optimized for better value extraction
+FIXED: Added filing parameter to _extract_8k_structured_data_optimized to fix variable reference error
 """
 import os
 import json
@@ -524,8 +525,8 @@ Write a clear, factual summary (200-300 words) that helps investors quickly unde
         # Generate event-specific tags
         tags = self._generate_8k_tags(summary, event_type)
         
-        # Extract structured 8-K data - OPTIMIZED PROMPTS
-        structured_data = await self._extract_8k_structured_data_optimized(content, event_type, summary)
+        # Extract structured 8-K data - OPTIMIZED PROMPTS (FIXED: Added filing parameter)
+        structured_data = await self._extract_8k_structured_data_optimized(filing, content, event_type, summary)
         
         result = {
             'summary': summary,
@@ -556,10 +557,11 @@ Write a clear, factual summary (200-300 words) that helps investors quickly unde
         
         return result
 
-    async def _extract_8k_structured_data_optimized(self, content: str, event_type: str, summary: str) -> Dict:
+    async def _extract_8k_structured_data_optimized(self, filing: Filing, content: str, event_type: str, summary: str) -> Dict:
         """
         Extract structured data specific to 8-K filings with OPTIMIZED prompts
         Following the new 3-field structure: What Happened, Potential Market Impact, What to Watch
+        FIXED: Added filing parameter to access company name
         """
         # Extract Item number
         item_pattern = r'Item\s+(\d+\.\d+)'
@@ -612,7 +614,7 @@ Write in the style of institutional research - professional, balanced, and focus
         market_impact_text = await self._generate_text(market_impact_prompt, max_tokens=400)
         
         # 3. What to Watch (key_considerations字段) - 前瞻性观察点
-        key_considerations_prompt = f"""Based on this {event_type} announcement, identify key developments to monitor going forward.
+        key_considerations_prompt = f"""Based on this {filing.company.name} {event_type} announcement, identify key developments to monitor going forward.
 
 Event summary:
 {summary[:300]}

@@ -3,6 +3,8 @@
 Text Extractor Service
 Extracts structured text from SEC filing HTML documents
 Enhanced for different filing types (10-K, 10-Q, 8-K, S-1)
+FIXED: iXBRL documents now properly extract filing-specific sections
+FIXED: Document type identification happens before iXBRL processing
 """
 import re
 from pathlib import Path
@@ -118,12 +120,13 @@ class TextExtractor:
         """Identify the filing type from text content"""
         text_upper = text.upper()[:5000]  # Check first 5000 chars
         
-        if 'FORM 10-K' in text_upper or 'ANNUAL REPORT' in text_upper:
+        # 8-K has higher priority - check it first
+        if 'FORM 8-K' in text_upper or 'CURRENT REPORT' in text_upper:
+            return '8-K'
+        elif 'FORM 10-K' in text_upper or 'ANNUAL REPORT' in text_upper:
             return '10-K'
         elif 'FORM 10-Q' in text_upper or 'QUARTERLY REPORT' in text_upper:
             return '10-Q'
-        elif 'FORM 8-K' in text_upper or 'CURRENT REPORT' in text_upper:
-            return '8-K'
         elif 'FORM S-1' in text_upper or 'REGISTRATION STATEMENT' in text_upper:
             return 'S-1'
         else:
@@ -132,41 +135,111 @@ class TextExtractor:
     def _extract_8k_sections_from_text(self, text: str) -> Dict[str, str]:
         """
         Extract specific items from 8-K text
+        Enhanced to handle iXBRL format variations
         """
         sections = {}
         
-        # Look for ITEM patterns in 8-K
-        # Common patterns: "Item 8.01", "ITEM 8.01", "Item 8.01 Other Events"
-        item_pattern = re.compile(r'(ITEM\s+\d+\.\d+[^\n]*)', re.IGNORECASE)
+        # DEBUG: Check text content
+        logger.info(f"Text length for 8-K extraction: {len(text)}")
+        
+        # Check for various ITEM formats in first 5000 chars
+        sample_text = text[:5000].upper()
+        logger.info(f"Sample contains 'ITEM 8': {'ITEM 8' in sample_text}")
+        
+        # Enhanced patterns to handle different formats
+        patterns_to_try = [
+            # Standard pattern with flexible spacing
+            (r'Item\s+(\d+\.?\d*)\s*([^\n.]*)', 'standard'),
+            # Pattern with multiple spaces or special chars
+            (r'Item[\s\xa0]+(\d+\.?\d*)[\s\xa0]*([^\n.]*)', 'flexible'),
+            # All caps version
+            (r'ITEM\s+(\d+\.?\d*)\s*([^\n.]*)', 'caps'),
+        ]
         
         items = []
-        matches = list(item_pattern.finditer(text))
+        all_matches = []
         
-        for i, match in enumerate(matches):
-            item_header = match.group(1)
+        # Try each pattern and combine results
+        for pattern, pattern_name in patterns_to_try:
+            item_pattern = re.compile(pattern, re.IGNORECASE | re.MULTILINE)
+            matches = list(item_pattern.finditer(text))
+            
+            if matches:
+                logger.info(f"Pattern '{pattern_name}' found {len(matches)} matches")
+                all_matches.extend(matches)
+        
+        # Remove duplicates based on position
+        unique_matches = []
+        seen_positions = set()
+        for match in all_matches:
+            pos = match.start()
+            if pos not in seen_positions and not any(abs(pos - p) < 10 for p in seen_positions):
+                unique_matches.append(match)
+                seen_positions.add(pos)
+        
+        logger.info(f"Total unique matches found: {len(unique_matches)}")
+        
+        if not unique_matches:
+            logger.warning("No ITEM patterns found in 8-K text")
+            # Return at least some content
+            sections['primary_content'] = text[:10000]
+            return sections
+        
+        # Sort matches by position
+        unique_matches.sort(key=lambda m: m.start())
+        
+        # Process each match
+        for i, match in enumerate(unique_matches):
+            # Get item number and title
+            groups = match.groups()
+            item_num = groups[0] if len(groups) > 0 else ""
+            item_title = groups[1] if len(groups) > 1 else ""
+            
+            item_header = f"Item {item_num}"
+            if item_title:
+                item_header += f" {item_title}"
+            
+            item_header = item_header.strip()
+            
+            # Find content boundaries
             start_pos = match.end()
             
-            # Find the end position (either next item or signature section)
-            if i + 1 < len(matches):
-                end_pos = matches[i + 1].start()
+            # Find the end position
+            if i + 1 < len(unique_matches):
+                end_pos = unique_matches[i + 1].start()
             else:
-                # Look for signature section or end
-                sig_pos = text.find('SIGNATURES', start_pos)
-                if sig_pos != -1:
-                    end_pos = sig_pos
-                else:
-                    end_pos = min(start_pos + 10000, len(text))  # Max 10k chars per item
+                # Look for signature section
+                sig_patterns = ['SIGNATURES', 'SIGNATURE', 'Pursuant to the requirements']
+                end_pos = len(text)
+                for sig_pattern in sig_patterns:
+                    sig_pos = text.find(sig_pattern, start_pos)
+                    if sig_pos != -1 and sig_pos < end_pos:
+                        end_pos = sig_pos
+                        break
+                
+                # Limit to reasonable size
+                end_pos = min(end_pos, start_pos + 15000)
             
             # Extract item content
             item_content = text[start_pos:end_pos].strip()
             
+            # Clean up the content
+            item_content = re.sub(r'\s+', ' ', item_content)  # Normalize whitespace
+            item_content = re.sub(r'^\s*\.+\s*', '', item_content)  # Remove leading dots
+            
             # Only include if there's substantial content
-            if len(item_content) > 50:
-                items.append(f"\n{item_header}\n{'-' * len(item_header)}\n{item_content}")
+            if len(item_content) > 30:  # Lower threshold for iXBRL
+                formatted_item = f"\n{item_header}\n{'-' * len(item_header)}\n{item_content}"
+                items.append(formatted_item)
+                logger.debug(f"Added item: {item_header} ({len(item_content)} chars)")
         
         if items:
             sections['items_content'] = '\n\n'.join(items)
             sections['primary_content'] = sections['items_content']
+            logger.info(f"Successfully extracted {len(items)} items, total length: {len(sections['items_content'])}")
+        else:
+            logger.warning("No items with substantial content found")
+            sections['primary_content'] = text[:10000]
         
         return sections
     
@@ -270,10 +343,15 @@ class TextExtractor:
             with open(html_path, 'r', encoding='utf-8', errors='ignore') as f:
                 html_content = f.read()
             
+            # FIXED: 先从原始HTML识别文档类型（在任何处理之前）
+            filing_type_from_html = self._identify_filing_type(html_content)
+            logger.info(f"Initial document type identified from HTML: {filing_type_from_html}")
+            
             # Check if this is an iXBRL document
             if 'ix:' in html_content or 'inline XBRL' in html_content.lower():
                 logger.info("Detected iXBRL document, using special extraction")
-                return self._extract_from_ixbrl(html_content)
+                # 传递预识别的文档类型
+                return self._extract_from_ixbrl(html_content, filing_type_from_html)
             
             soup = BeautifulSoup(html_content, 'html.parser')
             
@@ -294,8 +372,8 @@ class TextExtractor:
                 logger.warning(f"Extracted text too short ({len(text)} chars), trying alternative methods")
                 text = self._extract_all_text_content(soup)
             
-            # Identify filing type
-            filing_type = self._identify_filing_type(text)
+            # Use the pre-identified filing type
+            filing_type = filing_type_from_html
             
             # Extract sections based on filing type
             if filing_type == '8-K':
@@ -321,9 +399,12 @@ class TextExtractor:
             logger.error(f"Error extracting text from {html_path}: {e}")
             return {'error': str(e)}
     
-    def _extract_from_ixbrl(self, html_content: str) -> Dict[str, str]:
+    def _extract_from_ixbrl(self, html_content: str, pre_identified_type: str = None) -> Dict[str, str]:
         """
         Extract text from iXBRL (inline XBRL) documents
+        FIXED: Now properly extracts filing-specific sections for iXBRL documents
+        FIXED: Uses pre-identified filing type from original HTML
+        ENHANCED: Better handling of text structure preservation
         """
         soup = BeautifulSoup(html_content, 'html.parser')
         
@@ -332,40 +413,89 @@ class TextExtractor:
             elem.unwrap()
         
         # Remove script and style
-        for element in soup(['script', 'style', 'link', 'meta']):
+        for element in soup(['script', 'style', 'link', 'meta', 'noscript']):
             element.decompose()
         
-        # Look for the main content in various possible containers
-        main_content = None
+        # Method 1: Extract text while preserving structure
+        # This is crucial for iXBRL where text is split across many elements
+        text_parts = []
         
-        # Try different selectors for iXBRL documents
-        selectors = [
-            {'name': 'body'},
-            {'name': 'div', 'attrs': {'class': re.compile('document', re.I)}},
-            {'name': 'div', 'attrs': {'id': re.compile('document', re.I)}},
-            {'name': 'table'},
-        ]
+        # Process body content
+        body = soup.find('body')
+        if body:
+            # Walk through all elements and extract text with structure
+            for element in body.descendants:
+                if isinstance(element, str):
+                    text = element.strip()
+                    if text and not text.isspace():
+                        text_parts.append(text)
+                elif element.name in ['div', 'p', 'br']:
+                    # Add newline for block elements
+                    text_parts.append('\n')
         
-        for selector in selectors:
-            elements = soup.find_all(**selector)
-            if elements:
-                # Get the element with the most text content
-                main_content = max(elements, key=lambda e: len(e.get_text()))
-                if len(main_content.get_text()) > 500:
-                    break
+        # Join with spaces but preserve newlines
+        text = ' '.join(text_parts)
         
-        if main_content:
-            text = main_content.get_text()
+        # Clean up excessive whitespace while preserving structure
+        text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)  # Reduce multiple newlines
+        text = re.sub(r'[ \t]+', ' ', text)  # Reduce multiple spaces to one
+        text = text.strip()
+        
+        logger.info(f"Extracted text length from iXBRL: {len(text)}")
+        
+        # If text is still too short, try alternative extraction
+        if len(text) < 3000:
+            logger.warning(f"Text seems too short ({len(text)} chars), trying full extraction")
+            # Get all text without structure preservation as fallback
+            full_text = soup.get_text(separator=' ')
+            if len(full_text) > len(text):
+                text = full_text
+                logger.info(f"Using full text extraction: {len(text)} chars")
+        
+        # Use pre-identified type if available, otherwise try to identify
+        if pre_identified_type and pre_identified_type != 'UNKNOWN':
+            filing_type = pre_identified_type
+            logger.info(f"Using pre-identified filing type: {filing_type}")
         else:
-            text = soup.get_text()
+            filing_type = self._identify_filing_type(text)
+            logger.info(f"iXBRL document identified as: {filing_type}")
         
-        # Clean the text
-        text = self._clean_text(text)
+        # DEBUG: For 8-K, log content sample
+        if filing_type == '8-K':
+            logger.info(f"Processing 8-K iXBRL, text length: {len(text)}")
+            # Log sample around Item 8
+            item_pos = text.find('Item 8')
+            if item_pos != -1:
+                sample = text[max(0, item_pos-50):min(len(text), item_pos+200)]
+                logger.debug(f"Item 8 context: ...{sample}...")
         
-        return {
-            'full_text': text,
-            'primary_content': text[:50000]  # Use first 50k chars as primary
-        }
+        # Extract sections based on filing type
+        if filing_type == '8-K':
+            sections = self._extract_8k_sections_from_text(text)
+        elif filing_type == '10-K':
+            sections = self._extract_10k_sections_from_text(text)
+        elif filing_type == '10-Q':
+            sections = self._extract_10q_sections_from_text(text)
+        elif filing_type == 'S-1':
+            sections = self._extract_s1_sections_from_text(text)
+        else:
+            sections = {}
+        
+        # Always include full text
+        sections['full_text'] = text
+        
+        # If no primary content was extracted, use the first 50k chars
+        if 'primary_content' not in sections or not sections['primary_content']:
+            sections['primary_content'] = text[:50000]
+            logger.warning(f"No specific sections found for {filing_type}, using first 50k chars")
+        else:
+            logger.info(f"Successfully extracted {filing_type} sections from iXBRL")
+        
+        # Include items_content if it was extracted for 8-K
+        if 'items_content' in sections:
+            logger.info(f"Extracted {len(sections['items_content'])} chars of items content")
+        
+        return sections
     
     def _extract_all_text_content(self, soup: BeautifulSoup) -> str:
         """
@@ -497,8 +627,9 @@ class TextExtractor:
         """
         Clean extracted text
         """
-        # Remove excessive whitespace
-        text = re.sub(r'\s+', ' ', text)
+        # Remove excessive whitespace but preserve some structure
+        text = re.sub(r'\n\s*\n', '\n\n', text)  # Reduce multiple newlines to double
+        text = re.sub(r'[ \t]+', ' ', text)  # Reduce multiple spaces/tabs to single space
         
         # Remove special characters that might interfere with processing
         text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f-\x9f]', '', text)

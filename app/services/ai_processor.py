@@ -10,6 +10,7 @@ UPDATE: 10-Q now generates financial snapshot instead of structured metrics
 OPTIMIZED: 10-Q analysis functions now have clear boundaries to avoid content overlap
 UPDATE: 8-K processing optimized for better value extraction
 FIXED: Added filing parameter to _extract_8k_structured_data_optimized to fix variable reference error
+UPDATE: S-1 prompts optimized for professional narrative quality based on market principles
 """
 import os
 import json
@@ -641,34 +642,36 @@ Example format:
             'key_considerations': key_considerations_text  # What to Watch
         }
 
-    # ====================== EXISTING S-1 PROCESSING (UNCHANGED) ======================
+    # ====================== OPTIMIZED S-1 PROCESSING ======================
     
     async def _process_s1(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
         """
         Process S-1 IPO registration with focus on business model and risks
+        OPTIMIZED: Professional analysis based on market principles
         """
         logger.info("Processing S-1 IPO registration")
         
         content = self._prepare_content(primary_content)
         
-        # Generate IPO overview
-        summary_prompt = f"""You are a financial analyst. Create an IPO overview of this {filing.company.name} S-1 filing.
+        # Generate IPO overview - OPTIMIZED
+        summary_prompt = f"""You are a financial analyst evaluating {filing.company.name}'s S-1 filing.
 
-Focus on:
-1. Company business model and value proposition
-2. Financial snapshot (revenue, profitability, growth rates)
-3. Target valuation and share price range (if disclosed)
-4. Use of proceeds from IPO
-5. Key risk factors specific to this business
-6. Competitive advantages and market position
-7. Management team and major shareholders
+Create a compelling IPO overview (350-400 words) that captures the investment thesis:
+
+1. Business model essence - what problem they solve and how
+2. Financial trajectory - focus on growth rate, path to profitability  
+3. Market opportunity - addressable market size and expansion potential
+4. Competitive positioning - unique advantages and moat
+5. Use of proceeds - strategic priorities for IPO funds
+6. Key risks - the 2-3 most material challenges
+7. Management credibility - relevant experience and track record
 
 Content:
 {content}
 
-Write a comprehensive IPO summary (400-500 words) that helps investors evaluate this offering."""
+Style: Write like an equity research preview - informative yet engaging. Focus on what makes this IPO notable. Avoid generic descriptions."""
 
-        summary = await self._generate_text(summary_prompt, max_tokens=1200)
+        summary = await self._generate_text(summary_prompt, max_tokens=1000)
         
         # Extract one-line summary
         feed_summary = await self._generate_feed_summary(summary, filing.filing_type.value)
@@ -679,12 +682,14 @@ Write a comprehensive IPO summary (400-500 words) that helps investors evaluate 
         # Generate IPO-specific Q&A
         questions = await self._generate_ipo_questions(filing.company.name, content)
         
-        # Extract IPO-specific data - NOW ALL TEXT
-        ipo_details = await self._extract_ipo_details(content, full_text)
-        financial_summary = await self._extract_financial_summary_s1(content, full_text)
-        
-        # Extract financial highlights as narrative
-        financial_highlights_text = await self._extract_structured_financial_data(filing.filing_type.value, content, full_text)
+        # Extract IPO-specific data with optimized prompts
+        ipo_details = await self._extract_ipo_details_optimized(content, full_text)
+        company_overview = await self._generate_company_overview_optimized(filing.company.name, content)
+        financial_summary = await self._extract_financial_summary_s1_optimized(content, full_text)
+        financial_highlights = await self._extract_financial_highlights_s1(content, full_text)
+        risk_categories = await self._extract_risk_categories_optimized(content)
+        growth_path_analysis = await self._generate_growth_path_analysis_optimized(filing.company.name, summary, financial_summary)
+        competitive_moat_analysis = await self._generate_competitive_moat_analysis_optimized(content, summary)
         
         # Generate tags
         tags = self._generate_s1_tags(summary)
@@ -697,14 +702,14 @@ Write a comprehensive IPO summary (400-500 words) that helps investors evaluate 
             'tone_explanation': tone_data['explanation'],
             'questions': questions,
             'tags': tags,
-            'financial_data': financial_highlights_text,  # Now text narrative
-            # Differentiated display fields for S-1 - ALL NOW TEXT
+            'financial_data': financial_highlights,  # Financial highlights
+            # Differentiated display fields for S-1
             'ipo_details': ipo_details,
-            'company_overview': await self._generate_company_overview(filing.company.name, content),
+            'company_overview': company_overview,
             'financial_summary': financial_summary,
-            'risk_categories': await self._extract_risk_categories(content),
-            'growth_path_analysis': await self._generate_growth_path_analysis(filing.company.name, summary, financial_highlights_text),
-            'competitive_moat_analysis': await self._generate_competitive_moat_analysis(content, summary)
+            'risk_categories': risk_categories,
+            'growth_path_analysis': growth_path_analysis,
+            'competitive_moat_analysis': competitive_moat_analysis
         }
         
         # Update filing with differentiated fields
@@ -716,6 +721,176 @@ Write a comprehensive IPO summary (400-500 words) that helps investors evaluate 
         filing.competitive_moat_analysis = result.get('competitive_moat_analysis')
         
         return result
+
+    # ====================== OPTIMIZED S-1 FIELD EXTRACTORS ======================
+
+    async def _extract_ipo_details_optimized(self, content: str, full_text: str) -> str:
+        """Extract IPO details - OPTIMIZED for conciseness and relevance"""
+        prompt = f"""Extract key IPO mechanics from this S-1 filing.
+
+Content:
+{content[:3000]}
+
+Write a focused summary (120-150 words) covering ONLY material details:
+- Ticker and exchange (if disclosed)
+- Share offering size and price range (if available)
+- Expected proceeds and primary uses
+- Lead underwriters (top 2-3 names)
+- Lock-up period (if specified)
+
+If key details are missing, focus on what IS disclosed. 
+DO NOT say "not disclosed" repeatedly - only mention once at end if multiple items missing.
+
+Style: Dense with information, like a term sheet summary."""
+
+        return await self._generate_text(prompt, max_tokens=200)
+
+    async def _generate_company_overview_optimized(self, company_name: str, content: str) -> str:
+        """Generate company overview - OPTIMIZED for business model clarity"""
+        prompt = f"""Create a sharp company overview for {company_name} based on their S-1.
+
+Content:
+{content[:2000]}
+
+Write 150-180 words focusing on:
+1. Core value proposition in one clear sentence
+2. Revenue model - how they make money
+3. Customer base and market position
+4. Key operational metrics (customers, locations, employees)
+5. Founding story ONLY if it adds credibility
+
+Avoid: Generic descriptions, mission statements, aspirational language.
+Focus: Concrete business facts that help assess viability.
+
+Example opening: "Safe & Green designs and deploys modular buildings that reduce construction time by 50% while meeting green building standards."
+
+Make every sentence count."""
+
+        return await self._generate_text(prompt, max_tokens=250)
+
+    async def _extract_financial_summary_s1_optimized(self, content: str, full_text: str) -> str:
+        """Extract financial summary - OPTIMIZED for investment relevance"""
+        prompt = f"""Analyze the financial profile from this S-1 filing.
+
+Content:
+{content[:3000]}
+
+Write a punchy financial narrative (150-180 words) that tells the story:
+
+1. Revenue scale and growth trajectory (use specific numbers)
+2. Gross margin profile and trends
+3. Operating leverage - is the model working?
+4. Cash burn rate and implied runway
+5. Path to profitability timeline (if indicated)
+
+Key: Connect the numbers to business quality. Don't just report metrics.
+
+Example style: "Revenue doubled to $45M in 2024, driven by healthcare sector adoption. While still unprofitable, gross margins improved from 35% to 40%, validating the unit economics. Monthly cash burn of $3.75M suggests 8-month runway at current pace, making the IPO timing critical."
+
+Focus on what the numbers reveal about the business."""
+
+        return await self._generate_text(prompt, max_tokens=250)
+
+    async def _extract_financial_highlights_s1(self, content: str, full_text: str) -> str:
+        """Extract financial highlights for Financial Highlights field"""
+        prompt = f"""Extract key financial metrics from this S-1 filing.
+
+Content:
+{content[:3000]}
+
+Create a financial snapshot (100-120 words) with the most recent metrics:
+- Latest annual/trailing revenue and growth %
+- Gross and operating margins
+- Net income/loss
+- Cash position and burn rate
+- Any key unit economics mentioned
+
+Style: Crisp metric reporting. Lead with the most impressive number.
+Example: "The company generated $45 million in revenue for 2024, up 125% year-over-year..."
+
+Just facts and numbers, no analysis."""
+
+        return await self._generate_text(prompt, max_tokens=150)
+
+    async def _extract_risk_categories_optimized(self, content: str) -> str:
+        """Extract risk factors - OPTIMIZED for materiality"""
+        prompt = f"""Analyze risk factors from this S-1 filing.
+
+Content:
+{content[:3000]}
+
+Write a risk assessment (150-180 words) covering the 4-5 MOST MATERIAL risks:
+
+Focus on risks that could fundamentally impair the business:
+- Execution risks specific to their model
+- Regulatory hurdles that could block growth
+- Competitive dynamics that threaten positioning  
+- Financial risks given their current burn rate
+- Technology/operational risks
+
+Skip generic risks (economic conditions, competition exists, etc.)
+
+Style: Explain WHY each risk matters, not just what it is.
+Example: "Dependence on healthcare facility permits creates regulatory bottleneck risk - a single state's building code changes could halt expansion for 6-12 months."
+
+Make risks concrete and specific to THIS company."""
+
+        return await self._generate_text(prompt, max_tokens=250)
+
+    async def _generate_growth_path_analysis_optimized(self, company_name: str, summary: str, financial_summary: str) -> str:
+        """Analyze growth path - OPTIMIZED for actionable insights"""
+        prompt = f"""Analyze {company_name}'s growth trajectory based on their S-1 filing.
+
+Context from analysis:
+Summary: {summary[:500]}
+Financials: {financial_summary[:300]}
+
+Write a growth assessment (180-200 words) addressing:
+
+1. Historical proof points - what validates their model?
+2. Near-term catalysts - next 12-18 months
+3. Scalability evidence - unit economics improving?
+4. Market timing - why IPO now?
+5. Key milestones to profitability
+
+Apply market knowledge:
+- Reference typical IPO company trajectories
+- Note if growth rate is sustainable based on industry norms
+- Identify the 1-2 metrics investors will track closest
+
+Style: Forward-looking but grounded in evidence.
+Example: "The 125% growth rate, while impressive, follows the typical pattern of modular construction adoption curves..."
+
+End with what needs to go right for the growth story to play out."""
+
+        return await self._generate_text(prompt, max_tokens=300)
+
+    async def _generate_competitive_moat_analysis_optimized(self, content: str, summary: str) -> str:
+        """Analyze competitive position - OPTIMIZED for differentiation clarity"""
+        prompt = f"""Analyze competitive positioning from this S-1 filing.
+
+Summary context: {summary[:500]}
+Content: {content[:1500]}
+
+Write a moat analysis (180-200 words) that cuts through the noise:
+
+1. True differentiation - what's genuinely unique?
+2. Switching costs - quantify if possible
+3. Scale advantages - do they get stronger as they grow?
+4. IP/technology barriers - how defensible?
+5. Time advantage - how long before competition catches up?
+
+Be skeptical - most "moats" aren't. Look for:
+- Specific evidence, not claims
+- Customer behavior that proves stickiness
+- Structural advantages vs temporary leads
+
+Example: "The biomedical waste processing patent creates a 15-20% cost advantage for customers, but the 18-month regulatory approval for competitors provides only temporary protection..."
+
+End with honest assessment of moat durability.
+If the moat is weak, say so - investors value honesty."""
+
+        return await self._generate_text(prompt, max_tokens=300)
 
     # ====================== NEW: FINANCIAL SNAPSHOT FOR 10-Q ======================
     
@@ -1232,117 +1407,6 @@ Requirements:
 - Keep it 200-300 words"""
 
         return await self._generate_text(prompt, max_tokens=600)
-
-    async def _extract_ipo_details(self, content: str, full_text: str) -> str:
-        """Extract IPO details from S-1 - NOW RETURNS TEXT"""
-        prompt = f"""Analyze the IPO details from this S-1 filing.
-
-Content:
-{content[:3000]}
-
-Write a narrative summary (150-200 words) covering:
-1. Proposed ticker symbol and exchange
-2. Expected price range and valuation
-3. Number of shares offered
-4. Lead underwriters
-5. Use of proceeds
-6. Lock-up periods and key dates
-
-Present as a cohesive overview, not a data dump."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _extract_financial_summary_s1(self, content: str, full_text: str) -> str:
-        """Extract financial summary for S-1 - NOW RETURNS TEXT"""
-        prompt = f"""Analyze the financial summary from this S-1 IPO filing.
-
-Content:
-{content[:3000]}
-
-Write a narrative summary (150-200 words) covering:
-1. Revenue trajectory and growth rate
-2. Path to profitability (or current profitability)
-3. Cash burn rate and runway
-4. Unit economics and key metrics
-5. Financial position strength
-
-Focus on the investment story, not just raw numbers."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_company_overview(self, company_name: str, content: str) -> str:
-        """Generate company overview for S-1"""
-        prompt = f"""Create a concise company overview for {company_name} based on their S-1 filing.
-
-Content:
-{content[:2000]}
-
-Include:
-1. What the company does (business model)
-2. Target market and customers
-3. Key products or services
-4. Founding story and timeline
-5. Current scale (employees, customers, geographic presence)
-
-Keep it to 200-250 words."""
-
-        return await self._generate_text(prompt, max_tokens=400)
-
-    async def _extract_risk_categories(self, content: str) -> str:
-        """Extract and categorize risks for S-1 - NOW RETURNS TEXT"""
-        prompt = f"""Analyze the risk factors from this S-1 filing.
-
-Content excerpt:
-{content[:3000]}
-
-Write a narrative summary (150-200 words) covering:
-1. Core business model risks
-2. Market and competitive risks
-3. Regulatory and legal challenges
-4. Financial and liquidity risks
-5. Technology and execution risks
-
-Weave these into a cohesive risk overview, not separate categories."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_growth_path_analysis(self, company_name: str, summary: str, financial_narrative: str) -> str:
-        """Analyze growth path for S-1 companies"""
-        prompt = f"""Analyze the growth path and potential for {company_name} based on their S-1 filing.
-
-Summary:
-{summary[:1000]}
-
-Financial performance:
-{financial_narrative}
-
-Provide analysis (200-250 words) of:
-1. Historical growth trajectory
-2. Market opportunity size
-3. Growth strategy and expansion plans
-4. Key metrics and milestones
-5. Path to profitability (if applicable)"""
-
-        return await self._generate_text(prompt, max_tokens=400)
-
-    async def _generate_competitive_moat_analysis(self, content: str, summary: str) -> str:
-        """Analyze competitive advantages for S-1 companies"""
-        prompt = f"""Analyze the competitive moat and differentiation based on this S-1 filing.
-
-Summary:
-{summary[:1000]}
-
-Content excerpt:
-{content[:1500]}
-
-Provide analysis (200-250 words) of:
-1. Unique value proposition
-2. Competitive advantages
-3. Barriers to entry
-4. Network effects or switching costs
-5. Technology or IP advantages"""
-
-        return await self._generate_text(prompt, max_tokens=400)
 
     async def _process_generic(self, filing: Filing, primary_content: str) -> Dict:
         """Generic processing fallback for other filing types"""

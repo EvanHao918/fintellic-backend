@@ -20,7 +20,7 @@ class FilingBase(BaseModel):
 class FilingBrief(FilingBase):
     """Brief filing info for lists"""
     id: int
-    company: Dict[str, Any]  # 改为字典类型
+    company: Dict[str, Any]  # 改为字典类型，现在包含 is_sp500 和 is_nasdaq100
     one_liner: Optional[str] = None
     sentiment: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
@@ -28,6 +28,7 @@ class FilingBrief(FilingBase):
     # Interaction stats
     vote_counts: Dict[str, int] = Field(default_factory=lambda: {"bullish": 0, "neutral": 0, "bearish": 0})
     comment_count: int = 0
+    view_count: int = 0  # 添加 view_count 字段
     
     # For 8-K: event type
     event_type: Optional[str] = None
@@ -39,7 +40,7 @@ class FilingBrief(FilingBase):
 class Filing10KDetail(FilingBase):
     """10-K specific detail schema"""
     id: int
-    company: Dict[str, Any]  # 改为字典类型
+    company: Dict[str, Any]  # 改为字典类型，现在包含 is_sp500 和 is_nasdaq100
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -63,6 +64,7 @@ class Filing10KDetail(FilingBase):
     vote_counts: Dict[str, int] = Field(default_factory=lambda: {"bullish": 0, "neutral": 0, "bearish": 0})
     comment_count: int = 0
     user_vote: Optional[str] = None
+    view_count: int = 0  # 添加 view_count
     
     class Config:
         from_attributes = True
@@ -71,7 +73,7 @@ class Filing10KDetail(FilingBase):
 class Filing10QDetail(FilingBase):
     """10-Q specific detail schema"""
     id: int
-    company: Dict[str, Any]  # 改为字典类型
+    company: Dict[str, Any]  # 改为字典类型，现在包含 is_sp500 和 is_nasdaq100
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -94,6 +96,7 @@ class Filing10QDetail(FilingBase):
     vote_counts: Dict[str, int] = Field(default_factory=lambda: {"bullish": 0, "neutral": 0, "bearish": 0})
     comment_count: int = 0
     user_vote: Optional[str] = None
+    view_count: int = 0  # 添加 view_count
     
     class Config:
         from_attributes = True
@@ -102,7 +105,7 @@ class Filing10QDetail(FilingBase):
 class Filing8KDetail(FilingBase):
     """8-K specific detail schema"""
     id: int
-    company: Dict[str, Any]  # 改为字典类型
+    company: Dict[str, Any]  # 改为字典类型，现在包含 is_sp500 和 is_nasdaq100
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -123,6 +126,7 @@ class Filing8KDetail(FilingBase):
     vote_counts: Dict[str, int] = Field(default_factory=lambda: {"bullish": 0, "neutral": 0, "bearish": 0})
     comment_count: int = 0
     user_vote: Optional[str] = None
+    view_count: int = 0  # 添加 view_count
     
     class Config:
         from_attributes = True
@@ -131,7 +135,7 @@ class Filing8KDetail(FilingBase):
 class FilingS1Detail(FilingBase):
     """S-1 specific detail schema"""
     id: int
-    company: Dict[str, Any]  # 改为字典类型
+    company: Dict[str, Any]  # 改为字典类型，现在包含 is_sp500 和 is_nasdaq100
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -151,6 +155,7 @@ class FilingS1Detail(FilingBase):
     vote_counts: Dict[str, int] = Field(default_factory=lambda: {"bullish": 0, "neutral": 0, "bearish": 0})
     comment_count: int = 0
     user_vote: Optional[str] = None
+    view_count: int = 0  # 添加 view_count
     
     class Config:
         from_attributes = True
@@ -160,7 +165,7 @@ class FilingDetail(FilingBase):
     """Detailed filing info with all possible fields for backward compatibility"""
     id: int
     cik: str
-    company: Dict[str, Any]  # 改为字典类型
+    company: Dict[str, Any]  # 改为字典类型，现在包含 is_sp500 和 is_nasdaq100
     status: str
     
     # AI-generated content
@@ -242,6 +247,7 @@ class FilingDetail(FilingBase):
     vote_counts: Dict[str, int] = Field(default_factory=lambda: {"bullish": 0, "neutral": 0, "bearish": 0})
     comment_count: int = 0
     user_vote: Optional[str] = None
+    view_count: int = 0  # 添加 view_count
     
     # View limit info
     view_limit_info: Optional[dict] = None

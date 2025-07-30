@@ -83,13 +83,16 @@ async def get_filings(
                 "id": filing.company.id,
                 "name": filing.company.name,
                 "ticker": filing.company.ticker,
-                "cik": filing.company.cik
+                "cik": filing.company.cik,
+                "is_sp500": filing.company.is_sp500,  # 添加 S&P 500 标记
+                "is_nasdaq100": filing.company.is_nasdaq100  # 添加 NASDAQ 100 标记
             },
             one_liner=filing.ai_summary[:100] + "..." if filing.ai_summary else None,
             sentiment=filing.management_tone.value if filing.management_tone else None,
             tags=filing.key_tags or [],
             vote_counts=vote_counts,
             comment_count=filing.comment_count or 0,
+            view_count=view_count,  # 添加 view_count
             event_type=filing.event_type  # For 8-K
         )
         filing_responses.append(filing_brief)
@@ -147,7 +150,7 @@ async def get_filing(
             ViewTrackingService.record_view(db, current_user, filing_id)
         
         # Still increment view count even for cached results
-        StatsCache.increment_view_count(str(filing_id))
+        view_count = StatsCache.increment_view_count(str(filing_id))
         
         # Add view limit info to cached result
         cached_result["view_limit_info"] = {
@@ -155,6 +158,9 @@ async def get_filing(
             "is_pro": view_check["is_pro"],
             "views_today": view_check["views_today"]
         }
+        
+        # Add view count
+        cached_result["view_count"] = view_count
         
         # Add user vote if authenticated
         if current_user:
@@ -172,9 +178,8 @@ async def get_filing(
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")
     
-    # Record view for free users
-    if not view_check["is_pro"]:
-        ViewTrackingService.record_view(db, current_user, filing_id)
+    # Record view for ALL users (不管是否 Pro 用户)
+    ViewTrackingService.record_view(db, current_user, filing_id)
     
     # Increment view count
     view_count = StatsCache.increment_view_count(str(filing_id))
@@ -208,7 +213,9 @@ async def get_filing(
             "id": filing.company.id,
             "name": filing.company.name,
             "ticker": filing.company.ticker,
-            "cik": filing.company.cik
+            "cik": filing.company.cik,
+            "is_sp500": filing.company.is_sp500,  # 添加 S&P 500 标记
+            "is_nasdaq100": filing.company.is_nasdaq100  # 添加 NASDAQ 100 标记
         },
         "status": filing.status.value,
         "ai_summary": filing.ai_summary,
@@ -228,6 +235,7 @@ async def get_filing(
         # Add interaction stats
         "vote_counts": vote_counts,
         "comment_count": filing.comment_count or 0,
+        "view_count": view_count,  # 添加 view_count
         "user_vote": user_vote,
         # Add view limit info
         "view_limit_info": {

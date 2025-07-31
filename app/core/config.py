@@ -46,6 +46,33 @@ class Settings(BaseSettings):
     AI_MODEL: str = "gpt-4o-mini"
     AI_MAX_TOKENS: int = 16000
     
+    # ==================== NEW AI OPTIMIZATION SETTINGS ====================
+    # AI Generation Parameters
+    AI_TEMPERATURE: float = 0.3  # 降低temperature以获得更稳定的输出
+    AI_UNIFIED_ANALYSIS_MAX_TOKENS: int = 2000  # 统一分析的最大token数
+    AI_FEED_SUMMARY_MAX_TOKENS: int = 50  # Feed摘要的最大token数
+    
+    # Content Generation Settings
+    UNIFIED_ANALYSIS_MIN_WORDS: int = 800
+    UNIFIED_ANALYSIS_MAX_WORDS: int = 1200
+    UNIFIED_ANALYSIS_TARGET_WORDS: int = 1000
+    
+    # Smart Markup Settings
+    ENABLE_SMART_MARKUP: bool = True
+    MAX_MARKUP_DENSITY: float = 0.15  # 最多15%的文本被标记
+    MARKUP_TYPES: List[str] = ["number", "concept", "positive", "negative", "insight"]
+    
+    # Analyst Expectations API (for 10-Q)
+    YAHOO_FINANCE_API_KEY: Optional[str] = None
+    ENABLE_EXPECTATIONS_COMPARISON: bool = True
+    EXPECTATIONS_CACHE_TTL: int = 86400  # 24 hours
+    
+    # Performance Optimization
+    ENABLE_UNIFIED_PROCESSING: bool = True  # 启用统一处理模式
+    LEGACY_PROCESSING_FALLBACK: bool = True  # 保持向后兼容
+    
+    # ========================================================================
+    
     # Feature flags
     ENABLE_IPO_SCANNING: bool = True
     ENABLE_AUTO_PROCESSING: bool = True

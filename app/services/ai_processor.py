@@ -1,28 +1,19 @@
 # app/services/ai_processor.py
 """
-AI Processor Service
-Uses OpenAI to generate summaries and analysis of SEC filings
-Differentiated processing for 10-K, 10-Q, 8-K, and S-1 filings
-Enhanced with structured financial data extraction
-Day 20: Added market impact analysis for 10-K and 10-Q
-FIXED: All extraction functions now return text narratives instead of JSON
-UPDATE: 10-Q now generates financial snapshot instead of structured metrics
-OPTIMIZED: 10-Q analysis functions now have clear boundaries to avoid content overlap
-UPDATE: 8-K processing optimized for better value extraction
-FIXED: Added filing parameter to _extract_8k_structured_data_optimized to fix variable reference error
-UPDATE: S-1 prompts optimized for professional narrative quality based on market principles
+AI Processor Service - Unified Analysis Version
+Implements single-pass unified analysis with smart markup
+Optimized for content quality and API efficiency
 """
-import os
 import json
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from datetime import datetime
 import logging
 from pathlib import Path
+import aiohttp
 
 from openai import OpenAI
 from sqlalchemy.orm import Session
-from bs4 import BeautifulSoup
 
 from app.models.filing import Filing, ProcessingStatus, ManagementTone, FilingType
 from app.core.config import settings
@@ -36,17 +27,17 @@ client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 class AIProcessor:
     """
-    Process filings using OpenAI to generate summaries and analysis
+    Process filings using OpenAI to generate unified analysis with smart markup
     """
     
     def __init__(self):
-        self.model = "gpt-4o-mini"  # Updated to latest efficient model
-        self.max_tokens = 16000  # Much larger context window
+        self.model = settings.AI_MODEL
+        self.max_tokens = settings.AI_MAX_TOKENS
+        self.temperature = settings.AI_TEMPERATURE
         
     async def process_filing(self, db: Session, filing: Filing) -> bool:
         """
-        Process a filing using AI to generate summary and analysis
-        Routes to specific processor based on filing type
+        Process a filing using unified AI analysis
         
         Args:
             db: Database session
@@ -61,7 +52,7 @@ class AIProcessor:
             filing.processing_started_at = datetime.utcnow()
             db.commit()
             
-            logger.info(f"Starting AI processing for {filing.company.ticker} {filing.filing_type.value}")
+            logger.info(f"Starting unified AI processing for {filing.company.ticker} {filing.filing_type.value}")
             
             # Get filing directory
             filing_dir = Path(f"data/filings/{filing.company.cik}/{filing.accession_number.replace('-', '')}")
@@ -78,930 +69,367 @@ class AIProcessor:
             if not primary_content or len(primary_content) < 100:
                 raise Exception("Insufficient text content extracted")
             
-            # Route to specific processor based on filing type
-            if filing.filing_type == FilingType.FORM_10K:
-                result = await self._process_10k(filing, primary_content, full_text)
-            elif filing.filing_type == FilingType.FORM_10Q:
-                result = await self._process_10q(filing, primary_content, full_text)
-            elif filing.filing_type == FilingType.FORM_8K:
-                result = await self._process_8k(filing, primary_content, full_text)
-            elif filing.filing_type == FilingType.FORM_S1:
-                result = await self._process_s1(filing, primary_content, full_text)
-            else:
-                # Fallback to generic processing
-                result = await self._process_generic(filing, primary_content)
+            # Get analyst expectations for 10-Q if enabled
+            analyst_data = None
+            if filing.filing_type == FilingType.FORM_10Q and settings.ENABLE_EXPECTATIONS_COMPARISON:
+                analyst_data = await self._fetch_analyst_expectations(filing.company.ticker)
             
-            # Update filing with results
-            filing.ai_summary = result['summary']
+            # Generate unified analysis
+            unified_result = await self._generate_unified_analysis(
+                filing, primary_content, full_text, analyst_data
+            )
             
-            # Store feed_summary separately (could be in a new field or embedded)
-            if 'feed_summary' in result:
-                # For now, prepend to summary with a marker
-                filing.ai_summary = f"FEED_SUMMARY: {result['feed_summary']}\n\nFULL_SUMMARY:\n{result['summary']}"
+            # Store unified analysis fields
+            filing.unified_analysis = unified_result['unified_analysis']
+            filing.unified_feed_summary = unified_result['feed_summary']
+            filing.smart_markup_data = unified_result['markup_data']
+            filing.analysis_version = "v2"
             
-            filing.management_tone = result['tone']
-            filing.tone_explanation = result['tone_explanation']
-            filing.key_questions = result['questions']
-            filing.key_tags = result['tags']
+            if analyst_data:
+                filing.analyst_expectations = analyst_data
             
-            if filing.filing_type == FilingType.FORM_8K and 'event_type' in result:
-                filing.event_type = result.get('event_type')
+            # Extract supplementary fields from unified analysis
+            await self._extract_supplementary_fields(filing, unified_result, primary_content, full_text)
             
-            # Add financial data if available (now always text)
-            if 'financial_data' in result and result['financial_data']:
-                filing.financial_highlights = result['financial_data']
-            
+            # Set status
             filing.status = ProcessingStatus.COMPLETED
             filing.processing_completed_at = datetime.utcnow()
             
             db.commit()
             
-            logger.info(f"✅ AI processing completed for {filing.accession_number}")
+            logger.info(f"✅ Unified AI processing completed for {filing.accession_number}")
             return True
             
         except Exception as e:
-            logger.error(f"Error in AI processing: {e}")
+            logger.error(f"Error in unified AI processing: {e}")
             filing.status = ProcessingStatus.FAILED
             filing.error_message = str(e)
             db.commit()
             return False
     
-    async def _process_10k(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
+    async def _generate_unified_analysis(
+        self, 
+        filing: Filing, 
+        primary_content: str, 
+        full_text: str,
+        analyst_data: Optional[Dict] = None
+    ) -> Dict:
         """
-        Process 10-K annual report with specific focus areas
+        Generate unified analysis with smart markup
         """
-        logger.info("Processing 10-K annual report")
-        
-        # Truncate content if needed
         content = self._prepare_content(primary_content)
         
-        # Generate comprehensive annual summary
-        summary_prompt = f"""You are a financial analyst. Create a comprehensive 5-minute summary of this {filing.company.name} annual report (10-K).
-
-Focus on these key areas:
-1. Annual performance highlights and key metrics
-2. Geographic performance (especially mention China, India, emerging markets if discussed)
-3. Business segment performance (break down by major divisions)
-4. Strategic investments and R&D focus (especially AI, technology initiatives)
-5. Management's forward-looking statements and guidance
-6. Major risks and challenges faced during the year
-7. Capital allocation decisions (dividends, buybacks, acquisitions)
-
-Content:
-{content}
-
-Write a professional summary (400-500 words) that helps investors understand the company's annual performance and future direction."""
-
-        summary = await self._generate_text(summary_prompt, max_tokens=1200)
+        # Build filing-specific context
+        filing_context = self._build_filing_context(filing, analyst_data)
         
-        # Extract one-line summary
-        feed_summary = await self._generate_feed_summary(summary, filing.filing_type.value)
+        # Generate unified analysis with appropriate prompt
+        if filing.filing_type == FilingType.FORM_10K:
+            prompt = self._build_10k_unified_prompt(filing, content, filing_context)
+        elif filing.filing_type == FilingType.FORM_10Q:
+            prompt = self._build_10q_unified_prompt(filing, content, filing_context, analyst_data)
+        elif filing.filing_type == FilingType.FORM_8K:
+            prompt = self._build_8k_unified_prompt(filing, content, filing_context)
+        elif filing.filing_type == FilingType.FORM_S1:
+            prompt = self._build_s1_unified_prompt(filing, content, filing_context)
+        else:
+            prompt = self._build_generic_unified_prompt(filing, content, filing_context)
         
-        # Analyze tone
-        tone_data = await self._analyze_tone(content)
-        
-        # Generate comprehensive Q&A
-        questions = await self._generate_annual_questions(filing.company.name, content)
-        
-        # Extract financial data as narrative text
-        financial_highlights_text = await self._extract_structured_financial_data(filing.filing_type.value, content, full_text)
-        
-        # Generate tags
-        tags = self._generate_10k_tags(summary)
-        
-        # Generate market impact analysis for 10-K
-        market_impact_10k = await self._generate_market_impact_10k(filing.company.name, summary, financial_highlights_text)
-        
-        # Store all fields including differentiated display fields
-        result = {
-            'summary': summary,
-            'feed_summary': feed_summary,
-            'tone': tone_data['tone'],
-            'tone_explanation': tone_data['explanation'],
-            'questions': questions,
-            'tags': tags,
-            'financial_data': financial_highlights_text,  # Now this is text
-            # Differentiated display fields for 10-K - ALL NOW TEXT
-            'auditor_opinion': await self._extract_auditor_opinion(full_text),
-            'three_year_financials': await self._extract_three_year_financials(full_text),
-            'business_segments': await self._extract_business_segments(content, full_text),
-            'risk_summary': await self._extract_risk_summary(content),
-            'growth_drivers': await self._generate_growth_drivers(filing.company.name, summary, financial_highlights_text),
-            'management_outlook': await self._generate_management_outlook(content, summary),
-            'strategic_adjustments': await self._generate_strategic_adjustments(content, summary),
-            'market_impact_10k': market_impact_10k
-        }
-        
-        # Update filing with differentiated fields
-        filing.auditor_opinion = result.get('auditor_opinion')
-        filing.three_year_financials = result.get('three_year_financials')
-        filing.business_segments = result.get('business_segments')
-        filing.risk_summary = result.get('risk_summary')
-        filing.growth_drivers = result.get('growth_drivers')
-        filing.management_outlook = result.get('management_outlook')
-        filing.strategic_adjustments = result.get('strategic_adjustments')
-        filing.market_impact_10k = result.get('market_impact_10k')
-        
-        return result
-
-    async def _process_10q(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
-        """
-        Process 10-Q quarterly report with focus on trends and changes
-        OPTIMIZED: Clear boundaries between analysis functions to avoid content overlap
-        """
-        logger.info("Processing 10-Q quarterly report")
-        
-        content = self._prepare_content(primary_content)
-        
-        # Generate quarterly summary
-        summary_prompt = f"""You are a financial analyst. Create a focused quarterly summary of this {filing.company.name} 10-Q filing.
-
-Focus on:
-1. Quarterly results vs expectations (if mentioned)
-2. Key growth drivers this quarter
-3. Margin changes and profitability trends
-4. Updated guidance or outlook changes
-5. Quarter-over-quarter and year-over-year comparisons
-6. Significant events or changes during the quarter
-7. Cash flow and balance sheet highlights
-
-Content:
-{content}
-
-Write a concise but comprehensive summary (300-400 words) that helps investors understand quarterly performance and trends."""
-
-        summary = await self._generate_text(summary_prompt, max_tokens=1000)
-        
-        # Extract one-line summary
-        feed_summary = await self._generate_feed_summary(summary, filing.filing_type.value)
-        
-        # Analyze tone
-        tone_data = await self._analyze_tone(content)
-        
-        # Generate quarterly Q&A
-        questions = await self._generate_quarterly_questions(filing.company.name, content)
-        
-        # Generate financial snapshot for 10-Q (the core metrics narrative)
-        financial_snapshot = await self._generate_financial_snapshot_10q(content, summary)
-        
-        # Generate tags
-        tags = self._generate_10q_tags(summary)
-        
-        # OPTIMIZED: Generate differentiated analysis with clear boundaries
-        # 1. Expectations comparison - pure numerical analysis
-        expectations_comparison = await self._extract_expectations_comparison_optimized(content, summary)
-        
-        # 2. Cost structure - operational efficiency focus
-        cost_structure = await self._extract_cost_structure_optimized(content, full_text)
-        
-        # 3. Guidance update - forward looking statements only
-        guidance_update = await self._extract_guidance_update_optimized(content)
-        
-        # 4. Growth/decline drivers - business segment analysis
-        growth_decline_analysis = await self._generate_growth_decline_analysis_optimized(summary, content)
-        
-        # 5. Management tone - linguistic analysis
-        management_tone_analysis = await self._generate_management_tone_analysis_optimized(content, tone_data)
-        
-        # 6. Beat/miss analysis - root cause analysis
-        beat_miss_analysis = await self._generate_beat_miss_analysis_optimized(summary, content, expectations_comparison)
-        
-        # 7. Market impact - forward looking implications
-        market_impact_10q = await self._generate_market_impact_10q_optimized(
-            filing.company.name, summary, financial_snapshot, expectations_comparison
+        # Generate unified analysis
+        unified_analysis = await self._generate_text(
+            prompt, 
+            max_tokens=settings.AI_UNIFIED_ANALYSIS_MAX_TOKENS
         )
         
-        # Store all fields
-        result = {
-            'summary': summary,
-            'feed_summary': feed_summary,
-            'tone': tone_data['tone'],
-            'tone_explanation': tone_data['explanation'],
-            'questions': questions,
-            'tags': tags,
-            'financial_data': financial_snapshot,  # This is the financial snapshot text
-            # Differentiated display fields for 10-Q
-            'expectations_comparison': expectations_comparison,
-            'cost_structure': cost_structure,
-            'guidance_update': guidance_update,
-            'growth_decline_analysis': growth_decline_analysis,
-            'management_tone_analysis': management_tone_analysis,
-            'beat_miss_analysis': beat_miss_analysis,
-            'market_impact_10q': market_impact_10q
-        }
+        # Generate feed summary from unified analysis
+        feed_summary = await self._generate_feed_summary_from_unified(
+            unified_analysis, filing.filing_type.value
+        )
         
-        # Store in filing model
-        filing.core_metrics = financial_snapshot  # Store financial snapshot in core_metrics field
-        filing.expectations_comparison = result.get('expectations_comparison')
-        filing.cost_structure = result.get('cost_structure')
-        filing.guidance_update = result.get('guidance_update')
-        filing.growth_decline_analysis = result.get('growth_decline_analysis')
-        filing.management_tone_analysis = result.get('management_tone_analysis')
-        filing.beat_miss_analysis = result.get('beat_miss_analysis')
-        filing.market_impact_10q = result.get('market_impact_10q')
-        
-        return result
-
-    # ====================== OPTIMIZED 10-Q ANALYSIS FUNCTIONS ======================
-    
-    async def _extract_expectations_comparison_optimized(self, content: str, summary: str) -> str:
-        """Extract ONLY numerical performance vs consensus - no analysis"""
-        prompt = f"""Extract ONLY the numerical comparison between actual results and market expectations from this quarterly filing.
-
-Content:
-{content[:2000]}
-
-Summary context:
-{summary[:500]}
-
-STRICT REQUIREMENTS:
-1. ONLY extract numbers that are explicitly compared to "consensus", "estimates", "expectations", or "analysts expected"
-2. Focus on these metrics if mentioned:
-   - Revenue: actual vs consensus
-   - EPS: actual vs consensus  
-   - Operating income: actual vs expected
-   - Segment performance vs expectations
-3. Present as factual comparisons: "Revenue of $X vs consensus $Y"
-4. If no explicit comparisons exist, state: "The filing does not provide explicit comparisons with market expectations."
-5. DO NOT analyze reasons or implications
-
-Write 150-200 words of pure numerical comparisons. No interpretation."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _extract_cost_structure_optimized(self, content: str, full_text: str) -> str:
-        """Extract cost and efficiency metrics - no overlap with expectations"""
-        prompt = f"""Analyze the cost structure and operational efficiency from this quarterly report.
-
-Content:
-{content[:2000]}
-
-STRICT REQUIREMENTS:
-1. Focus ONLY on cost categories and efficiency metrics:
-   - COGS as % of revenue (if stated)
-   - SG&A trends
-   - R&D spending levels
-   - Operating leverage changes
-   - Margin analysis (gross, operating)
-2. Compare to prior periods if data provided
-3. DO NOT discuss revenue performance or expectations
-4. DO NOT analyze why costs changed - just report the changes
-5. If limited cost data provided, acknowledge this
-
-Write 150-200 words focused purely on cost structure and margins."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _extract_guidance_update_optimized(self, content: str) -> str:
-        """Extract ONLY forward guidance - no historical analysis"""
-        prompt = f"""Extract ONLY guidance and forward-looking statements from this filing.
-
-Content:
-{content[:2000]}
-
-STRICT REQUIREMENTS:
-1. Look for explicit mentions of:
-   - "guidance", "outlook", "expect", "forecast", "anticipate"
-   - Future quarter/year projections
-   - Management targets or ranges
-2. State whether guidance was raised/lowered/maintained/withdrawn
-3. Include specific numbers or ranges if provided
-4. Note key assumptions mentioned
-5. If NO guidance provided, state: "The report does not provide updated guidance."
-6. DO NOT discuss past performance
-
-Write 100-150 words focused only on forward-looking statements."""
-
-        return await self._generate_text(prompt, max_tokens=250)
-
-    async def _generate_growth_decline_analysis_optimized(self, summary: str, content: str) -> str:
-        """Analyze business drivers by segment and geography - no financial metrics"""
-        prompt = f"""Analyze the operational drivers of growth or decline by business segment and geography.
-
-Summary:
-{summary[:1000]}
-
-Content excerpt:
-{content[:1000]}
-
-STRICT REQUIREMENTS:
-1. Focus on BUSINESS factors only:
-   - Which segments/products grew or declined
-   - Geographic performance variations
-   - Volume vs pricing dynamics
-   - Customer/market dynamics
-   - Operational factors (capacity, efficiency)
-2. DO NOT repeat revenue numbers or percentages
-3. DO NOT discuss expectations or guidance
-4. Focus on the "what" and "where", not financial outcomes
-
-Write 150-200 words on operational performance drivers only."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_management_tone_analysis_optimized(self, content: str, tone_data: Dict) -> str:
-        """Analyze linguistic tone and confidence - no performance discussion"""
-        prompt = f"""Analyze management's tone and confidence level based on their language in this filing.
-
-Initial tone assessment: {tone_data.get('tone', 'NEUTRAL')}
-
-Content excerpt:
-{content[:1500]}
-
-STRICT REQUIREMENTS:
-1. Focus on LANGUAGE analysis:
-   - Quote specific phrases that indicate confidence/caution
-   - Count positive vs negative descriptors
-   - Analyze certainty of language (definitive vs hedged)
-   - Compare tone to typical quarterly reports
-2. DO NOT discuss actual performance numbers
-3. DO NOT analyze business results
-4. Focus purely on HOW things are said, not WHAT is said
-
-Write 150-200 words of linguistic analysis only."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_beat_miss_analysis_optimized(self, summary: str, content: str, expectations_data: str) -> str:
-        """Analyze root causes for variance - assume reader knows the numbers"""
-        prompt = f"""Analyze the ROOT CAUSES behind the company's performance relative to expectations.
-
-The reader already knows the numerical variances from this data:
-{expectations_data[:200]}
-
-Summary for context:
-{summary[:500]}
-
-Content excerpt:
-{content[:1000]}
-
-STRICT REQUIREMENTS:
-1. Focus ONLY on explaining WHY variances occurred:
-   - Identify top 3 factors management cites
-   - Classify as structural (ongoing) vs temporary (one-time)
-   - Note which factors were within vs outside company control
-2. DO NOT repeat any numbers or variances
-3. DO NOT describe what happened - explain WHY it happened
-4. Assess likelihood these factors persist next quarter
-
-Write 150-200 words of pure causal analysis."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_market_impact_10q_optimized(self, company_name: str, summary: str, 
-                                                    financial_snapshot: str, expectations_data: str) -> str:
-        """Analyze market implications - forward looking only"""
-        prompt = f"""You are a senior equity analyst. Based on this {company_name} quarterly report, analyze potential market implications.
-
-Key context (reader already knows this):
-- Financial snapshot: {financial_snapshot[:200]}
-- Expectations variance: {expectations_data[:200]}
-
-Summary for additional context:
-{summary[:300]}
-
-ANALYSIS REQUIREMENTS:
-1. Focus on FORWARD implications only:
-   - Which investor types may find this report attractive/concerning
-   - Key metrics analysts will likely revise
-   - Catalyst events to monitor from the filing
-   - Peer comparison implications
-   
-2. Apply market experience carefully:
-   - Use phrases like "historically", "typically", "market participants often"
-   - Balance both constructive and cautious perspectives
-   - Acknowledge uncertainty with "may", "could", "potentially"
-   
-3. DO NOT:
-   - Recap what happened this quarter
-   - Repeat performance numbers
-   - Make specific price predictions
-
-Write 250-300 words of forward-looking market analysis in a measured, professional tone."""
-
-        return await self._generate_text(prompt, max_tokens=600)
-
-    # ====================== OPTIMIZED 8-K PROCESSING ======================
-
-    async def _process_8k(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
-        """
-        Process 8-K current report with focus on specific events
-        OPTIMIZED: Better prompts for value extraction
-        """
-        logger.info("Processing 8-K current report")
-        
-        content = self._prepare_content(primary_content)
-        
-        # Identify event type from content
-        event_type = self._identify_8k_event_type(content)
-        
-        # Generate event summary
-        summary_prompt = f"""You are a financial analyst. Create a quick summary of this {filing.company.name} 8-K filing.
-
-This appears to be about: {event_type}
-
-Focus on:
-1. What happened (the specific event or announcement)
-2. When it happened or will happen
-3. Who is involved (people, companies, divisions)
-4. Why it matters to investors
-5. Immediate impact or expected impact
-
-Content:
-{content}
-
-Write a clear, factual summary (200-300 words) that helps investors quickly understand this event."""
-
-        summary = await self._generate_text(summary_prompt, max_tokens=800)
-        
-        # Extract one-line summary
-        feed_summary = await self._generate_feed_summary(summary, filing.filing_type.value)
-        
-        # For 8-K, tone analysis should reflect the event nature
-        tone_data = await self._analyze_8k_tone(content, event_type)
-        
-        # Generate event-specific Q&A
-        questions = await self._generate_8k_questions(filing.company.name, content, event_type)
-        
-        # Generate event-specific tags
-        tags = self._generate_8k_tags(summary, event_type)
-        
-        # Extract structured 8-K data - OPTIMIZED PROMPTS (FIXED: Added filing parameter)
-        structured_data = await self._extract_8k_structured_data_optimized(filing, content, event_type, summary)
-        
-        result = {
-            'summary': summary,
-            'feed_summary': feed_summary,
-            'tone': tone_data['tone'],
-            'tone_explanation': tone_data['explanation'],
-            'questions': questions,
-            'tags': tags,
-            'event_type': event_type,
-            'financial_data': None,  # Not used for 8-K
-            # Differentiated display fields for 8-K
-            'item_type': structured_data.get('item_type'),
-            'items': structured_data.get('items'),  # What Happened
-            'market_impact_analysis': structured_data.get('market_impact'),  # Potential Market Impact
-            'key_considerations': structured_data.get('key_considerations'),  # What to Watch
-            # These will be hidden in frontend but kept for backward compatibility
-            'event_timeline': None,
-            'event_nature_analysis': None
-        }
-        
-        # Update filing with differentiated fields
-        filing.item_type = result.get('item_type')
-        filing.items = result.get('items')
-        filing.event_timeline = result.get('event_timeline')
-        filing.event_nature_analysis = result.get('event_nature_analysis')
-        filing.market_impact_analysis = result.get('market_impact_analysis')
-        filing.key_considerations = result.get('key_considerations')
-        
-        return result
-
-    async def _extract_8k_structured_data_optimized(self, filing: Filing, content: str, event_type: str, summary: str) -> Dict:
-        """
-        Extract structured data specific to 8-K filings with OPTIMIZED prompts
-        Following the new 3-field structure: What Happened, Potential Market Impact, What to Watch
-        FIXED: Added filing parameter to access company name
-        """
-        # Extract Item number
-        item_pattern = r'Item\s+(\d+\.\d+)'
-        item_match = re.search(item_pattern, content, re.IGNORECASE)
-        item_type = item_match.group(1) if item_match else None
-        
-        # 1. What Happened (items field) - 精炼事实陈述
-        items_prompt = f"""Based on this 8-K filing, provide a concise summary of what was disclosed.
-
-Event type: {event_type}
-Content excerpt:
-{content[:1500]}
-
-Write a factual summary (100-150 words) covering:
-- The specific event or transaction announced
-- Key terms, amounts, or dates mentioned
-- Parties involved and their roles
-- Any conditions or contingencies noted
-
-Style: Write like a financial journalist's lead paragraph - precise, informative, and focused on material facts only. No interpretation or speculation.
-
-Example: "The company announced the appointment of Jane Smith as Chief Financial Officer, effective September 1, 2025. Smith previously served as CFO at ABC Corporation and brings 20 years of financial leadership experience. Current CFO John Doe will remain through August 31 to ensure transition. The company initiated an external search process three months ago with assistance from executive search firm XYZ."
-"""
-
-        items_text = await self._generate_text(items_prompt, max_tokens=200)
-        
-        # 2. Potential Market Impact - 专业分析师视角
-        market_impact_prompt = f"""You are a senior equity analyst. Based on this {filing.company.name} 8-K filing, analyze the potential market implications.
-
-Event summary:
-{summary[:500]}
-
-Content for context:
-{content[:1000]}
-
-Provide balanced analysis (200-250 words) covering:
-1. How this event may influence market perception of the company
-2. Potential impacts on key financial metrics or business operations  
-3. Factors that could amplify or mitigate the impact
-4. Relevant considerations for different stakeholder groups
-
-Style requirements:
-- Use measured language: "may", "could", "potentially", "likely"
-- Acknowledge both positive and cautionary aspects
-- Focus on first and second-order effects
-- Avoid definitive predictions or recommendations
-
-Write in the style of institutional research - professional, balanced, and focused on implications rather than advice."""
-
-        market_impact_text = await self._generate_text(market_impact_prompt, max_tokens=400)
-        
-        # 3. What to Watch (key_considerations字段) - 前瞻性观察点
-        key_considerations_prompt = f"""Based on this {filing.company.name} {event_type} announcement, identify key developments to monitor going forward.
-
-Event summary:
-{summary[:300]}
-
-List 4-5 specific items to track (150-200 words total), such as:
-- Concrete milestones or deadlines mentioned
-- Required follow-up disclosures
-- Execution dependencies or conditions
-- Related events that typically follow
-- Metrics that will indicate success/failure
-
-Style: Write as forward-looking observation points, not recommendations. Use bullet points with 1-2 sentences each explaining why each item matters.
-
-Example format:
-• Successor announcement timeline - Companies typically name permanent replacements within 60-90 days; extended searches may signal difficulty attracting candidates
-• Integration milestones - Watch for 100-day plan disclosure and initial synergy quantification in next quarterly filing"""
-
-        key_considerations_text = await self._generate_text(key_considerations_prompt, max_tokens=300)
+        # Extract smart markup data
+        markup_data = self._extract_markup_data(unified_analysis)
         
         return {
-            'item_type': item_type,
-            'items': items_text,  # What Happened
-            'market_impact': market_impact_text,  # Potential Market Impact
-            'key_considerations': key_considerations_text  # What to Watch
+            'unified_analysis': unified_analysis,
+            'feed_summary': feed_summary,
+            'markup_data': markup_data
         }
-
-    # ====================== OPTIMIZED S-1 PROCESSING ======================
     
-    async def _process_s1(self, filing: Filing, primary_content: str, full_text: str) -> Dict:
-        """
-        Process S-1 IPO registration with focus on business model and risks
-        OPTIMIZED: Professional analysis based on market principles
-        """
-        logger.info("Processing S-1 IPO registration")
-        
-        content = self._prepare_content(primary_content)
-        
-        # Generate IPO overview - OPTIMIZED
-        summary_prompt = f"""You are a financial analyst evaluating {filing.company.name}'s S-1 filing.
+    def _build_10k_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
+        """Build unified prompt for 10-K filings"""
+        return f"""You are a professional equity analyst writing for sophisticated retail investors. Create a compelling annual report analysis for {filing.company.name} ({filing.company.ticker}).
 
-Create a compelling IPO overview (350-400 words) that captures the investment thesis:
+STRICT REQUIREMENTS:
+1. Write exactly 800-1200 words
+2. Professional investment report style - no AI markers like "First, Second, Lastly"
+3. Open with a strong hook - a surprising insight or contrarian observation
+4. Each paragraph 50-80 words max, with clear logical flow
+5. Use smart markup for emphasis (see markup rules below)
 
-1. Business model essence - what problem they solve and how
-2. Financial trajectory - focus on growth rate, path to profitability  
-3. Market opportunity - addressable market size and expansion potential
-4. Competitive positioning - unique advantages and moat
-5. Use of proceeds - strategic priorities for IPO funds
-6. Key risks - the 2-3 most material challenges
-7. Management credibility - relevant experience and track record
+SMART MARKUP RULES:
+- Key numbers: *37%* or *$5.2B*
+- Important concepts: **transformation** or **market leadership**
+- Positive trends: +[revenue up 15%]
+- Negative trends: -[margins compressed 120bps]
+- Critical insights: [!This marks a strategic inflection point]
 
-Content:
+CONTENT FOCUS for 10-K:
+1. Annual performance trajectory and inflection points
+2. Strategic positioning changes during the year
+3. Capital allocation effectiveness
+4. Competitive dynamics evolution
+5. Management execution track record
+6. Forward-looking strategic priorities
+7. Key risks that materialized or emerged
+
+CONTEXT:
+Fiscal Year: {context.get('fiscal_year', 'FY2024')}
+Period End: {context.get('period_end_date', '')}
+
+FILING CONTENT:
 {content}
 
-Style: Write like an equity research preview - informative yet engaging. Focus on what makes this IPO notable. Avoid generic descriptions."""
+Write a narrative that tells the investment story, not a mechanical summary. Focus on what changed, why it matters, and what to watch going forward."""
+    
+    def _build_10q_unified_prompt(self, filing: Filing, content: str, context: Dict, analyst_data: Optional[Dict] = None) -> str:
+        """Build unified prompt for 10-Q filings"""
+        analyst_context = ""
+        if analyst_data:
+            analyst_context = f"""
+ANALYST EXPECTATIONS:
+Revenue Estimate: ${analyst_data.get('revenue_estimate', {}).get('value', 'N/A')}
+EPS Estimate: ${analyst_data.get('eps_estimate', {}).get('value', 'N/A')}
+Number of Analysts: {analyst_data.get('revenue_estimate', {}).get('analysts', 'N/A')}
+"""
+        
+        return f"""You are a professional equity analyst writing for sophisticated retail investors. Create a compelling quarterly earnings analysis for {filing.company.name} ({filing.company.ticker}).
 
-        summary = await self._generate_text(summary_prompt, max_tokens=1000)
-        
-        # Extract one-line summary
-        feed_summary = await self._generate_feed_summary(summary, filing.filing_type.value)
-        
-        # Analyze tone (usually optimistic for S-1)
-        tone_data = await self._analyze_ipo_tone(content)
-        
-        # Generate IPO-specific Q&A
-        questions = await self._generate_ipo_questions(filing.company.name, content)
-        
-        # Extract IPO-specific data with optimized prompts
-        ipo_details = await self._extract_ipo_details_optimized(content, full_text)
-        company_overview = await self._generate_company_overview_optimized(filing.company.name, content)
-        financial_summary = await self._extract_financial_summary_s1_optimized(content, full_text)
-        financial_highlights = await self._extract_financial_highlights_s1(content, full_text)
-        risk_categories = await self._extract_risk_categories_optimized(content)
-        growth_path_analysis = await self._generate_growth_path_analysis_optimized(filing.company.name, summary, financial_summary)
-        competitive_moat_analysis = await self._generate_competitive_moat_analysis_optimized(content, summary)
-        
-        # Generate tags
-        tags = self._generate_s1_tags(summary)
-        
-        # Extract S-1 specific structured data
-        result = {
-            'summary': summary,
-            'feed_summary': feed_summary,
-            'tone': tone_data['tone'],
-            'tone_explanation': tone_data['explanation'],
-            'questions': questions,
-            'tags': tags,
-            'financial_data': financial_highlights,  # Financial highlights
-            # Differentiated display fields for S-1
-            'ipo_details': ipo_details,
-            'company_overview': company_overview,
-            'financial_summary': financial_summary,
-            'risk_categories': risk_categories,
-            'growth_path_analysis': growth_path_analysis,
-            'competitive_moat_analysis': competitive_moat_analysis
+STRICT REQUIREMENTS:
+1. Write exactly 800-1200 words
+2. Professional investment report style - punchy, insightful, no fluff
+3. Open with the most important takeaway - performance vs expectations if available
+4. Each paragraph 50-80 words max, crisp and impactful
+5. Use smart markup strategically (see rules below)
+
+SMART MARKUP RULES:
+- Key metrics: *12%* or *$1.3B*
+- Critical concepts: **margin expansion** or **guidance raise**
+- Beats/positive: +[EPS beat by $0.05]
+- Misses/negative: -[revenue miss by 2%]
+- Key insights: [!This suggests sustainable momentum]
+
+CONTENT FOCUS for 10-Q:
+1. Performance vs expectations (if analyst data provided)
+2. Sequential and year-over-year momentum
+3. Margin trajectory and operational leverage
+4. Guidance changes and management confidence
+5. Business mix evolution
+6. Cash generation and capital deployment
+7. Near-term catalysts and concerns
+
+CONTEXT:
+Quarter: {context.get('fiscal_quarter', 'Q3 2024')}
+{analyst_context}
+
+FILING CONTENT:
+{content}
+
+Tell the quarterly story - what drove results, what surprised, and what it means for the investment thesis."""
+    
+    def _build_8k_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
+        """Build unified prompt for 8-K filings"""
+        return f"""You are a financial journalist writing a market-moving event analysis for {filing.company.name} ({filing.company.ticker}).
+
+STRICT REQUIREMENTS:
+1. Write exactly 600-800 words
+2. News article style - direct, factual, implications-focused
+3. Lead with what happened and why it matters
+4. Short paragraphs, 40-60 words each
+5. Use smart markup sparingly for emphasis
+
+SMART MARKUP RULES:
+- Key facts: *CEO departure* or *$2B acquisition*
+- Material changes: **strategic pivot**
+- Positive implications: +[accretive to earnings]
+- Negative implications: -[integration risk]
+- Critical insight: [!This changes the growth trajectory]
+
+CONTENT FOCUS for 8-K:
+1. What exactly was announced/disclosed
+2. Immediate implications for operations
+3. Financial impact assessment
+4. Strategic rationale or context
+5. Implementation timeline
+6. Key risks or uncertainties
+7. Market precedents or comparisons
+
+EVENT TYPE: {context.get('event_type', 'Material Event')}
+
+FILING CONTENT:
+{content}
+
+Focus on why this event matters to investors and what they should monitor going forward."""
+    
+    def _build_s1_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
+        """Build unified prompt for S-1 filings"""
+        return f"""You are an IPO analyst writing for potential investors in {filing.company.name}'s public offering.
+
+STRICT REQUIREMENTS:
+1. Write exactly 800-1000 words
+2. IPO research preview style - balanced but engaging
+3. Open with the investment thesis in one compelling sentence
+4. Structured narrative with 60-80 word paragraphs
+5. Use smart markup to highlight key data
+
+SMART MARKUP RULES:
+- Key metrics: *125% revenue growth* or *$500M addressable market*
+- Differentiators: **proprietary technology** or **first-mover advantage**
+- Strengths: +[85% gross margins]
+- Risks: -[cash burn of $10M/month]
+- Critical insights: [!Path to profitability unclear]
+
+CONTENT FOCUS for S-1:
+1. Business model clarity and unit economics
+2. Market opportunity size and capture strategy
+3. Competitive differentiation and moat
+4. Growth trajectory and scalability
+5. Path to profitability timeline
+6. Use of proceeds priorities
+7. Key risk factors that could derail the story
+
+FILING CONTENT:
+{content}
+
+Write an analysis that helps investors understand if this IPO offers compelling value at likely valuations."""
+    
+    def _build_generic_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
+        """Build generic unified prompt for other filing types"""
+        return f"""You are a financial analyst creating a summary of this {filing.filing_type.value} filing for {filing.company.name} ({filing.company.ticker}).
+
+Write a professional analysis (600-800 words) that:
+1. Explains what was disclosed and why it matters
+2. Uses clear paragraphs of 50-80 words
+3. Includes relevant financial metrics with *markup*
+4. Highlights key insights with [!insight markers]
+
+Focus on material information that impacts investment decisions.
+
+FILING CONTENT:
+{content}"""
+    
+    def _build_filing_context(self, filing: Filing, analyst_data: Optional[Dict] = None) -> Dict:
+        """Build context dictionary for prompt generation"""
+        context = {
+            'fiscal_year': filing.fiscal_year,
+            'fiscal_quarter': filing.fiscal_quarter,
+            'period_end_date': filing.period_end_date.strftime('%B %d, %Y') if filing.period_end_date else None,
+            'filing_date': filing.filing_date.strftime('%B %d, %Y'),
         }
         
-        # Update filing with differentiated fields
-        filing.ipo_details = result.get('ipo_details')
-        filing.company_overview = result.get('company_overview')
-        filing.financial_summary = result.get('financial_summary')
-        filing.risk_categories = result.get('risk_categories')
-        filing.growth_path_analysis = result.get('growth_path_analysis')
-        filing.competitive_moat_analysis = result.get('competitive_moat_analysis')
+        if analyst_data:
+            context['analyst_data'] = analyst_data
         
-        return result
-
-    # ====================== OPTIMIZED S-1 FIELD EXTRACTORS ======================
-
-    async def _extract_ipo_details_optimized(self, content: str, full_text: str) -> str:
-        """Extract IPO details - OPTIMIZED for conciseness and relevance"""
-        prompt = f"""Extract key IPO mechanics from this S-1 filing.
-
-Content:
-{content[:3000]}
-
-Write a focused summary (120-150 words) covering ONLY material details:
-- Ticker and exchange (if disclosed)
-- Share offering size and price range (if available)
-- Expected proceeds and primary uses
-- Lead underwriters (top 2-3 names)
-- Lock-up period (if specified)
-
-If key details are missing, focus on what IS disclosed. 
-DO NOT say "not disclosed" repeatedly - only mention once at end if multiple items missing.
-
-Style: Dense with information, like a term sheet summary."""
-
-        return await self._generate_text(prompt, max_tokens=200)
-
-    async def _generate_company_overview_optimized(self, company_name: str, content: str) -> str:
-        """Generate company overview - OPTIMIZED for business model clarity"""
-        prompt = f"""Create a sharp company overview for {company_name} based on their S-1.
-
-Content:
-{content[:2000]}
-
-Write 150-180 words focusing on:
-1. Core value proposition in one clear sentence
-2. Revenue model - how they make money
-3. Customer base and market position
-4. Key operational metrics (customers, locations, employees)
-5. Founding story ONLY if it adds credibility
-
-Avoid: Generic descriptions, mission statements, aspirational language.
-Focus: Concrete business facts that help assess viability.
-
-Example opening: "Safe & Green designs and deploys modular buildings that reduce construction time by 50% while meeting green building standards."
-
-Make every sentence count."""
-
-        return await self._generate_text(prompt, max_tokens=250)
-
-    async def _extract_financial_summary_s1_optimized(self, content: str, full_text: str) -> str:
-        """Extract financial summary - OPTIMIZED for investment relevance"""
-        prompt = f"""Analyze the financial profile from this S-1 filing.
-
-Content:
-{content[:3000]}
-
-Write a punchy financial narrative (150-180 words) that tells the story:
-
-1. Revenue scale and growth trajectory (use specific numbers)
-2. Gross margin profile and trends
-3. Operating leverage - is the model working?
-4. Cash burn rate and implied runway
-5. Path to profitability timeline (if indicated)
-
-Key: Connect the numbers to business quality. Don't just report metrics.
-
-Example style: "Revenue doubled to $45M in 2024, driven by healthcare sector adoption. While still unprofitable, gross margins improved from 35% to 40%, validating the unit economics. Monthly cash burn of $3.75M suggests 8-month runway at current pace, making the IPO timing critical."
-
-Focus on what the numbers reveal about the business."""
-
-        return await self._generate_text(prompt, max_tokens=250)
-
-    async def _extract_financial_highlights_s1(self, content: str, full_text: str) -> str:
-        """Extract financial highlights for Financial Highlights field"""
-        prompt = f"""Extract key financial metrics from this S-1 filing.
-
-Content:
-{content[:3000]}
-
-Create a financial snapshot (100-120 words) with the most recent metrics:
-- Latest annual/trailing revenue and growth %
-- Gross and operating margins
-- Net income/loss
-- Cash position and burn rate
-- Any key unit economics mentioned
-
-Style: Crisp metric reporting. Lead with the most impressive number.
-Example: "The company generated $45 million in revenue for 2024, up 125% year-over-year..."
-
-Just facts and numbers, no analysis."""
-
-        return await self._generate_text(prompt, max_tokens=150)
-
-    async def _extract_risk_categories_optimized(self, content: str) -> str:
-        """Extract risk factors - OPTIMIZED for materiality"""
-        prompt = f"""Analyze risk factors from this S-1 filing.
-
-Content:
-{content[:3000]}
-
-Write a risk assessment (150-180 words) covering the 4-5 MOST MATERIAL risks:
-
-Focus on risks that could fundamentally impair the business:
-- Execution risks specific to their model
-- Regulatory hurdles that could block growth
-- Competitive dynamics that threaten positioning  
-- Financial risks given their current burn rate
-- Technology/operational risks
-
-Skip generic risks (economic conditions, competition exists, etc.)
-
-Style: Explain WHY each risk matters, not just what it is.
-Example: "Dependence on healthcare facility permits creates regulatory bottleneck risk - a single state's building code changes could halt expansion for 6-12 months."
-
-Make risks concrete and specific to THIS company."""
-
-        return await self._generate_text(prompt, max_tokens=250)
-
-    async def _generate_growth_path_analysis_optimized(self, company_name: str, summary: str, financial_summary: str) -> str:
-        """Analyze growth path - OPTIMIZED for actionable insights"""
-        prompt = f"""Analyze {company_name}'s growth trajectory based on their S-1 filing.
-
-Context from analysis:
-Summary: {summary[:500]}
-Financials: {financial_summary[:300]}
-
-Write a growth assessment (180-200 words) addressing:
-
-1. Historical proof points - what validates their model?
-2. Near-term catalysts - next 12-18 months
-3. Scalability evidence - unit economics improving?
-4. Market timing - why IPO now?
-5. Key milestones to profitability
-
-Apply market knowledge:
-- Reference typical IPO company trajectories
-- Note if growth rate is sustainable based on industry norms
-- Identify the 1-2 metrics investors will track closest
-
-Style: Forward-looking but grounded in evidence.
-Example: "The 125% growth rate, while impressive, follows the typical pattern of modular construction adoption curves..."
-
-End with what needs to go right for the growth story to play out."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_competitive_moat_analysis_optimized(self, content: str, summary: str) -> str:
-        """Analyze competitive position - OPTIMIZED for differentiation clarity"""
-        prompt = f"""Analyze competitive positioning from this S-1 filing.
-
-Summary context: {summary[:500]}
-Content: {content[:1500]}
-
-Write a moat analysis (180-200 words) that cuts through the noise:
-
-1. True differentiation - what's genuinely unique?
-2. Switching costs - quantify if possible
-3. Scale advantages - do they get stronger as they grow?
-4. IP/technology barriers - how defensible?
-5. Time advantage - how long before competition catches up?
-
-Be skeptical - most "moats" aren't. Look for:
-- Specific evidence, not claims
-- Customer behavior that proves stickiness
-- Structural advantages vs temporary leads
-
-Example: "The biomedical waste processing patent creates a 15-20% cost advantage for customers, but the 18-month regulatory approval for competitors provides only temporary protection..."
-
-End with honest assessment of moat durability.
-If the moat is weak, say so - investors value honesty."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    # ====================== NEW: FINANCIAL SNAPSHOT FOR 10-Q ======================
+        # Add event type for 8-K
+        if filing.filing_type == FilingType.FORM_8K and filing.event_type:
+            context['event_type'] = filing.event_type
+            
+        return context
     
-    async def _generate_financial_snapshot_10q(self, content: str, summary: str) -> str:
-        """Generate financial snapshot for 10-Q - the first display item"""
-        prompt = f"""Create a compelling quarterly financial snapshot based on this 10-Q filing.
+    async def _generate_feed_summary_from_unified(self, unified_analysis: str, filing_type: str) -> str:
+        """Generate a one-line feed summary from unified analysis"""
+        prompt = f"""Based on this {filing_type} analysis, create a single compelling sentence (max 100 characters) that captures the most important takeaway:
 
-Content excerpt:
-{content[:2000]}
-
-Summary context:
-{summary[:500]}
-
-Write a financial snapshot (120-150 words) that:
-1. Opens with the most important metric (usually revenue and growth)
-2. Highlights profitability and EPS performance vs expectations
-3. Notes margin trends and operational efficiency
-4. Mentions cash generation or balance sheet strength
-5. Ends with forward-looking context if available
-
-Style: Write like a financial journalist's lead paragraph - punchy, informative, and engaging.
-
-Example: "The company delivered third-quarter revenue of $8.3 billion, up 12% year-over-year, driven by robust international activity. Net income reached $1.2 billion, translating to earnings of $0.85 per share, beating consensus by $0.03. Operating margins expanded 120 basis points to 15.3%, reflecting improved pricing and operational leverage. The company generated $1.8 billion in free cash flow, strengthening an already solid balance sheet with net debt reduced to $8.5 billion. Management's confident tone and raised guidance suggest momentum continuing into the fourth quarter."
-
-Make it narrative and insightful, not just a data dump."""
-
-        return await self._generate_text(prompt, max_tokens=200)
-
-    # ====================== UPDATED: FINANCIAL DATA EXTRACTOR ======================
-    
-    async def _extract_structured_financial_data(self, filing_type: str, content: str, full_text: str) -> str:
-        """Extract financial data as narrative text instead of JSON"""
-        prompt = f"""Extract and summarize key financial metrics from this {filing_type} filing.
-
-Content:
-{content[:3000]}
-
-Write a compelling financial narrative (150-200 words) that includes:
-1. Revenue figures and growth trends
-2. Profitability metrics (net income, EPS)
-3. Margin performance (gross and operating)
-4. Balance sheet strength (cash position, debt levels)
-5. Key financial ratios or metrics
-
-Style: Write like a financial analyst's summary - informative yet engaging. Use specific numbers but weave them into a narrative.
-
-Example: "The company delivered robust financial performance with revenue reaching $95 billion, up 8.5% year-over-year, driven by strong product demand across all segments. Net income of $20 billion translated to earnings of $5.67 per share, reflecting exceptional operational execution. Gross margins held steady at 43.2% while operating margins expanded to 29.8%, demonstrating pricing power and efficiency gains. The balance sheet remains fortress-like with $30 billion in cash against $120 billion in total debt, providing ample flexibility for strategic investments and capital returns."
-
-Make it narrative and insightful, focusing on the story behind the numbers."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    # ====================== HELPER METHODS ======================
-
-    def _prepare_content(self, content: str) -> str:
-        """Prepare content for processing, truncate if needed"""
-        if len(content) > self.max_tokens * 3:  # Rough estimate: 1 token ≈ 3 chars
-            content = content[:self.max_tokens * 3]
-            logger.info(f"Truncated content to {len(content)} chars")
-        return content
-
-    async def _generate_text(self, prompt: str, max_tokens: int = 500) -> str:
-        """Generate text using OpenAI with error handling"""
-        try:
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a professional financial analyst with expertise in SEC filings analysis."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_tokens,
-                temperature=0.7
-            )
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            logger.error(f"Error generating text: {e}")
-            return ""
-
-    async def _generate_feed_summary(self, summary: str, filing_type: str) -> str:
-        """Generate a one-line summary for the feed"""
-        prompt = f"""Based on this {filing_type} summary, create a single compelling sentence (max 100 characters) that captures the most important takeaway:
-
-{summary}
+{unified_analysis[:1000]}
 
 Requirements:
 - Must be under 100 characters
 - Focus on the single most important fact or trend
 - Use active voice
-- Be specific with numbers when relevant"""
+- Be specific with numbers when relevant
+- No markup or special characters"""
 
-        return await self._generate_text(prompt, max_tokens=50)
-
+        return await self._generate_text(prompt, max_tokens=settings.AI_FEED_SUMMARY_MAX_TOKENS)
+    
+    def _extract_markup_data(self, text: str) -> Dict:
+        """Extract smart markup metadata for frontend rendering"""
+        markup_data = {
+            'numbers': [],
+            'concepts': [],
+            'positive': [],
+            'negative': [],
+            'insights': []
+        }
+        
+        # Extract key numbers: *value*
+        numbers = re.findall(r'\*([^*]+)\*', text)
+        markup_data['numbers'] = numbers[:10]  # Limit to 10
+        
+        # Extract concepts: **concept**
+        concepts = re.findall(r'\*\*([^*]+)\*\*', text)
+        markup_data['concepts'] = concepts[:8]
+        
+        # Extract positive trends: +[text]
+        positive = re.findall(r'\+\[([^\]]+)\]', text)
+        markup_data['positive'] = positive[:5]
+        
+        # Extract negative trends: -[text]
+        negative = re.findall(r'-\[([^\]]+)\]', text)
+        markup_data['negative'] = negative[:5]
+        
+        # Extract insights: [!text]
+        insights = re.findall(r'\[!([^\]]+)\]', text)
+        markup_data['insights'] = insights[:3]
+        
+        return markup_data
+    
+    async def _extract_supplementary_fields(self, filing: Filing, unified_result: Dict, primary_content: str, full_text: str):
+        """Extract supplementary fields from unified analysis"""
+        unified_text = unified_result['unified_analysis']
+        
+        # Extract tone from unified analysis
+        tone_data = await self._analyze_tone(unified_text)
+        filing.management_tone = tone_data['tone']
+        filing.tone_explanation = tone_data['explanation']
+        
+        # Generate questions based on unified analysis
+        filing.key_questions = await self._generate_questions_from_unified(
+            filing.company.name, filing.filing_type.value, unified_text
+        )
+        
+        # Extract tags from markup data and content
+        filing.key_tags = self._generate_tags_from_unified(unified_result['markup_data'], unified_text, filing.filing_type)
+        
+        # Set ai_summary to first 2-3 paragraphs for backward compatibility
+        paragraphs = unified_text.split('\n\n')
+        filing.ai_summary = '\n\n'.join(paragraphs[:3])
+        
+        # Extract key type-specific fields if needed
+        if filing.filing_type == FilingType.FORM_10K:
+            filing.financial_highlights = await self._extract_financial_highlights(unified_text)
+        elif filing.filing_type == FilingType.FORM_10Q:
+            filing.core_metrics = await self._extract_financial_highlights(unified_text)
+            if unified_result.get('analyst_data'):
+                filing.expectations_comparison = await self._extract_expectations_narrative(unified_text, unified_result['analyst_data'])
+        elif filing.filing_type == FilingType.FORM_8K:
+            filing.event_type = self._identify_8k_event_type(primary_content)
+            filing.item_type = self._extract_8k_item_type(primary_content)
+        elif filing.filing_type == FilingType.FORM_S1:
+            filing.financial_highlights = await self._extract_financial_highlights(unified_text)
+    
     async def _analyze_tone(self, content: str) -> Dict:
-        """Analyze management tone from filing content"""
-        prompt = f"""Analyze the management tone in this filing. Classify as one of:
+        """Analyze management tone from unified analysis"""
+        prompt = f"""Analyze the tone of this financial analysis. Classify as one of:
 - OPTIMISTIC: Positive outlook, growth expectations, confidence
 - CONFIDENT: Steady progress, meeting targets, stable outlook  
 - NEUTRAL: Balanced view, normal operations, mixed signals
 - CAUTIOUS: Some concerns, watchful stance, conservative outlook
 - CONCERNED: Significant challenges, risks, negative trends
 
-Content excerpt:
-{content[:3000]}
-
-Provide:
-1. Tone classification (one word from above)
-2. Brief explanation (2-3 sentences)
+Analysis excerpt:
+{content[:2000]}
 
 Format:
 TONE: [classification]
-EXPLANATION: [your explanation]"""
+EXPLANATION: [2-3 sentence explanation]"""
 
         response = await self._generate_text(prompt, max_tokens=150)
         
@@ -1022,44 +450,13 @@ EXPLANATION: [your explanation]"""
                     explanation = line.replace('EXPLANATION:', '').strip()
         
         return {'tone': tone, 'explanation': explanation}
+    
+    async def _generate_questions_from_unified(self, company_name: str, filing_type: str, unified_text: str) -> List[Dict]:
+        """Generate Q&A from unified analysis"""
+        prompt = f"""Based on this {filing_type} analysis for {company_name}, generate 3 important questions investors might ask, with brief answers.
 
-    async def _generate_annual_questions(self, company_name: str, content: str) -> List[Dict]:
-        """Generate Q&A for annual reports"""
-        prompt = f"""Generate 3 important questions investors might have about this {company_name} annual report, with brief answers.
-
-Content excerpt:
-{content[:2000]}
-
-Format each as:
-Q: [Question]
-A: [Brief answer, 2-3 sentences]"""
-
-        response = await self._generate_text(prompt, max_tokens=400)
-        
-        questions = []
-        if response:
-            qa_pairs = response.split('\n\n')
-            for pair in qa_pairs:
-                if 'Q:' in pair and 'A:' in pair:
-                    parts = pair.split('\nA:')
-                    if len(parts) == 2:
-                        question = parts[0].replace('Q:', '').strip()
-                        answer = parts[1].strip()
-                        questions.append({'question': question, 'answer': answer})
-        
-        return questions[:3]  # Ensure max 3 questions
-
-    async def _generate_quarterly_questions(self, company_name: str, content: str) -> List[Dict]:
-        """Generate Q&A for quarterly reports"""
-        prompt = f"""Generate 3 important questions investors might have about this {company_name} quarterly report, with brief answers.
-
-Focus on:
-- Quarterly performance vs expectations
-- Guidance changes
-- Key metrics trends
-
-Content excerpt:
-{content[:2000]}
+Analysis excerpt:
+{unified_text[:1500]}
 
 Format each as:
 Q: [Question]
@@ -1079,58 +476,83 @@ A: [Brief answer, 2-3 sentences]"""
                         questions.append({'question': question, 'answer': answer})
         
         return questions[:3]
-
-    def _generate_10k_tags(self, summary: str) -> List[str]:
-        """Generate tags for 10-K filing"""
+    
+    def _generate_tags_from_unified(self, markup_data: Dict, unified_text: str, filing_type: FilingType) -> List[str]:
+        """Generate tags from unified analysis and markup data"""
         tags = []
+        text_lower = unified_text.lower()
         
-        # Check for common 10-K themes
-        summary_lower = summary.lower()
+        # Add tags based on markup content
+        if markup_data['positive']:
+            if any('beat' in item.lower() or 'exceed' in item.lower() for item in markup_data['positive']):
+                tags.append('Earnings Beat')
+            if any('growth' in item.lower() for item in markup_data['positive']):
+                tags.append('Growth')
         
-        if any(word in summary_lower for word in ['record', 'growth', 'increase']):
-            tags.append('Growth')
-        if any(word in summary_lower for word in ['dividend', 'buyback', 'repurchase']):
-            tags.append('Capital Return')
-        if any(word in summary_lower for word in ['acquisition', 'merger', 'm&a']):
-            tags.append('M&A')
-        if any(word in summary_lower for word in ['restructur', 'transform']):
-            tags.append('Restructuring')
-        if 'ai' in summary_lower or 'artificial intelligence' in summary_lower:
-            tags.append('AI Investment')
-        if any(word in summary_lower for word in ['margin', 'profitability']):
+        if markup_data['negative']:
+            if any('miss' in item.lower() or 'below' in item.lower() for item in markup_data['negative']):
+                tags.append('Earnings Miss')
+            tags.append('Challenges')
+        
+        # Content-based tags
+        if any('margin' in concept.lower() for concept in markup_data['concepts']):
             tags.append('Margins')
-        
-        # Always add
-        tags.append('Annual Report')
-        
-        return list(set(tags))[:5]  # Max 5 tags
-
-    def _generate_10q_tags(self, summary: str) -> List[str]:
-        """Generate tags for 10-Q filing"""
-        tags = []
-        
-        summary_lower = summary.lower()
-        
-        if any(word in summary_lower for word in ['beat', 'exceed', 'surpass']):
-            tags.append('Earnings Beat')
-        if any(word in summary_lower for word in ['miss', 'below', 'disappoint']):
-            tags.append('Earnings Miss')
-        if 'guidance' in summary_lower:
+        if 'guidance' in text_lower:
             tags.append('Guidance Update')
-        if any(word in summary_lower for word in ['margin', 'profitability']):
-            tags.append('Margins')
-        if any(word in summary_lower for word in ['growth', 'increase']):
-            tags.append('Growth')
+        if any(word in text_lower for word in ['dividend', 'buyback', 'repurchase']):
+            tags.append('Capital Return')
+        if any(word in text_lower for word in ['acquisition', 'merger', 'm&a']):
+            tags.append('M&A')
         
-        tags.append('Quarterly Results')
-        
+        # Filing type tag
+        if filing_type == FilingType.FORM_10K:
+            tags.append('Annual Report')
+        elif filing_type == FilingType.FORM_10Q:
+            tags.append('Quarterly Results')
+        elif filing_type == FilingType.FORM_8K:
+            tags.append('Material Event')
+        elif filing_type == FilingType.FORM_S1:
+            tags.append('IPO')
+            
         return list(set(tags))[:5]
+    
+    async def _extract_financial_highlights(self, unified_text: str) -> str:
+        """Extract financial highlights from unified analysis"""
+        prompt = f"""Extract key financial metrics mentioned in this analysis and create a brief financial highlights summary.
 
+Analysis:
+{unified_text[:2000]}
+
+Create a 100-150 word summary focusing on:
+- Revenue figures and growth
+- Profitability metrics
+- Margin performance
+- Cash position
+- Any other key financial metrics mentioned
+
+Write in narrative form, not bullet points."""
+
+        return await self._generate_text(prompt, max_tokens=200)
+    
+    async def _extract_expectations_narrative(self, unified_text: str, analyst_data: Dict) -> str:
+        """Create expectations comparison narrative"""
+        prompt = f"""Based on this analysis and analyst expectations data, create a brief comparison narrative.
+
+Analyst Expectations:
+Revenue Estimate: ${analyst_data.get('revenue_estimate', {}).get('value', 'N/A')}
+EPS Estimate: ${analyst_data.get('eps_estimate', {}).get('value', 'N/A')}
+
+Analysis excerpt:
+{unified_text[:1000]}
+
+Write 100-150 words comparing actual results to expectations, if mentioned."""
+
+        return await self._generate_text(prompt, max_tokens=200)
+    
     def _identify_8k_event_type(self, content: str) -> str:
         """Identify the type of 8-K event from content"""
         content_lower = content.lower()
         
-        # Common 8-K events
         if 'item 1.01' in content_lower or 'entry into' in content_lower:
             return "Material Agreement"
         elif 'item 2.02' in content_lower or 'results of operations' in content_lower:
@@ -1139,349 +561,72 @@ A: [Brief answer, 2-3 sentences]"""
             return "Executive Change"
         elif 'item 7.01' in content_lower or 'regulation fd' in content_lower:
             return "Regulation FD Disclosure"
-        elif 'item 8.01' in content_lower:
-            return "Other Events"
         elif 'merger' in content_lower or 'acquisition' in content_lower:
             return "M&A Activity"
         elif 'dividend' in content_lower:
             return "Dividend Announcement"
         else:
             return "Corporate Event"
-
-    def _generate_8k_tags(self, summary: str, event_type: str) -> List[str]:
-        """Generate tags for 8-K filing"""
-        tags = [event_type]
-        
-        summary_lower = summary.lower()
-        
-        if 'ceo' in summary_lower or 'cfo' in summary_lower or 'executive' in summary_lower:
-            tags.append('Leadership Change')
-        if 'earnings' in summary_lower:
-            tags.append('Earnings')
-        if 'acquisition' in summary_lower or 'merger' in summary_lower:
-            tags.append('M&A')
-        if 'dividend' in summary_lower:
-            tags.append('Dividend')
-        
-        return list(set(tags))[:5]
-
-    def _generate_s1_tags(self, summary: str) -> List[str]:
-        """Generate tags for S-1 filing"""
-        tags = ['IPO']
-        
-        summary_lower = summary.lower()
-        
-        if 'technology' in summary_lower or 'software' in summary_lower:
-            tags.append('Tech IPO')
-        if 'biotech' in summary_lower or 'pharmaceutical' in summary_lower:
-            tags.append('Biotech IPO')
-        if 'saas' in summary_lower:
-            tags.append('SaaS')
-        if 'ai' in summary_lower or 'artificial intelligence' in summary_lower:
-            tags.append('AI')
-        if 'profitable' in summary_lower:
-            tags.append('Profitable')
-        elif 'loss' in summary_lower:
-            tags.append('Pre-Revenue')
-        
-        return list(set(tags))[:5]
-
-    async def _analyze_8k_tone(self, content: str, event_type: str) -> Dict:
-        """Analyze tone specific to 8-K events"""
-        # For 8-K, tone often depends on event type
-        if event_type == "Earnings Release":
-            return await self._analyze_tone(content)
-        elif event_type == "Executive Change":
-            # Executive changes are usually neutral unless negative circumstances
-            if any(word in content.lower() for word in ['resignation', 'termination', 'departure']):
-                return {'tone': ManagementTone.CAUTIOUS, 'explanation': 'Executive departure may signal transition period'}
-            else:
-                return {'tone': ManagementTone.NEUTRAL, 'explanation': 'Routine executive appointment'}
-        else:
-            return {'tone': ManagementTone.NEUTRAL, 'explanation': f'{event_type} disclosed as required'}
-
-    async def _generate_8k_questions(self, company_name: str, content: str, event_type: str) -> List[Dict]:
-        """Generate event-specific questions for 8-K"""
-        prompt = f"""Generate 2 important questions investors might have about this {company_name} {event_type} announcement, with brief answers.
-
-Content excerpt:
-{content[:1500]}
-
-Format each as:
-Q: [Question]
-A: [Brief answer, 2-3 sentences]"""
-
-        response = await self._generate_text(prompt, max_tokens=300)
-        
-        questions = []
-        if response:
-            qa_pairs = response.split('\n\n')
-            for pair in qa_pairs:
-                if 'Q:' in pair and 'A:' in pair:
-                    parts = pair.split('\nA:')
-                    if len(parts) == 2:
-                        question = parts[0].replace('Q:', '').strip()
-                        answer = parts[1].strip()
-                        questions.append({'question': question, 'answer': answer})
-        
-        return questions[:2]
-
-    async def _analyze_ipo_tone(self, content: str) -> Dict:
-        """Analyze tone for S-1 filings (usually optimistic)"""
-        # S-1 filings are typically optimistic as companies are selling their story
-        return {
-            'tone': ManagementTone.OPTIMISTIC,
-            'explanation': 'Company presenting growth story and market opportunity for IPO'
-        }
-
-    async def _generate_ipo_questions(self, company_name: str, content: str) -> List[Dict]:
-        """Generate IPO-specific questions"""
-        prompt = f"""Generate 3 important questions investors might have about this {company_name} IPO, with brief answers.
-
-Focus on:
-- Business model viability
-- Path to profitability
-- Competitive advantages
-- Use of proceeds
-
-Content excerpt:
-{content[:2000]}
-
-Format each as:
-Q: [Question]
-A: [Brief answer, 2-3 sentences]"""
-
-        response = await self._generate_text(prompt, max_tokens=400)
-        
-        questions = []
-        if response:
-            qa_pairs = response.split('\n\n')
-            for pair in qa_pairs:
-                if 'Q:' in pair and 'A:' in pair:
-                    parts = pair.split('\nA:')
-                    if len(parts) == 2:
-                        question = parts[0].replace('Q:', '').strip()
-                        answer = parts[1].strip()
-                        questions.append({'question': question, 'answer': answer})
-        
-        return questions[:3]
-
-    # ====================== DIFFERENTIATED DISPLAY FIELD EXTRACTORS (ALL TEXT) ======================
-
-    async def _extract_auditor_opinion(self, full_text: str) -> str:
-        """Extract auditor opinion from 10-K"""
-        prompt = f"""Extract the auditor's opinion from this 10-K filing. Look for the auditor's report section.
-
-Content excerpt:
-{full_text[:5000]}
-
-Provide a brief summary of the auditor's opinion (e.g., "Unqualified opinion from PwC" or "Clean opinion from Deloitte with no material weaknesses")"""
-
-        return await self._generate_text(prompt, max_tokens=100)
-
-    async def _extract_three_year_financials(self, full_text: str) -> str:
-        """Extract 3-year financial trends from 10-K - NOW RETURNS TEXT"""
-        prompt = f"""Analyze the 3-year financial data from this 10-K filing.
-
-Content:
-{full_text[:5000]}
-
-Write a narrative summary (150-200 words) describing:
-1. Revenue trend over the past 3 years (growth rate, key drivers)
-2. Net income/profitability trend
-3. Margin evolution (gross and operating margins)
-4. Key financial ratios and their changes
-5. Overall financial trajectory
-
-Focus on telling the financial story, not just listing numbers."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _extract_business_segments(self, content: str, full_text: str) -> str:
-        """Extract business segment breakdown - NOW RETURNS TEXT"""
-        prompt = f"""Analyze the business segment information from this 10-K filing.
-
-Content:
-{content[:3000]}
-
-Write a narrative summary (150-200 words) describing:
-1. Major business segments and their revenue contribution
-2. Relative performance of each segment
-3. Growth rates by segment
-4. Geographic breakdown if available
-5. Strategic importance of each segment
-
-Present as a cohesive narrative, not a list."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _extract_risk_summary(self, content: str) -> str:
-        """Extract and categorize key risks - NOW RETURNS TEXT"""
-        prompt = f"""Analyze and summarize the key risk factors from this 10-K filing.
-
-Content excerpt:
-{content[:3000]}
-
-Write a narrative summary (150-200 words) covering:
-1. Most critical operational risks
-2. Key financial and market risks
-3. Regulatory and compliance challenges
-4. Competitive threats
-5. Technology or disruption risks
-
-Group them logically but present as flowing text, not lists."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_growth_drivers(self, company_name: str, summary: str, financial_narrative: str) -> str:
-        """Generate analysis of growth drivers"""
-        prompt = f"""Based on this {company_name} annual report summary and financial performance, identify and explain the key growth drivers.
-
-Summary:
-{summary[:1000]}
-
-Financial performance:
-{financial_narrative}
-
-Provide a concise analysis (150-200 words) of:
-1. Primary growth drivers
-2. Emerging growth opportunities
-3. Growth sustainability factors"""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_management_outlook(self, content: str, summary: str) -> str:
-        """Extract and analyze management's forward-looking statements"""
-        prompt = f"""Analyze management's outlook and forward-looking statements from this annual report.
-
-Summary:
-{summary[:1000]}
-
-Content excerpt:
-{content[:2000]}
-
-Provide a concise summary (150-200 words) of:
-1. Management's view on future prospects
-2. Key priorities mentioned
-3. Tone of forward guidance"""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_strategic_adjustments(self, content: str, summary: str) -> str:
-        """Identify strategic changes or pivots"""
-        prompt = f"""Identify any strategic adjustments or changes in direction from this annual report.
-
-Summary:
-{summary[:1000]}
-
-Look for:
-1. New strategic initiatives
-2. Changes in business focus
-3. Market expansion or contraction
-4. Technology or product pivots
-
-Provide a concise analysis (150-200 words)."""
-
-        return await self._generate_text(prompt, max_tokens=300)
-
-    async def _generate_market_impact_10k(self, company_name: str, summary: str, financial_narrative: str) -> str:
-        """Generate market impact analysis for 10-K"""
-        prompt = f"""You are a senior financial analyst. Based on this {company_name} annual report (10-K), analyze the potential market impact.
-
-Summary content:
-{summary}
-
-Financial performance:
-{financial_narrative}
-
-Please analyze:
-1. Points that may attract positive market attention
-2. Aspects that may need continued market observation
-3. Potential impact of long-term strategic adjustments on valuation
-4. Relative performance compared to peers
-
-Requirements:
-- Use soft expressions like "may", "could", "worth noting"
-- Avoid predicting specific price movements
-- Focus on fundamental analysis
-- Keep it 200-300 words"""
-
-        return await self._generate_text(prompt, max_tokens=600)
-
-    async def _process_generic(self, filing: Filing, primary_content: str) -> Dict:
-        """Generic processing fallback for other filing types"""
-        logger.info(f"Processing generic filing type: {filing.filing_type.value}")
-        
-        content = self._prepare_content(primary_content)
-        
-        # Generate basic summary
-        summary = await self._generate_summary(filing.company.name, filing.filing_type.value, content)
-        feed_summary = await self._generate_feed_summary(summary, filing.filing_type.value)
-        tone_data = await self._analyze_tone(content)
-        questions = await self._generate_questions(filing.company.name, filing.filing_type.value, content)
-        tags = self._generate_tags(filing.filing_type.value, summary)
-        
-        return {
-            'summary': summary,
-            'feed_summary': feed_summary,
-            'tone': tone_data['tone'],
-            'tone_explanation': tone_data['explanation'],
-            'questions': questions,
-            'tags': tags
-        }
-
-    async def _generate_summary(self, company_name: str, filing_type: str, content: str) -> str:
-        """Generate generic summary"""
-        prompt = f"""Create a comprehensive summary of this {company_name} {filing_type} filing.
-
-Content:
-{content[:3000]}
-
-Write a professional summary (300-400 words) covering key points and takeaways."""
-
-        return await self._generate_text(prompt, max_tokens=1000)
-
-    async def _generate_questions(self, company_name: str, filing_type: str, content: str) -> List[Dict]:
-        """Generate generic Q&A"""
-        prompt = f"""Generate 3 important questions investors might have about this {company_name} {filing_type}, with brief answers.
-
-Content excerpt:
-{content[:1500]}
-
-Format each as:
-Q: [Question]
-A: [Brief answer, 2-3 sentences]"""
-
-        response = await self._generate_text(prompt, max_tokens=400)
-        
-        questions = []
-        if response:
-            qa_pairs = response.split('\n\n')
-            for pair in qa_pairs:
-                if 'Q:' in pair and 'A:' in pair:
-                    parts = pair.split('\nA:')
-                    if len(parts) == 2:
-                        question = parts[0].replace('Q:', '').strip()
-                        answer = parts[1].strip()
-                        questions.append({'question': question, 'answer': answer})
-        
-        return questions[:3]
-
-    def _generate_tags(self, filing_type: str, summary: str) -> List[str]:
-        """Generate generic tags"""
-        tags = [filing_type.replace('FORM_', '').replace('_', '-')]
-        
-        summary_lower = summary.lower()
-        
-        # Add some common tags based on content
-        if 'acquisition' in summary_lower:
-            tags.append('M&A')
-        if 'earnings' in summary_lower:
-            tags.append('Earnings')
-        if 'restructuring' in summary_lower:
-            tags.append('Restructuring')
-        
-        return tags[:5]
+    
+    def _extract_8k_item_type(self, content: str) -> Optional[str]:
+        """Extract Item number from 8-K content"""
+        item_pattern = r'Item\s+(\d+\.\d+)'
+        match = re.search(item_pattern, content, re.IGNORECASE)
+        return match.group(1) if match else None
+    
+    async def _fetch_analyst_expectations(self, ticker: str) -> Optional[Dict]:
+        """Fetch analyst expectations from Yahoo Finance API"""
+        if not settings.YAHOO_FINANCE_API_KEY:
+            return None
+            
+        try:
+            # TODO: Implement actual Yahoo Finance API call
+            # This is a placeholder structure
+            url = f"https://api.yahoofinance.com/v1/finance/quote/{ticker}/analysts"
+            headers = {"X-API-KEY": settings.YAHOO_FINANCE_API_KEY}
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        # Parse and return relevant expectations
+                        return {
+                            'revenue_estimate': {
+                                'value': data.get('revenue', {}).get('avg'),
+                                'analysts': data.get('revenue', {}).get('numberOfAnalysts')
+                            },
+                            'eps_estimate': {
+                                'value': data.get('eps', {}).get('avg'),
+                                'analysts': data.get('eps', {}).get('numberOfAnalysts')
+                            }
+                        }
+        except Exception as e:
+            logger.warning(f"Failed to fetch analyst expectations: {e}")
+            return None
+    
+    def _prepare_content(self, content: str) -> str:
+        """Prepare content for processing, truncate if needed"""
+        if len(content) > self.max_tokens * 3:  # Rough estimate: 1 token ≈ 3 chars
+            content = content[:self.max_tokens * 3]
+            logger.info(f"Truncated content to {len(content)} chars")
+        return content
+    
+    async def _generate_text(self, prompt: str, max_tokens: int = 500) -> str:
+        """Generate text using OpenAI with configured temperature"""
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a professional financial analyst with expertise in SEC filings analysis."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=max_tokens,
+                temperature=self.temperature
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"Error generating text: {e}")
+            return ""
 
 
 # Initialize singleton

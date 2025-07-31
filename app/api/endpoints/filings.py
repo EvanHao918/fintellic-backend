@@ -1,7 +1,7 @@
 # app/api/endpoints/filings.py
 """
-Filing-related API endpoints with caching support and view tracking
-FIXED: All financial_metrics and core_metrics now expect text narratives, not JSON
+Filing-related API endpoints with unified analysis support
+Handles both v1 (legacy) and v2 (unified) analysis formats
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -27,7 +27,7 @@ async def get_filings(
     form_type: Optional[str] = Query(None, description="Filter by form type (10-K, 10-Q, 8-K, S-1)"),
     ticker: Optional[str] = Query(None, description="Filter by company ticker"),
     db: Session = Depends(deps.get_db),
-    current_user = Depends(deps.get_current_user_optional)  # 改为可选认证
+    current_user = Depends(deps.get_current_user_optional)  # Optional authentication
 ):
     """
     Get list of filings with optional filters
@@ -73,6 +73,11 @@ async def get_filings(
             "bearish": filing.bearish_votes or 0
         }
         
+        # Use unified feed summary if available, fallback to legacy
+        one_liner = filing.unified_feed_summary if filing.unified_feed_summary else (
+            filing.ai_summary[:100] + "..." if filing.ai_summary else None
+        )
+        
         filing_brief = FilingBrief(
             id=filing.id,
             form_type=filing.filing_type.value,
@@ -84,16 +89,17 @@ async def get_filings(
                 "name": filing.company.name,
                 "ticker": filing.company.ticker,
                 "cik": filing.company.cik,
-                "is_sp500": filing.company.is_sp500,  # 添加 S&P 500 标记
-                "is_nasdaq100": filing.company.is_nasdaq100  # 添加 NASDAQ 100 标记
+                "is_sp500": filing.company.is_sp500,
+                "is_nasdaq100": filing.company.is_nasdaq100
             },
-            one_liner=filing.ai_summary[:100] + "..." if filing.ai_summary else None,
+            one_liner=one_liner,
             sentiment=filing.management_tone.value if filing.management_tone else None,
             tags=filing.key_tags or [],
             vote_counts=vote_counts,
             comment_count=filing.comment_count or 0,
-            view_count=view_count,  # 添加 view_count
-            event_type=filing.event_type  # For 8-K
+            view_count=view_count,
+            event_type=filing.event_type,  # For 8-K
+            has_unified_analysis=filing.analysis_version == "v2"
         )
         filing_responses.append(filing_brief)
     
@@ -115,11 +121,11 @@ async def get_filing(
     filing_id: int,
     include_charts: bool = Query(True, description="Include chart data in response"),
     db: Session = Depends(deps.get_db),
-    current_user = Depends(deps.get_current_user)  # 详情页仍需要认证
+    current_user = Depends(deps.get_current_user)  # Requires authentication
 ):
     """
-    Get specific filing by ID with differentiated display support
-    Returns type-specific fields based on filing_type
+    Get specific filing by ID with unified analysis support
+    Returns unified analysis if available (v2), otherwise legacy format
     Results are cached for 1 hour
     Enforces daily view limits for free users
     """
@@ -145,9 +151,8 @@ async def get_filing(
     # Try cache first
     cached_result = cache.get(cache_key)
     if cached_result:
-        # Record view for free users (Pro users don't need tracking)
-        if not view_check["is_pro"]:
-            ViewTrackingService.record_view(db, current_user, filing_id)
+        # Record view
+        ViewTrackingService.record_view(db, current_user, filing_id)
         
         # Still increment view count even for cached results
         view_count = StatsCache.increment_view_count(str(filing_id))
@@ -178,7 +183,7 @@ async def get_filing(
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")
     
-    # Record view for ALL users (不管是否 Pro 用户)
+    # Record view
     ViewTrackingService.record_view(db, current_user, filing_id)
     
     # Increment view count
@@ -214,12 +219,21 @@ async def get_filing(
             "name": filing.company.name,
             "ticker": filing.company.ticker,
             "cik": filing.company.cik,
-            "is_sp500": filing.company.is_sp500,  # 添加 S&P 500 标记
-            "is_nasdaq100": filing.company.is_nasdaq100  # 添加 NASDAQ 100 标记
+            "is_sp500": filing.company.is_sp500,
+            "is_nasdaq100": filing.company.is_nasdaq100
         },
         "status": filing.status.value,
+        
+        # ==================== UNIFIED ANALYSIS FIELDS ====================
+        "unified_analysis": filing.unified_analysis,
+        "unified_feed_summary": filing.unified_feed_summary,
+        "analysis_version": filing.analysis_version,
+        "smart_markup_data": filing.smart_markup_data,
+        "analyst_expectations": filing.analyst_expectations,
+        
+        # ==================== LEGACY FIELDS ====================
         "ai_summary": filing.ai_summary,
-        "one_liner": filing.ai_summary[:100] + "..." if filing.ai_summary else None,
+        "one_liner": filing.unified_feed_summary or (filing.ai_summary[:100] + "..." if filing.ai_summary else None),
         "sentiment": filing.management_tone.value if filing.management_tone else None,
         "sentiment_explanation": filing.tone_explanation,
         "key_points": extract_key_points(filing),
@@ -227,22 +241,26 @@ async def get_filing(
         "opportunities": extract_opportunities(filing),
         "questions_answers": filing.key_questions or [],
         "tags": filing.key_tags or [],
-        # FIXED: financial_metrics now expects text narrative, not JSON
-        "financial_metrics": filing.financial_highlights,  # This is now text
+        "financial_metrics": filing.financial_highlights,
+        
+        # Metadata
         "processed_at": filing.processing_completed_at,
         "created_at": filing.created_at,
         "updated_at": filing.updated_at,
-        # Add interaction stats
+        
+        # Interaction stats
         "vote_counts": vote_counts,
         "comment_count": filing.comment_count or 0,
-        "view_count": view_count,  # 添加 view_count
+        "view_count": view_count,
         "user_vote": user_vote,
-        # Add view limit info
+        
+        # View limit info
         "view_limit_info": {
             "views_remaining": view_check["views_remaining"],
             "is_pro": view_check["is_pro"],
             "views_today": view_check["views_today"]
         },
+        
         # Existing differentiated fields
         "specific_data": filing.filing_specific_data if filing.filing_specific_data else {},
         "chart_data": filing.chart_data if include_charts and filing.chart_data else None,
@@ -280,8 +298,8 @@ async def get_filing(
             "management_tone_analysis": filing.management_tone_analysis,
             "beat_miss_analysis": filing.beat_miss_analysis,
             "market_impact_10q": filing.market_impact_10q,
-            # FIXED: core_metrics now uses financial_highlights which is text
-            "core_metrics": filing.financial_highlights  # This is now text (financial snapshot)
+            # FIXED: Use financial_highlights instead of non-existent core_metrics
+            "core_metrics": filing.financial_highlights  # 修复: 使用 financial_highlights
         })
     
     elif filing_type == "8-K":
@@ -335,11 +353,16 @@ async def check_filing_access(
     # Also get user's overall stats
     user_stats = ViewTrackingService.get_user_view_stats(db, current_user.id)
     
+    # Check if filing has unified analysis
+    filing = db.query(Filing).filter(Filing.id == filing_id).first()
+    has_unified_analysis = filing and filing.analysis_version == "v2"
+    
     return {
         "filing_id": filing_id,
         "can_view": view_check["can_view"],
         "reason": view_check["reason"],
-        "user_stats": user_stats
+        "user_stats": user_stats,
+        "has_unified_analysis": has_unified_analysis
     }
 
 
@@ -348,7 +371,7 @@ async def get_popular_filings(
     period: str = "day",  # day, week, month
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(deps.get_db),
-    current_user = Depends(deps.get_current_user_optional)  # 改为可选认证
+    current_user = Depends(deps.get_current_user_optional)
 ):
     """
     Get popular filings based on view count
@@ -410,16 +433,22 @@ async def get_popular_filings(
             "bearish": filing.bearish_votes or 0
         }
         
+        # Use unified content if available
+        summary = filing.unified_analysis[:200] + "..." if filing.unified_analysis else (
+            filing.ai_summary[:200] + "..." if filing.ai_summary else None
+        )
+        
         result.append({
             "id": filing.id,
             "company_name": filing.company.name,
             "company_ticker": filing.company.ticker,
             "form_type": filing.filing_type.value,
             "filing_date": filing.filing_date.isoformat(),
-            "ai_summary": filing.ai_summary[:200] + "..." if filing.ai_summary else None,
+            "ai_summary": summary,
             "view_count": item["view_count"],
             "votes": vote_counts,
-            "created_at": filing.created_at.isoformat()
+            "created_at": filing.created_at.isoformat(),
+            "has_unified_analysis": filing.analysis_version == "v2"
         })
     
     # Cache the result
@@ -431,28 +460,40 @@ async def get_popular_filings(
 # Helper functions
 def extract_event_summary(filing: Filing) -> str:
     """Extract event summary from AI summary for 8-K"""
-    # Use first paragraph of AI summary as event summary
-    if filing.ai_summary:
+    # Use unified analysis if available
+    if filing.unified_analysis:
+        # Take first paragraph
+        return filing.unified_analysis.split('\n')[0]
+    elif filing.ai_summary:
         return filing.ai_summary.split('\n')[0]
     return None
 
 
 def extract_key_points(filing: Filing) -> List[str]:
     """Extract key points from filing"""
-    # TODO: Implement proper extraction logic
-    # For now, return empty list
+    # If we have smart markup data, extract key insights
+    if filing.smart_markup_data and filing.smart_markup_data.get('insights'):
+        return filing.smart_markup_data['insights']
+    
+    # TODO: Implement legacy extraction logic if needed
     return []
 
 
 def extract_risks(filing: Filing) -> List[str]:
     """Extract risks from filing"""
-    # TODO: Implement proper extraction logic
-    # For now, return empty list
+    # If we have smart markup data, extract negative items
+    if filing.smart_markup_data and filing.smart_markup_data.get('negative'):
+        return filing.smart_markup_data['negative']
+    
+    # TODO: Implement legacy extraction logic if needed
     return []
 
 
 def extract_opportunities(filing: Filing) -> List[str]:
     """Extract opportunities from filing"""
-    # TODO: Implement proper extraction logic
-    # For now, return empty list
+    # If we have smart markup data, extract positive items
+    if filing.smart_markup_data and filing.smart_markup_data.get('positive'):
+        return filing.smart_markup_data['positive']
+    
+    # TODO: Implement legacy extraction logic if needed
     return []

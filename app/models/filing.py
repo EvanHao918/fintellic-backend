@@ -53,7 +53,18 @@ class Filing(Base):
     primary_doc_description = Column(String(255))
     full_text_url = Column(String(500))
     
-    # AI-generated content
+    # ==================== UNIFIED ANALYSIS FIELDS (NEW) ====================
+    # Core unified content
+    unified_analysis = Column(Text, comment="Unified 800-1200 word narrative analysis")
+    unified_feed_summary = Column(Text, comment="One-line feed summary (max 100 chars)")
+    analysis_version = Column(String(10), comment="Analysis version (v1=legacy, v2=unified)")
+    
+    # Smart markup and metadata
+    smart_markup_data = Column(JSON, comment="Smart markup metadata for frontend rendering")
+    analyst_expectations = Column(JSON, comment="Analyst expectations data for 10-Q")
+    # ========================================================================
+    
+    # AI-generated content (LEGACY - kept for backward compatibility)
     ai_summary = Column(Text)  # 5-minute summary
     management_tone = Column(Enum(ManagementTone))
     tone_explanation = Column(Text)
@@ -151,6 +162,11 @@ class Filing(Base):
             return self.filing_specific_data.get("s1_data", {})
         else:
             return {}
+    
+    @property
+    def is_unified_analysis(self):
+        """Check if this filing uses unified analysis"""
+        return self.analysis_version == "v2" and self.unified_analysis is not None
     
     def __repr__(self):
         return f"<Filing(id={self.id}, type={self.filing_type}, company_id={self.company_id})>"

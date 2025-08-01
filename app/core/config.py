@@ -63,8 +63,8 @@ class Settings(BaseSettings):
     MARKUP_TYPES: List[str] = ["number", "concept", "positive", "negative", "insight"]
     
     # Analyst Expectations API (for 10-Q)
-    YAHOO_FINANCE_API_KEY: Optional[str] = None
-    ENABLE_EXPECTATIONS_COMPARISON: bool = True
+    
+    ENABLE_EXPECTATIONS_COMPARISON: bool = False
     EXPECTATIONS_CACHE_TTL: int = 86400  # 24 hours
     
     # Performance Optimization

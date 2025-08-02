@@ -30,3 +30,5 @@ __pycache__/
 *.pyd
 logs/
 pids/
+*.pyc
+__pycache__/

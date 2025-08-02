@@ -1,8 +1,10 @@
 # app/services/ai_processor.py
 """
-AI Processor Service - Reformed Version
+AI Processor Service - Enhanced Version
 Implements intelligent guidance approach with unified analysis
 Focus on goals over rules, quality over format
+ENHANCED: Smart content preprocessing and token management
+ENHANCED: Filing type awareness for better prompts
 """
 import json
 import re
@@ -16,6 +18,7 @@ from random import uniform
 import requests
 from bs4 import BeautifulSoup
 import asyncio
+import tiktoken
 
 from openai import OpenAI
 from sqlalchemy.orm import Session
@@ -44,12 +47,101 @@ client = OpenAI(api_key=settings.OPENAI_API_KEY)
 class AIProcessor:
     """
     Process filings using OpenAI to generate unified analysis with intelligent guidance
+    Enhanced with smart content preprocessing and token management
     """
     
     def __init__(self):
         self.model = settings.AI_MODEL
         self.max_tokens = settings.AI_MAX_TOKENS
         self.temperature = settings.AI_TEMPERATURE
+        
+        # Initialize tokenizer for accurate token counting
+        try:
+            self.encoding = tiktoken.encoding_for_model(self.model)
+        except:
+            # Fallback to cl100k_base encoding
+            self.encoding = tiktoken.get_encoding("cl100k_base")
+        
+        # Token limits with safety margin
+        self.max_input_tokens = 100000  # Conservative limit to avoid errors
+        self.target_output_tokens = 3000  # For unified analysis
+    
+    def _count_tokens(self, text: str) -> int:
+        """Count tokens in text using tiktoken"""
+        try:
+            return len(self.encoding.encode(text))
+        except:
+            # Fallback estimation
+            return len(text) // 4
+    
+    def _smart_truncate_content(self, content: str, max_tokens: int, filing_type: str) -> str:
+        """
+        Intelligently truncate content while preserving key sections
+        """
+        current_tokens = self._count_tokens(content)
+        
+        if current_tokens <= max_tokens:
+            return content
+        
+        logger.info(f"Content needs truncation: {current_tokens} tokens > {max_tokens} limit")
+        
+        # Split content into sections
+        sections = content.split('\n\n')
+        
+        # Priority keywords for different filing types
+        priority_keywords = {
+            'FORM_10K': ['management discussion', 'financial statements', 'risk factors', 'business'],
+            'FORM_10Q': ['financial statements', 'management discussion', 'quarter', 'three months'],
+            'FORM_8K': ['item', 'event', 'agreement', 'announcement'],
+            'FORM_S1': ['summary', 'risk factors', 'use of proceeds', 'business']
+        }
+        
+        # Score each section
+        scored_sections = []
+        filing_keywords = priority_keywords.get(filing_type.value, [])
+        
+        for section in sections:
+            score = 0
+            section_lower = section.lower()
+            
+            # Score based on keywords
+            for keyword in filing_keywords:
+                if keyword in section_lower:
+                    score += 10
+            
+            # Score based on financial data
+            score += len(re.findall(r'\$[\d,]+', section)) * 2
+            score += len(re.findall(r'\d+\.?\d*%', section)) * 2
+            
+            # Score based on section markers
+            if re.search(r'^={3,}|^Item\s+\d+|^Part\s+[IVX]+', section):
+                score += 5
+            
+            scored_sections.append((score, section))
+        
+        # Sort by score (highest first)
+        scored_sections.sort(key=lambda x: x[0], reverse=True)
+        
+        # Build truncated content
+        truncated_parts = []
+        total_tokens = 0
+        
+        for score, section in scored_sections:
+            section_tokens = self._count_tokens(section)
+            if total_tokens + section_tokens <= max_tokens:
+                truncated_parts.append(section)
+                total_tokens += section_tokens
+            elif total_tokens < max_tokens * 0.9:  # Try to use at least 90% of limit
+                # Partially include this section
+                remaining_tokens = max_tokens - total_tokens
+                partial_section = section[:remaining_tokens * 4]  # Approximate
+                truncated_parts.append(partial_section + "\n[Section truncated...]")
+                break
+        
+        result = '\n\n'.join(truncated_parts)
+        logger.info(f"Truncated content from {current_tokens} to {self._count_tokens(result)} tokens")
+        
+        return result
         
     async def process_filing(self, db: Session, filing: Filing) -> bool:
         """
@@ -68,22 +160,29 @@ class AIProcessor:
             filing.processing_started_at = datetime.utcnow()
             db.commit()
             
-            logger.info(f"Starting unified AI processing for {filing.company.ticker} {filing.filing_type.value}")
+            logger.info(f"Starting enhanced AI processing for {filing.company.ticker} {filing.filing_type.value}")
             
             # Get filing directory
             filing_dir = Path(f"data/filings/{filing.company.cik}/{filing.accession_number.replace('-', '')}")
             
-            # Extract text
+            # Extract text with enhanced extractor
             sections = text_extractor.extract_from_filing(filing_dir)
             
             if 'error' in sections:
                 raise Exception(f"Text extraction failed: {sections['error']}")
+            
+            # Get the filing type from extraction
+            extracted_filing_type = sections.get('filing_type', 'UNKNOWN')
+            logger.info(f"Extracted filing type: {extracted_filing_type}")
             
             primary_content = sections.get('primary_content', '')
             full_text = sections.get('full_text', '')
             
             if not primary_content or len(primary_content) < 100:
                 raise Exception("Insufficient text content extracted")
+            
+            # Log content quality
+            logger.info(f"Extracted content - Primary: {len(primary_content)} chars, Full: {len(full_text)} chars")
             
             # Get analyst expectations for 10-Q if enabled
             analyst_data = None
@@ -105,7 +204,7 @@ class AIProcessor:
             filing.unified_analysis = unified_result['unified_analysis']
             filing.unified_feed_summary = unified_result['feed_summary']
             filing.smart_markup_data = unified_result['markup_data']
-            filing.analysis_version = "v3"  # Reformed version
+            filing.analysis_version = "v4"  # Enhanced version
             
             if analyst_data:
                 filing.analyst_expectations = analyst_data
@@ -119,11 +218,11 @@ class AIProcessor:
             
             db.commit()
             
-            logger.info(f"✅ Unified AI processing completed for {filing.accession_number}")
+            logger.info(f"✅ Enhanced AI processing completed for {filing.accession_number}")
             return True
             
         except Exception as e:
-            logger.error(f"Error in unified AI processing: {e}")
+            logger.error(f"Error in enhanced AI processing: {e}")
             filing.status = ProcessingStatus.FAILED
             filing.error_message = str(e)
             db.commit()
@@ -137,14 +236,19 @@ class AIProcessor:
         analyst_data: Optional[Dict] = None
     ) -> Dict:
         """
-        Generate unified analysis with intelligent retry logic
+        Generate unified analysis with intelligent retry logic and content optimization
         """
         max_retries = 3
         
         for attempt in range(max_retries):
+            # Preprocess content to ensure quality and token limits
+            processed_content = self._preprocess_content_for_ai(
+                primary_content, full_text, filing.filing_type, attempt
+            )
+            
             # Generate analysis
             unified_result = await self._generate_unified_analysis(
-                filing, primary_content, full_text, analyst_data
+                filing, processed_content, processed_content, analyst_data
             )
             
             # Validate word count with flexibility
@@ -156,12 +260,17 @@ class AIProcessor:
                 logger.warning(f"Template numbers detected, retrying... (attempt {attempt + 1})")
                 continue
             
+            # Check content quality
+            if not self._validate_content_quality(unified_result['unified_analysis'], filing.filing_type):
+                logger.warning(f"Content quality check failed, retrying... (attempt {attempt + 1})")
+                continue
+            
             if word_count >= target_min:
                 logger.info(f"Generated {word_count} words, within acceptable range")
                 break
             elif attempt < max_retries - 1:
-                logger.warning(f"Word count {word_count} below target, enhancing prompt for retry...")
-                # Will enhance prompt in next iteration
+                logger.warning(f"Word count {word_count} below target, enhancing content for retry...")
+                # Next iteration will use more content
                 continue
         
         # Final optimization
@@ -171,16 +280,97 @@ class AIProcessor:
         
         return unified_result
     
+    def _preprocess_content_for_ai(self, primary_content: str, full_text: str, filing_type: FilingType, attempt: int) -> str:
+        """
+        Preprocess content to ensure AI gets high-quality input within token limits
+        """
+        # Start with primary content
+        if attempt == 0:
+            content = primary_content
+        else:
+            # Use more content on retries
+            content = primary_content + "\n\n[Additional Context]\n\n" + full_text[len(primary_content):len(primary_content) + 20000 * attempt]
+        
+        # Check token count
+        prompt_tokens = 2000  # Estimate for prompt
+        available_tokens = self.max_input_tokens - prompt_tokens - self.target_output_tokens
+        
+        # Smart truncate if needed
+        content = self._smart_truncate_content(content, available_tokens, filing_type)
+        
+        # Clean up content
+        content = self._clean_content_for_ai(content)
+        
+        # Log preprocessing results
+        logger.info(f"Preprocessed content: {self._count_tokens(content)} tokens, {len(content)} chars")
+        
+        return content
+    
+    def _clean_content_for_ai(self, content: str) -> str:
+        """
+        Clean content for better AI processing
+        """
+        # Remove excessive legal boilerplate
+        legal_patterns = [
+            r'PURSUANT TO THE REQUIREMENTS.*?(?=\n\n|\Z)',
+            r'The information.*?incorporated by reference.*?(?=\n\n|\Z)',
+            r'SIGNATURES?\s*\n.*?\Z',
+        ]
+        
+        for pattern in legal_patterns:
+            content = re.sub(pattern, '', content, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Remove excessive whitespace
+        content = re.sub(r'\n{4,}', '\n\n\n', content)
+        content = re.sub(r' {3,}', ' ', content)
+        
+        # Remove page numbers and headers
+        content = re.sub(r'Page \d+ of \d+', '', content)
+        content = re.sub(r'Table of Contents', '', content, flags=re.IGNORECASE)
+        
+        return content.strip()
+    
+    def _validate_content_quality(self, analysis: str, filing_type: FilingType) -> bool:
+        """
+        Validate that the generated analysis has sufficient quality
+        """
+        # Check for minimum financial data mentions
+        financial_mentions = len(re.findall(r'\$[\d,]+[BMK]?|[\d,]+%|\d+\.?\d*\s*(?:million|billion)', analysis))
+        
+        if filing_type in [FilingType.FORM_10K, FilingType.FORM_10Q]:
+            if financial_mentions < 5:
+                logger.warning(f"Insufficient financial data in analysis: {financial_mentions} mentions")
+                return False
+        
+        # Check for key sections
+        if filing_type == FilingType.FORM_10K:
+            required_topics = ['revenue', 'income', 'business']
+            found_topics = sum(1 for topic in required_topics if topic.lower() in analysis.lower())
+            if found_topics < 2:
+                logger.warning("Missing key topics in 10-K analysis")
+                return False
+        
+        # Check for substantive paragraphs
+        paragraphs = [p for p in analysis.split('\n\n') if len(p) > 100]
+        if len(paragraphs) < 3:
+            logger.warning("Insufficient substantive paragraphs")
+            return False
+        
+        return True
+    
     def _contains_template_numbers(self, text: str) -> bool:
         """Check if analysis contains suspicious template numbers"""
         template_patterns = [
             r'\$5\.2B',
             r'exceeded.*by.*6%',
-            r'\$4\.9B'
+            r'\$4\.9B',
+            r'placeholder',
+            r'INSERT.*HERE',
+            r'TBD',
         ]
         
         for pattern in template_patterns:
-            if re.search(pattern, text):
+            if re.search(pattern, text, re.IGNORECASE):
                 return True
         return False
     
@@ -366,8 +556,8 @@ class AIProcessor:
         """
         Generate unified analysis with intelligent guidance approach
         """
-        # Use full content without truncation
-        content = full_text
+        # Use the preprocessed content
+        content = primary_content  # Already preprocessed
         
         # Build filing-specific context
         filing_context = self._build_filing_context(filing, analyst_data)
@@ -383,6 +573,10 @@ class AIProcessor:
             prompt = self._build_s1_unified_prompt(filing, content, filing_context)
         else:
             prompt = self._build_generic_unified_prompt(filing, content, filing_context)
+        
+        # Log token usage
+        prompt_tokens = self._count_tokens(prompt)
+        logger.info(f"Prompt tokens: {prompt_tokens}")
         
         # Generate unified analysis
         unified_analysis = await self._generate_text(
@@ -412,6 +606,9 @@ class AIProcessor:
 
 CORE MISSION: 
 Create a 1000-1200 word analysis of this annual report that helps readers understand {filing.company.name}'s ({filing.company.ticker}) year in review and future prospects.
+
+CONTENT CONTEXT:
+This filing contains key sections including business overview, risk factors, management discussion & analysis (MD&A), and financial statements. Focus on the most material information provided.
 
 KEY PRINCIPLES:
 1. **Data Integrity**: Every number must come from THIS filing - trace metrics to their source
@@ -466,6 +663,9 @@ Now, tell the story of {filing.company.ticker}'s year and what it means for inve
 CORE MISSION:
 Write an 800-1000 word analysis of {filing.company.name}'s ({filing.company.ticker}) quarterly results that answers: What happened? Why does it matter? What's next?
 
+CONTENT CONTEXT:
+This quarterly filing includes financial statements and management's discussion of the quarter's performance. Focus on the key drivers and changes.
+
 KEY PRINCIPLES:
 1. **Real Data Only**: Use numbers from THIS filing - no templates or examples
 2. **Clear Story Arc**: Performance → Drivers → Implications → Outlook
@@ -499,6 +699,9 @@ Analyze this quarter's performance and tell investors what they need to know."""
 CORE MISSION:
 In 600-800 words, explain this event's significance and likely impact on the company and its investors.
 
+CONTENT CONTEXT:
+This 8-K filing reports a material event or change. The content includes specific Item disclosures that describe what happened.
+
 KEY PRINCIPLES:
 1. **Event Focus**: What happened and why it matters - get to the point quickly
 2. **Impact Analysis**: Immediate and longer-term implications
@@ -529,6 +732,9 @@ Analyze this event and its implications for investors."""
 
 CORE MISSION:
 Create an 800-1000 word analysis that helps investors understand the investment opportunity and risks.
+
+CONTENT CONTEXT:
+This S-1 registration statement includes business overview, risk factors, use of proceeds, and financial information for a company going public.
 
 KEY PRINCIPLES:
 1. **Investment Thesis**: What's the opportunity and why should investors care?

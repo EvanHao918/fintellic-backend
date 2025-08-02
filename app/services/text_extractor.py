@@ -1,14 +1,15 @@
 # app/services/text_extractor.py
 """
-Text Extractor Service
+Text Extractor Service - Enhanced Version
 Extracts structured text from SEC filing HTML documents
 Enhanced for different filing types (10-K, 10-Q, 8-K, S-1)
-FIXED: iXBRL documents now properly extract filing-specific sections
-FIXED: Document type identification happens before iXBRL processing
+FIXED: Better document type identification with multiple patterns
+FIXED: Smart content extraction based on filing type
+FIXED: Improved iXBRL handling with content validation
 """
 import re
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 from bs4 import BeautifulSoup
 import logging
 
@@ -23,6 +24,57 @@ class TextExtractor:
     def __init__(self):
         self.min_section_length = 100  # Minimum characters for a valid section
         self.max_section_length = 50000  # Maximum characters to avoid memory issues
+        
+        # Define filing type patterns with priority
+        self.filing_patterns = {
+            '8-K': [
+                (r'FORM\s*8[\s\-]*K', 100),
+                (r'CURRENT\s+REPORT', 90),
+                (r'Pursuant\s+to\s+Section\s+13\s+or\s+15\(d\)', 80),
+                (r'Item\s+\d+\.\d+', 70),
+            ],
+            '10-K': [
+                (r'FORM\s*10[\s\-]*K', 100),
+                (r'ANNUAL\s+REPORT', 90),
+                (r'Pursuant\s+to\s+Section\s+13\s+or\s+15\(d\).*annual', 80),
+                (r'Item\s+1[.\s]+Business', 70),
+                (r'Item\s+7[.\s]+Management', 70),
+            ],
+            '10-Q': [
+                (r'FORM\s*10[\s\-]*Q', 100),
+                (r'QUARTERLY\s+REPORT', 90),
+                (r'Pursuant\s+to\s+Section\s+13\s+or\s+15\(d\).*quarterly', 80),
+                (r'For\s+the\s+(?:quarterly\s+period|three\s+months)', 70),
+            ],
+            'S-1': [
+                (r'FORM\s*S[\s\-]*1', 100),
+                (r'REGISTRATION\s+STATEMENT', 90),
+                (r'PROSPECTUS', 80),
+                (r'Under\s+the\s+Securities\s+Act\s+of\s+1933', 70),
+            ]
+        }
+        
+        # Key sections for each filing type
+        self.key_sections = {
+            '10-K': {
+                'Item 1A': {'pattern': r'Item\s*1A[.\s]+Risk\s+Factors', 'max_chars': 30000},
+                'Item 7': {'pattern': r'Item\s*7[.\s]+Management.{0,50}Discussion', 'max_chars': 40000},
+                'Item 8': {'pattern': r'Item\s*8[.\s]+Financial\s+Statements', 'max_chars': 50000},
+            },
+            '10-Q': {
+                'Financial Statements': {'pattern': r'(?:Condensed\s+)?(?:Consolidated\s+)?Financial\s+Statements', 'max_chars': 40000},
+                'MD&A': {'pattern': r'Management.{0,50}Discussion\s+and\s+Analysis', 'max_chars': 35000},
+            },
+            '8-K': {
+                'Items': {'pattern': r'Item\s+\d+\.\d+', 'max_chars': 10000},
+            },
+            'S-1': {
+                'Summary': {'pattern': r'(?:Prospectus\s+)?Summary', 'max_chars': 20000},
+                'Risk Factors': {'pattern': r'Risk\s+Factors', 'max_chars': 25000},
+                'Business': {'pattern': r'(?:Our\s+)?Business', 'max_chars': 20000},
+                'Use of Proceeds': {'pattern': r'Use\s+of\s+Proceeds', 'max_chars': 10000},
+            }
+        }
     
     def extract_from_filing(self, filing_dir: Path) -> Dict[str, str]:
         """
@@ -70,264 +122,45 @@ class TextExtractor:
                 content = f.read()
             
             # Remove SEC document headers
-            # Find the end of header section (usually marked by </SEC-HEADER>)
             header_end = content.find('</SEC-HEADER>')
             if header_end != -1:
                 content = content[header_end + len('</SEC-HEADER>'):]
             
-            # Remove HTML/XML tags if present
-            content = re.sub(r'<[^>]+>', ' ', content)
-            
-            # Find the main document section (between <DOCUMENT> and </DOCUMENT>)
+            # Find the main document section
             doc_start = content.find('<DOCUMENT>')
             doc_end = content.find('</DOCUMENT>')
             
             if doc_start != -1 and doc_end != -1:
-                # Extract just the first document (the main filing)
                 main_content = content[doc_start:doc_end]
             else:
                 main_content = content
             
+            # Remove HTML/XML tags
+            main_content = re.sub(r'<[^>]+>', ' ', main_content)
+            
             # Clean up the text
             main_content = self._clean_text(main_content)
             
-            # Identify filing type
-            filing_type = self._identify_filing_type(main_content)
+            # Identify filing type with enhanced method
+            filing_type = self._identify_filing_type_enhanced(main_content)
+            logger.info(f"Document identified as: {filing_type}")
             
             # Extract sections based on filing type
-            if filing_type == '8-K':
-                sections = self._extract_8k_sections_from_text(main_content)
-            elif filing_type == '10-K':
-                sections = self._extract_10k_sections_from_text(main_content)
-            elif filing_type == '10-Q':
-                sections = self._extract_10q_sections_from_text(main_content)
-            elif filing_type == 'S-1':
-                sections = self._extract_s1_sections_from_text(main_content)
-            else:
-                sections = {}
+            sections = self._extract_sections_by_type(main_content, filing_type)
             
             # Always include full text and primary content
             sections['full_text'] = main_content
-            sections['primary_content'] = sections.get('primary_content', main_content[:50000])
+            sections['filing_type'] = filing_type
+            
+            # Ensure we have quality primary content
+            if 'primary_content' not in sections or len(sections.get('primary_content', '')) < 1000:
+                sections['primary_content'] = self._extract_smart_content(main_content, filing_type)
             
             return sections
             
         except Exception as e:
             logger.error(f"Error extracting from TXT file {txt_path}: {e}")
             return {'error': str(e)}
-    
-    def _identify_filing_type(self, text: str) -> str:
-        """Identify the filing type from text content"""
-        text_upper = text.upper()[:5000]  # Check first 5000 chars
-        
-        # 8-K has higher priority - check it first
-        if 'FORM 8-K' in text_upper or 'CURRENT REPORT' in text_upper:
-            return '8-K'
-        elif 'FORM 10-K' in text_upper or 'ANNUAL REPORT' in text_upper:
-            return '10-K'
-        elif 'FORM 10-Q' in text_upper or 'QUARTERLY REPORT' in text_upper:
-            return '10-Q'
-        elif 'FORM S-1' in text_upper or 'REGISTRATION STATEMENT' in text_upper:
-            return 'S-1'
-        else:
-            return 'UNKNOWN'
-    
-    def _extract_8k_sections_from_text(self, text: str) -> Dict[str, str]:
-        """
-        Extract specific items from 8-K text
-        Enhanced to handle iXBRL format variations
-        """
-        sections = {}
-        
-        # DEBUG: Check text content
-        logger.info(f"Text length for 8-K extraction: {len(text)}")
-        
-        # Check for various ITEM formats in first 5000 chars
-        sample_text = text[:5000].upper()
-        logger.info(f"Sample contains 'ITEM 8': {'ITEM 8' in sample_text}")
-        
-        # Enhanced patterns to handle different formats
-        patterns_to_try = [
-            # Standard pattern with flexible spacing
-            (r'Item\s+(\d+\.?\d*)\s*([^\n.]*)', 'standard'),
-            # Pattern with multiple spaces or special chars
-            (r'Item[\s\xa0]+(\d+\.?\d*)[\s\xa0]*([^\n.]*)', 'flexible'),
-            # All caps version
-            (r'ITEM\s+(\d+\.?\d*)\s*([^\n.]*)', 'caps'),
-        ]
-        
-        items = []
-        all_matches = []
-        
-        # Try each pattern and combine results
-        for pattern, pattern_name in patterns_to_try:
-            item_pattern = re.compile(pattern, re.IGNORECASE | re.MULTILINE)
-            matches = list(item_pattern.finditer(text))
-            
-            if matches:
-                logger.info(f"Pattern '{pattern_name}' found {len(matches)} matches")
-                all_matches.extend(matches)
-        
-        # Remove duplicates based on position
-        unique_matches = []
-        seen_positions = set()
-        for match in all_matches:
-            pos = match.start()
-            if pos not in seen_positions and not any(abs(pos - p) < 10 for p in seen_positions):
-                unique_matches.append(match)
-                seen_positions.add(pos)
-        
-        logger.info(f"Total unique matches found: {len(unique_matches)}")
-        
-        if not unique_matches:
-            logger.warning("No ITEM patterns found in 8-K text")
-            # Return at least some content
-            sections['primary_content'] = text[:10000]
-            return sections
-        
-        # Sort matches by position
-        unique_matches.sort(key=lambda m: m.start())
-        
-        # Process each match
-        for i, match in enumerate(unique_matches):
-            # Get item number and title
-            groups = match.groups()
-            item_num = groups[0] if len(groups) > 0 else ""
-            item_title = groups[1] if len(groups) > 1 else ""
-            
-            item_header = f"Item {item_num}"
-            if item_title:
-                item_header += f" {item_title}"
-            
-            item_header = item_header.strip()
-            
-            # Find content boundaries
-            start_pos = match.end()
-            
-            # Find the end position
-            if i + 1 < len(unique_matches):
-                end_pos = unique_matches[i + 1].start()
-            else:
-                # Look for signature section
-                sig_patterns = ['SIGNATURES', 'SIGNATURE', 'Pursuant to the requirements']
-                end_pos = len(text)
-                for sig_pattern in sig_patterns:
-                    sig_pos = text.find(sig_pattern, start_pos)
-                    if sig_pos != -1 and sig_pos < end_pos:
-                        end_pos = sig_pos
-                        break
-                
-                # Limit to reasonable size
-                end_pos = min(end_pos, start_pos + 15000)
-            
-            # Extract item content
-            item_content = text[start_pos:end_pos].strip()
-            
-            # Clean up the content
-            item_content = re.sub(r'\s+', ' ', item_content)  # Normalize whitespace
-            item_content = re.sub(r'^\s*\.+\s*', '', item_content)  # Remove leading dots
-            
-            # Only include if there's substantial content
-            if len(item_content) > 30:  # Lower threshold for iXBRL
-                formatted_item = f"\n{item_header}\n{'-' * len(item_header)}\n{item_content}"
-                items.append(formatted_item)
-                logger.debug(f"Added item: {item_header} ({len(item_content)} chars)")
-        
-        if items:
-            sections['items_content'] = '\n\n'.join(items)
-            sections['primary_content'] = sections['items_content']
-            logger.info(f"Successfully extracted {len(items)} items, total length: {len(sections['items_content'])}")
-        else:
-            logger.warning("No items with substantial content found")
-            sections['primary_content'] = text[:10000]
-        
-        return sections
-    
-    def _extract_10k_sections_from_text(self, text: str) -> Dict[str, str]:
-        """
-        Extract key sections from 10-K text
-        """
-        sections = {}
-        
-        # Key sections to look for in 10-K
-        section_patterns = {
-            'business': r'(?:ITEM\s+1[.\s]+BUSINESS|PART\s+I[.\s]+ITEM\s+1)',
-            'risk_factors': r'(?:ITEM\s+1A[.\s]+RISK\s+FACTORS)',
-            'mda': r'(?:ITEM\s+7[.\s]+MANAGEMENT.S\s+DISCUSSION)',
-            'financial_statements': r'(?:ITEM\s+8[.\s]+FINANCIAL\s+STATEMENTS)'
-        }
-        
-        combined_sections = []
-        
-        for section_name, pattern in section_patterns.items():
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                start = match.start()
-                # Extract up to 20k chars from this section
-                section_text = text[start:start + 20000]
-                if len(section_text) > 500:
-                    combined_sections.append(section_text)
-        
-        if combined_sections:
-            sections['primary_content'] = '\n\n'.join(combined_sections)
-        
-        return sections
-    
-    def _extract_10q_sections_from_text(self, text: str) -> Dict[str, str]:
-        """
-        Extract key sections from 10-Q text
-        """
-        sections = {}
-        
-        # Focus on financial data and MD&A for quarterly reports
-        section_patterns = {
-            'financial_statements': r'(?:FINANCIAL\s+STATEMENTS|CONDENSED\s+CONSOLIDATED)',
-            'mda': r'(?:MANAGEMENT.S\s+DISCUSSION\s+AND\s+ANALYSIS)'
-        }
-        
-        combined_sections = []
-        
-        for section_name, pattern in section_patterns.items():
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                start = match.start()
-                section_text = text[start:start + 25000]  # More content for quarterly
-                if len(section_text) > 500:
-                    combined_sections.append(section_text)
-        
-        if combined_sections:
-            sections['primary_content'] = '\n\n'.join(combined_sections)
-        
-        return sections
-    
-    def _extract_s1_sections_from_text(self, text: str) -> Dict[str, str]:
-        """
-        Extract key sections from S-1 text
-        """
-        sections = {}
-        
-        # Key sections for IPO filings
-        section_patterns = {
-            'summary': r'(?:PROSPECTUS\s+SUMMARY|SUMMARY)',
-            'risk_factors': r'(?:RISK\s+FACTORS)',
-            'use_of_proceeds': r'(?:USE\s+OF\s+PROCEEDS)',
-            'business': r'(?:BUSINESS|OUR\s+BUSINESS)'
-        }
-        
-        combined_sections = []
-        
-        for section_name, pattern in section_patterns.items():
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                start = match.start()
-                section_text = text[start:start + 15000]
-                if len(section_text) > 500:
-                    combined_sections.append(section_text)
-        
-        if combined_sections:
-            sections['primary_content'] = '\n\n'.join(combined_sections)
-        
-        return sections
     
     def extract_from_html(self, html_path: Path) -> Dict[str, str]:
         """
@@ -337,21 +170,20 @@ class TextExtractor:
             html_path: Path to the HTML file
             
         Returns:
-            Dictionary with keys: 'full_text', 'primary_content'
+            Dictionary with keys: 'full_text', 'primary_content', 'filing_type'
         """
         try:
             with open(html_path, 'r', encoding='utf-8', errors='ignore') as f:
                 html_content = f.read()
             
-            # FIXED: 先从原始HTML识别文档类型（在任何处理之前）
-            filing_type_from_html = self._identify_filing_type(html_content)
-            logger.info(f"Initial document type identified from HTML: {filing_type_from_html}")
+            # Identify filing type from raw HTML first
+            filing_type = self._identify_filing_type_enhanced(html_content)
+            logger.info(f"Initial document type identified from HTML: {filing_type}")
             
             # Check if this is an iXBRL document
             if 'ix:' in html_content or 'inline XBRL' in html_content.lower():
                 logger.info("Detected iXBRL document, using special extraction")
-                # 传递预识别的文档类型
-                return self._extract_from_ixbrl(html_content, filing_type_from_html)
+                return self._extract_from_ixbrl(html_content, filing_type)
             
             soup = BeautifulSoup(html_content, 'html.parser')
             
@@ -363,35 +195,23 @@ class TextExtractor:
             text = soup.get_text()
             
             # Clean up text
-            lines = (line.strip() for line in text.splitlines())
-            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-            text = ' '.join(chunk for chunk in chunks if chunk)
+            text = self._clean_text(text)
             
             # If text is too short, try alternative extraction
             if len(text) < 500:
                 logger.warning(f"Extracted text too short ({len(text)} chars), trying alternative methods")
                 text = self._extract_all_text_content(soup)
             
-            # Use the pre-identified filing type
-            filing_type = filing_type_from_html
-            
             # Extract sections based on filing type
-            if filing_type == '8-K':
-                sections = self._extract_8k_sections(soup, text)
-            elif filing_type == '10-K':
-                sections = self._extract_10k_sections(soup, text)
-            elif filing_type == '10-Q':
-                sections = self._extract_10q_sections(soup, text)
-            elif filing_type == 'S-1':
-                sections = self._extract_s1_sections(soup, text)
-            else:
-                sections = {'full_text': text, 'primary_content': text[:50000]}
+            sections = self._extract_sections_by_type(text, filing_type)
             
             # Always ensure we have these keys
-            if 'full_text' not in sections:
-                sections['full_text'] = text
-            if 'primary_content' not in sections:
-                sections['primary_content'] = text[:50000]
+            sections['full_text'] = text
+            sections['filing_type'] = filing_type
+            
+            # Ensure quality primary content
+            if 'primary_content' not in sections or len(sections.get('primary_content', '')) < 1000:
+                sections['primary_content'] = self._extract_smart_content(text, filing_type)
             
             return sections
             
@@ -399,12 +219,314 @@ class TextExtractor:
             logger.error(f"Error extracting text from {html_path}: {e}")
             return {'error': str(e)}
     
+    def _identify_filing_type_enhanced(self, text: str) -> str:
+        """
+        Enhanced filing type identification using multiple patterns and scoring
+        """
+        # Expand search range to catch more patterns
+        search_text = text[:20000] if len(text) > 20000 else text
+        search_text_upper = search_text.upper()
+        
+        # Score each filing type
+        scores = {}
+        
+        for filing_type, patterns in self.filing_patterns.items():
+            score = 0
+            matches = []
+            
+            for pattern, weight in patterns:
+                if re.search(pattern, search_text_upper):
+                    score += weight
+                    matches.append(pattern)
+            
+            if score > 0:
+                scores[filing_type] = score
+                logger.debug(f"{filing_type} score: {score}, matches: {matches}")
+        
+        # Return the filing type with highest score
+        if scores:
+            best_type = max(scores.items(), key=lambda x: x[1])[0]
+            logger.info(f"Filing type identified as {best_type} with score {scores[best_type]}")
+            return best_type
+        
+        # Fallback: check for any item patterns (might be 8-K)
+        if re.search(r'Item\s+\d+\.\d+', search_text_upper):
+            logger.info("Found Item pattern, assuming 8-K")
+            return '8-K'
+        
+        logger.warning("Could not identify filing type, defaulting to UNKNOWN")
+        return 'UNKNOWN'
+    
+    def _extract_sections_by_type(self, text: str, filing_type: str) -> Dict[str, str]:
+        """
+        Extract sections based on identified filing type
+        """
+        if filing_type == '8-K':
+            return self._extract_8k_sections_enhanced(text)
+        elif filing_type == '10-K':
+            return self._extract_10k_sections_enhanced(text)
+        elif filing_type == '10-Q':
+            return self._extract_10q_sections_enhanced(text)
+        elif filing_type == 'S-1':
+            return self._extract_s1_sections_enhanced(text)
+        else:
+            return {'primary_content': text[:50000]}
+    
+    def _extract_smart_content(self, text: str, filing_type: str) -> str:
+        """
+        Smart content extraction when standard methods fail
+        """
+        logger.info(f"Using smart content extraction for {filing_type}")
+        
+        # Find content-dense areas
+        paragraphs = text.split('\n\n')
+        scored_paragraphs = []
+        
+        # Keywords indicating valuable content
+        value_keywords = [
+            'revenue', 'income', 'earnings', 'financial', 'business', 'operations',
+            'management', 'discussion', 'analysis', 'risk', 'factors', 'results',
+            'quarter', 'year', 'growth', 'decrease', 'increase', 'million', 'billion'
+        ]
+        
+        for para in paragraphs:
+            if len(para) < 100:  # Skip short paragraphs
+                continue
+                
+            score = 0
+            para_lower = para.lower()
+            
+            # Score based on keyword presence
+            for keyword in value_keywords:
+                score += para_lower.count(keyword)
+            
+            # Bonus for financial numbers
+            score += len(re.findall(r'\$[\d,]+', para)) * 2
+            score += len(re.findall(r'\d+\.\d+%', para)) * 2
+            
+            # Penalty for legal boilerplate
+            if any(term in para_lower for term in ['pursuant to', 'securities act', 'incorporated by reference']):
+                score -= 5
+            
+            scored_paragraphs.append((score, para))
+        
+        # Sort by score and take the best content
+        scored_paragraphs.sort(key=lambda x: x[0], reverse=True)
+        
+        # Build content from highest-scoring paragraphs
+        smart_content = []
+        total_length = 0
+        
+        for score, para in scored_paragraphs:
+            if total_length + len(para) > 80000:  # Respect token limits
+                break
+            if score > 0:  # Only include paragraphs with positive scores
+                smart_content.append(para)
+                total_length += len(para)
+        
+        result = '\n\n'.join(smart_content)
+        logger.info(f"Smart extraction yielded {len(result)} chars from {len(scored_paragraphs)} paragraphs")
+        
+        return result if result else text[:50000]  # Fallback
+    
+    def _extract_8k_sections_enhanced(self, text: str) -> Dict[str, str]:
+        """
+        Enhanced 8-K extraction with better Item detection
+        """
+        sections = {}
+        items = []
+        
+        # More flexible Item patterns
+        item_patterns = [
+            r'Item\s+(\d+\.\d+)\s*[:\-\s]*([^\n]{0,200})',
+            r'ITEM\s+(\d+\.\d+)\s*[:\-\s]*([^\n]{0,200})',
+            r'Item\s+(\d+\.\d+)',
+        ]
+        
+        all_matches = []
+        
+        for pattern in item_patterns:
+            matches = list(re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE))
+            all_matches.extend(matches)
+        
+        # Remove duplicates by position
+        unique_matches = []
+        seen_positions = set()
+        
+        for match in all_matches:
+            pos = match.start()
+            if not any(abs(pos - p) < 50 for p in seen_positions):
+                unique_matches.append(match)
+                seen_positions.add(pos)
+        
+        # Sort by position
+        unique_matches.sort(key=lambda m: m.start())
+        
+        logger.info(f"Found {len(unique_matches)} unique Item references in 8-K")
+        
+        # Extract each item's content
+        for i, match in enumerate(unique_matches):
+            item_num = match.group(1)
+            item_title = match.group(2) if match.lastindex >= 2 else ""
+            
+            # Find content boundaries
+            start_pos = match.end()
+            
+            # End position is either next item or signature section
+            if i + 1 < len(unique_matches):
+                end_pos = unique_matches[i + 1].start()
+            else:
+                # Look for signature section
+                sig_match = re.search(r'SIGNATURES?|Pursuant\s+to\s+the\s+requirements', text[start_pos:], re.IGNORECASE)
+                if sig_match:
+                    end_pos = start_pos + sig_match.start()
+                else:
+                    end_pos = min(start_pos + 15000, len(text))
+            
+            # Extract content
+            item_content = text[start_pos:end_pos].strip()
+            
+            # Clean up
+            item_content = re.sub(r'\s+', ' ', item_content)
+            
+            # Only include substantial content
+            if len(item_content) > 50:
+                item_header = f"Item {item_num}"
+                if item_title:
+                    item_header += f" - {item_title.strip()}"
+                
+                formatted_item = f"\n{item_header}\n{'-' * len(item_header)}\n{item_content}"
+                items.append(formatted_item)
+                logger.debug(f"Extracted {item_header}: {len(item_content)} chars")
+        
+        if items:
+            sections['items_content'] = '\n\n'.join(items)
+            sections['primary_content'] = sections['items_content']
+            logger.info(f"Successfully extracted {len(items)} items from 8-K")
+        
+        return sections
+    
+    def _extract_10k_sections_enhanced(self, text: str) -> Dict[str, str]:
+        """
+        Enhanced 10-K extraction focusing on key business sections
+        """
+        sections = {}
+        combined_content = []
+        
+        # Extract each key section
+        for section_name, section_info in self.key_sections['10-K'].items():
+            pattern = section_info['pattern']
+            max_chars = section_info['max_chars']
+            
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                start = match.start()
+                end = min(start + max_chars, len(text))
+                
+                # Find the next major section to avoid overrun
+                next_section = re.search(r'Item\s+\d+[A-Z]?[.\s]', text[start + 100:end])
+                if next_section:
+                    end = start + 100 + next_section.start()
+                
+                section_text = text[start:end]
+                
+                if len(section_text) > 500:
+                    header = f"\n{'='*50}\n{section_name}\n{'='*50}\n"
+                    combined_content.append(header + section_text)
+                    logger.info(f"Extracted {section_name} from 10-K: {len(section_text)} chars")
+        
+        if combined_content:
+            sections['primary_content'] = '\n\n'.join(combined_content)
+        
+        # Also extract financial highlights if present
+        fin_match = re.search(r'Financial\s+Highlights|Selected\s+Financial\s+Data', text, re.IGNORECASE)
+        if fin_match:
+            fin_start = fin_match.start()
+            fin_section = text[fin_start:fin_start + 10000]
+            sections['financial_highlights'] = fin_section
+        
+        return sections
+    
+    def _extract_10q_sections_enhanced(self, text: str) -> Dict[str, str]:
+        """
+        Enhanced 10-Q extraction focusing on quarterly results
+        """
+        sections = {}
+        combined_content = []
+        
+        # Extract each key section
+        for section_name, section_info in self.key_sections['10-Q'].items():
+            pattern = section_info['pattern']
+            max_chars = section_info['max_chars']
+            
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                start = match.start()
+                end = min(start + max_chars, len(text))
+                
+                # Find the next major section
+                next_section = re.search(r'(?:Part|PART|Item|ITEM)\s+[IVX\d]+', text[start + 100:end])
+                if next_section:
+                    end = start + 100 + next_section.start()
+                
+                section_text = text[start:end]
+                
+                if len(section_text) > 500:
+                    header = f"\n{'='*50}\n{section_name}\n{'='*50}\n"
+                    combined_content.append(header + section_text)
+                    logger.info(f"Extracted {section_name} from 10-Q: {len(section_text)} chars")
+        
+        if combined_content:
+            sections['primary_content'] = '\n\n'.join(combined_content)
+        
+        # Extract recent quarter results
+        quarter_match = re.search(r'Three\s+Months\s+Ended|Quarter\s+Ended', text, re.IGNORECASE)
+        if quarter_match:
+            results_start = quarter_match.start()
+            results_section = text[results_start:results_start + 15000]
+            sections['quarterly_results'] = results_section
+        
+        return sections
+    
+    def _extract_s1_sections_enhanced(self, text: str) -> Dict[str, str]:
+        """
+        Enhanced S-1 extraction for IPO documents
+        """
+        sections = {}
+        combined_content = []
+        
+        # Extract each key section
+        for section_name, section_info in self.key_sections['S-1'].items():
+            pattern = section_info['pattern']
+            max_chars = section_info['max_chars']
+            
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                start = match.start()
+                end = min(start + max_chars, len(text))
+                
+                section_text = text[start:end]
+                
+                if len(section_text) > 500:
+                    header = f"\n{'='*50}\n{section_name}\n{'='*50}\n"
+                    combined_content.append(header + section_text)
+                    logger.info(f"Extracted {section_name} from S-1: {len(section_text)} chars")
+        
+        if combined_content:
+            sections['primary_content'] = '\n\n'.join(combined_content)
+        
+        # Look for offering details
+        offering_match = re.search(r'The\s+Offering|Offering\s+Summary', text, re.IGNORECASE)
+        if offering_match:
+            offering_start = offering_match.start()
+            offering_section = text[offering_start:offering_start + 5000]
+            sections['offering_details'] = offering_section
+        
+        return sections
+    
     def _extract_from_ixbrl(self, html_content: str, pre_identified_type: str = None) -> Dict[str, str]:
         """
-        Extract text from iXBRL (inline XBRL) documents
-        FIXED: Now properly extracts filing-specific sections for iXBRL documents
-        FIXED: Uses pre-identified filing type from original HTML
-        ENHANCED: Better handling of text structure preservation
+        Enhanced iXBRL extraction with better content preservation
         """
         soup = BeautifulSoup(html_content, 'html.parser')
         
@@ -416,84 +538,44 @@ class TextExtractor:
         for element in soup(['script', 'style', 'link', 'meta', 'noscript']):
             element.decompose()
         
-        # Method 1: Extract text while preserving structure
-        # This is crucial for iXBRL where text is split across many elements
+        # Extract text with structure preservation
         text_parts = []
         
         # Process body content
         body = soup.find('body')
         if body:
-            # Walk through all elements and extract text with structure
+            # Walk through all elements
             for element in body.descendants:
                 if isinstance(element, str):
                     text = element.strip()
                     if text and not text.isspace():
                         text_parts.append(text)
-                elif element.name in ['div', 'p', 'br']:
-                    # Add newline for block elements
+                elif element.name in ['div', 'p', 'br', 'h1', 'h2', 'h3']:
+                    # Add spacing for structure
                     text_parts.append('\n')
         
-        # Join with spaces but preserve newlines
+        # Join and clean
         text = ' '.join(text_parts)
-        
-        # Clean up excessive whitespace while preserving structure
-        text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)  # Reduce multiple newlines
-        text = re.sub(r'[ \t]+', ' ', text)  # Reduce multiple spaces to one
+        text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)
+        text = re.sub(r'[ \t]+', ' ', text)
         text = text.strip()
         
-        logger.info(f"Extracted text length from iXBRL: {len(text)}")
+        logger.info(f"Extracted {len(text)} chars from iXBRL")
         
-        # If text is still too short, try alternative extraction
-        if len(text) < 3000:
-            logger.warning(f"Text seems too short ({len(text)} chars), trying full extraction")
-            # Get all text without structure preservation as fallback
-            full_text = soup.get_text(separator=' ')
-            if len(full_text) > len(text):
-                text = full_text
-                logger.info(f"Using full text extraction: {len(text)} chars")
+        # Use pre-identified type if available
+        filing_type = pre_identified_type if pre_identified_type and pre_identified_type != 'UNKNOWN' else self._identify_filing_type_enhanced(text)
+        logger.info(f"Processing iXBRL as {filing_type}")
         
-        # Use pre-identified type if available, otherwise try to identify
-        if pre_identified_type and pre_identified_type != 'UNKNOWN':
-            filing_type = pre_identified_type
-            logger.info(f"Using pre-identified filing type: {filing_type}")
-        else:
-            filing_type = self._identify_filing_type(text)
-            logger.info(f"iXBRL document identified as: {filing_type}")
+        # Extract sections based on type
+        sections = self._extract_sections_by_type(text, filing_type)
         
-        # DEBUG: For 8-K, log content sample
-        if filing_type == '8-K':
-            logger.info(f"Processing 8-K iXBRL, text length: {len(text)}")
-            # Log sample around Item 8
-            item_pos = text.find('Item 8')
-            if item_pos != -1:
-                sample = text[max(0, item_pos-50):min(len(text), item_pos+200)]
-                logger.debug(f"Item 8 context: ...{sample}...")
-        
-        # Extract sections based on filing type
-        if filing_type == '8-K':
-            sections = self._extract_8k_sections_from_text(text)
-        elif filing_type == '10-K':
-            sections = self._extract_10k_sections_from_text(text)
-        elif filing_type == '10-Q':
-            sections = self._extract_10q_sections_from_text(text)
-        elif filing_type == 'S-1':
-            sections = self._extract_s1_sections_from_text(text)
-        else:
-            sections = {}
-        
-        # Always include full text
+        # Always include full text and filing type
         sections['full_text'] = text
+        sections['filing_type'] = filing_type
         
-        # If no primary content was extracted, use the first 50k chars
-        if 'primary_content' not in sections or not sections['primary_content']:
-            sections['primary_content'] = text[:50000]
-            logger.warning(f"No specific sections found for {filing_type}, using first 50k chars")
-        else:
-            logger.info(f"Successfully extracted {filing_type} sections from iXBRL")
-        
-        # Include items_content if it was extracted for 8-K
-        if 'items_content' in sections:
-            logger.info(f"Extracted {len(sections['items_content'])} chars of items content")
+        # Ensure primary content
+        if 'primary_content' not in sections or len(sections.get('primary_content', '')) < 1000:
+            sections['primary_content'] = self._extract_smart_content(text, filing_type)
         
         return sections
     
@@ -510,142 +592,28 @@ class TextExtractor:
         
         return ' '.join(texts)
     
-    def _extract_8k_sections(self, soup: BeautifulSoup, full_text: str) -> Dict[str, str]:
-        """
-        Extract specific sections from 8-K filing
-        """
-        sections = {
-            'full_text': full_text,
-            'primary_content': ''
-        }
-        
-        # Try to find the main content area
-        # Look for common patterns in 8-K filings
-        
-        # Method 1: Look for Item sections
-        item_pattern = re.compile(r'Item\s+\d+\.\d+', re.IGNORECASE)
-        items_found = []
-        
-        for element in soup.find_all(text=item_pattern):
-            parent = element.parent
-            if parent:
-                # Get the text content after this item header
-                content = []
-                for sibling in parent.find_next_siblings():
-                    if sibling.name and item_pattern.search(sibling.get_text()):
-                        break  # Stop at next item
-                    content.append(sibling.get_text())
-                
-                item_text = ' '.join(content)
-                if len(item_text) > 50:  # Only include substantial content
-                    items_found.append(f"{element.strip()}: {item_text}")
-        
-        # Method 2: Look for the main document div/table
-        main_content = soup.find('div', {'class': 'document'})
-        if not main_content:
-            # Try to find the largest text block
-            all_divs = soup.find_all('div')
-            if all_divs:
-                main_content = max(all_divs, key=lambda d: len(d.get_text()))
-        
-        if main_content:
-            sections['primary_content'] = self._clean_text(main_content.get_text())
-        elif items_found:
-            sections['primary_content'] = '\n\n'.join(items_found)
-        else:
-            # Fallback: use the full text
-            sections['primary_content'] = full_text[:10000]  # First 10k characters
-        
-        return sections
-    
-    def _extract_10k_sections(self, soup: BeautifulSoup, full_text: str) -> Dict[str, str]:
-        """Extract sections from 10-K filing"""
-        sections = {
-            'full_text': full_text,
-            'primary_content': ''
-        }
-        
-        # Look for key sections in 10-K
-        key_sections = []
-        
-        # Try to find Business section
-        for heading in soup.find_all(['h1', 'h2', 'h3', 'b']):
-            heading_text = heading.get_text().upper()
-            if 'BUSINESS' in heading_text and 'ITEM' in heading_text:
-                # Get next 10k chars
-                parent = heading.parent
-                if parent:
-                    section_text = parent.get_text()[:10000]
-                    key_sections.append(section_text)
-                    break
-        
-        # Try to find MD&A section
-        for heading in soup.find_all(['h1', 'h2', 'h3', 'b']):
-            heading_text = heading.get_text().upper()
-            if 'MANAGEMENT' in heading_text and 'DISCUSSION' in heading_text:
-                parent = heading.parent
-                if parent:
-                    section_text = parent.get_text()[:15000]
-                    key_sections.append(section_text)
-                    break
-        
-        if key_sections:
-            sections['primary_content'] = '\n\n'.join(key_sections)
-        else:
-            sections['primary_content'] = full_text[:50000]
-        
-        return sections
-    
-    def _extract_10q_sections(self, soup: BeautifulSoup, full_text: str) -> Dict[str, str]:
-        """Extract sections from 10-Q filing"""
-        # Similar to 10-K but focus on quarterly data
-        return self._extract_10k_sections(soup, full_text)
-    
-    def _extract_s1_sections(self, soup: BeautifulSoup, full_text: str) -> Dict[str, str]:
-        """Extract sections from S-1 filing"""
-        sections = {
-            'full_text': full_text,
-            'primary_content': ''
-        }
-        
-        # Look for prospectus summary
-        for heading in soup.find_all(['h1', 'h2', 'h3']):
-            heading_text = heading.get_text().upper()
-            if 'PROSPECTUS SUMMARY' in heading_text or 'SUMMARY' in heading_text:
-                parent = heading.parent
-                if parent:
-                    section_text = parent.get_text()[:20000]
-                    sections['primary_content'] = section_text
-                    break
-        
-        if not sections['primary_content']:
-            sections['primary_content'] = full_text[:50000]
-        
-        return sections
-    
     def _clean_text(self, text: str) -> str:
         """
         Clean extracted text
         """
         # Remove excessive whitespace but preserve some structure
-        text = re.sub(r'\n\s*\n', '\n\n', text)  # Reduce multiple newlines to double
-        text = re.sub(r'[ \t]+', ' ', text)  # Reduce multiple spaces/tabs to single space
+        text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)  # Reduce multiple newlines
+        text = re.sub(r'[ \t]+', ' ', text)  # Reduce multiple spaces/tabs
         
-        # Remove special characters that might interfere with processing
+        # Remove special characters that might interfere
         text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f-\x9f]', '', text)
         
-        # Remove repeated underscores or dashes (often used as separators)
+        # Remove repeated underscores or dashes
         text = re.sub(r'[_\-]{4,}', '', text)
         
-        # Trim
-        text = text.strip()
+        # Remove excessive dots
+        text = re.sub(r'\.{4,}', '...', text)
         
-        return text
+        return text.strip()
     
     def extract_financial_tables(self, soup: BeautifulSoup) -> List[Dict]:
         """
         Extract financial tables from HTML
-        This is a helper method for future enhancement
         """
         tables = []
         

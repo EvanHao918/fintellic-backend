@@ -70,3 +70,4 @@ websockets==15.0.1
 yarl==1.20.1
 beautifulsoup4==4.12.2
 yfinance==0.2.36lxml==4.9.3
+tiktoken==0.5.2

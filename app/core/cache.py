@@ -232,12 +232,61 @@ class StatsCache:
         }
 
 
+class FMPCache:
+    """Cache operations for FMP data"""
+    
+    @staticmethod
+    def get_analyst_estimates_key(ticker: str, target_date: Optional[str] = None) -> str:
+        """
+        Generate cache key for analyst estimates
+        
+        Args:
+            ticker: Stock ticker symbol
+            target_date: Optional target date for period-specific estimates
+            
+        Returns:
+            Cache key string
+        """
+        if target_date:
+            return f"fmp:estimates:{ticker}:{target_date}"
+        return f"fmp:estimates:{ticker}"
+    
+    @staticmethod
+    def get_earnings_calendar_key(from_date: str, to_date: str) -> str:
+        """
+        Generate cache key for earnings calendar
+        
+        Args:
+            from_date: Start date (YYYY-MM-DD)
+            to_date: End date (YYYY-MM-DD)
+            
+        Returns:
+            Cache key string
+        """
+        return f"fmp:calendar:{from_date}:{to_date}"
+    
+    @staticmethod
+    def invalidate_analyst_estimates(ticker: str):
+        """Invalidate all analyst estimates cache for a ticker"""
+        return cache.delete_pattern(f"fmp:estimates:{ticker}:*")
+    
+    @staticmethod
+    def invalidate_all_fmp_cache():
+        """Invalidate all FMP related cache"""
+        deleted_count = 0
+        deleted_count += cache.delete_pattern("fmp:estimates:*")
+        deleted_count += cache.delete_pattern("fmp:calendar:*")
+        return deleted_count
+
+
 # Cache TTL constants
 CACHE_TTL = {
-    "filing_list": 5 * 60,        # 5 minutes
-    "filing_detail": 60 * 60,     # 1 hour
-    "company_list": 60 * 60,      # 1 hour
-    "company_detail": 60 * 60,    # 1 hour
-    "popular_filings": 10 * 60,   # 10 minutes
-    "earnings_calendar": 60 * 60, # 1 hour
+    "filing_list": 5 * 60,           # 5 minutes
+    "filing_detail": 60 * 60,        # 1 hour
+    "company_list": 60 * 60,         # 1 hour
+    "company_detail": 60 * 60,       # 1 hour
+    "popular_filings": 10 * 60,      # 10 minutes
+    "earnings_calendar": 60 * 60,    # 1 hour
+    "analyst_estimates": 60 * 60,    # 1 hour
+    "fmp_data": 60 * 60,            # 1 hour (general FMP data)
 }

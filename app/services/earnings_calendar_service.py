@@ -1,31 +1,34 @@
 # app/services/earnings_calendar_service.py
 """
 Service for fetching and managing earnings calendar data
+Updated to use FMP instead of yfinance
 """
-import yfinance as yf
 from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
 import logging
+import asyncio
 
 from app.models.company import Company
 from app.models.earnings_calendar import EarningsCalendar, EarningsTime
 from app.core.cache import cache, CACHE_TTL
+from app.core.config import settings
+from app.services.fmp_service import fmp_service
 
 logger = logging.getLogger(__name__)
 
 
 class EarningsCalendarService:
-    """Service for managing earnings calendar data"""
+    """Service for managing earnings calendar data using FMP"""
     
     @staticmethod
-    def fetch_earnings_calendar(
+    async def fetch_earnings_calendar(
         ticker: str,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None
     ) -> List[Dict]:
         """
-        Fetch earnings calendar data from yfinance
+        Fetch earnings calendar data from FMP
         """
         try:
             # Default to next 3 months if not specified
@@ -34,41 +37,47 @@ class EarningsCalendarService:
             if not end_date:
                 end_date = start_date + timedelta(days=90)
             
-            # Get ticker data
-            stock = yf.Ticker(ticker)
+            # Get earnings data from FMP
+            earnings_data = await fmp_service.get_earnings_calendar(
+                start_date.isoformat(),
+                end_date.isoformat()
+            )
             
-            # Get earnings dates
-            earnings_dates = stock.earnings_dates
+            # Filter for specific ticker
+            ticker_earnings = [e for e in earnings_data if e.get('symbol') == ticker]
             
-            if earnings_dates is None or earnings_dates.empty:
+            if not ticker_earnings:
                 logger.warning(f"No earnings data found for {ticker}")
                 return []
             
-            # Filter by date range
-            earnings_dates = earnings_dates[
-                (earnings_dates.index.date >= start_date) & 
-                (earnings_dates.index.date <= end_date)
-            ]
-            
-            # Convert to list of dicts
+            # Convert to expected format
             results = []
-            for idx, row in earnings_dates.iterrows():
-                # Determine earnings time based on hour
-                hour = idx.hour
-                if hour < 9:
+            for item in ticker_earnings:
+                # Parse date and time
+                earnings_date_str = item.get('date', '')
+                earnings_time_str = item.get('time', 'TNS').upper()
+                
+                # Convert time to enum
+                if earnings_time_str == 'BMO':
                     earnings_time = EarningsTime.BMO
-                elif hour >= 16:
+                elif earnings_time_str == 'AMC':
                     earnings_time = EarningsTime.AMC
                 else:
                     earnings_time = EarningsTime.TNS
                 
+                # Parse date
+                try:
+                    earnings_date = datetime.strptime(earnings_date_str, '%Y-%m-%d').date()
+                except:
+                    continue
+                
                 results.append({
-                    "earnings_date": idx.date(),
+                    "earnings_date": earnings_date,
                     "earnings_time": earnings_time,
-                    "eps_estimate": row.get("EPS Estimate"),
-                    "revenue_estimate": row.get("Revenue Estimate"),
-                    "fiscal_quarter": f"Q{idx.quarter} {idx.year}",
-                    "fiscal_year": idx.year
+                    "eps_estimate": item.get('epsEstimated'),
+                    "revenue_estimate": item.get('revenueEstimated'),
+                    "fiscal_quarter": item.get('fiscalDateEnding', ''),
+                    "fiscal_year": earnings_date.year
                 })
             
             return results
@@ -78,13 +87,13 @@ class EarningsCalendarService:
             return []
     
     @staticmethod
-    def update_company_earnings(db: Session, company: Company) -> List[EarningsCalendar]:
+    async def update_company_earnings(db: Session, company: Company) -> List[EarningsCalendar]:
         """
         Update earnings calendar for a specific company
         """
         try:
             # Fetch latest earnings data
-            earnings_data = EarningsCalendarService.fetch_earnings_calendar(
+            earnings_data = await EarningsCalendarService.fetch_earnings_calendar(
                 company.ticker,
                 start_date=date.today(),
                 end_date=date.today() + timedelta(days=90)
@@ -105,6 +114,7 @@ class EarningsCalendarService:
                     existing.eps_estimate = data["eps_estimate"]
                     existing.revenue_estimate = data["revenue_estimate"]
                     existing.updated_at = datetime.utcnow()
+                    existing.source = "fmp"  # Update source
                     updated_earnings.append(existing)
                 else:
                     # Create new entry
@@ -116,7 +126,7 @@ class EarningsCalendarService:
                         fiscal_year=data["fiscal_year"],
                         eps_estimate=data["eps_estimate"],
                         revenue_estimate=data["revenue_estimate"],
-                        source="yfinance"
+                        source="fmp"  # Set source to FMP
                     )
                     db.add(new_earning)
                     updated_earnings.append(new_earning)
@@ -135,7 +145,7 @@ class EarningsCalendarService:
             return []
     
     @staticmethod
-    def update_all_sp500_earnings(db: Session) -> int:
+    async def update_all_sp500_earnings(db: Session) -> int:
         """
         Update earnings calendar for all S&P 500 companies
         This should be run as a scheduled task
@@ -147,24 +157,89 @@ class EarningsCalendarService:
                 Company.is_active == True
             ).all()
             
+            # Get all earnings for date range from FMP in one call
+            start_date = date.today()
+            end_date = start_date + timedelta(days=90)
+            
+            logger.info(f"Fetching earnings calendar from FMP: {start_date} to {end_date}")
+            all_earnings_data = await fmp_service.get_earnings_calendar(
+                start_date.isoformat(),
+                end_date.isoformat()
+            )
+            
+            logger.info(f"FMP returned {len(all_earnings_data)} total earnings entries")
+            
+            # Create a map of ticker to earnings data
+            earnings_by_ticker = {}
+            for item in all_earnings_data:
+                ticker = item.get('symbol')
+                if ticker:
+                    if ticker not in earnings_by_ticker:
+                        earnings_by_ticker[ticker] = []
+                    earnings_by_ticker[ticker].append(item)
+            
             updated_count = 0
             
             for i, company in enumerate(companies):
                 logger.info(f"Updating earnings for {company.ticker} ({i+1}/{len(companies)})")
                 
-                earnings = EarningsCalendarService.update_company_earnings(db, company)
-                if earnings:
-                    updated_count += len(earnings)
+                ticker_earnings = earnings_by_ticker.get(company.ticker, [])
                 
-                # Add small delay to avoid rate limiting
-                import time
-                time.sleep(0.5)
+                for item in ticker_earnings:
+                    # Parse earnings data
+                    earnings_date_str = item.get('date', '')
+                    earnings_time_str = item.get('time', 'TNS').upper()
+                    
+                    # Convert time to enum
+                    if earnings_time_str == 'BMO':
+                        earnings_time = EarningsTime.BMO
+                    elif earnings_time_str == 'AMC':
+                        earnings_time = EarningsTime.AMC
+                    else:
+                        earnings_time = EarningsTime.TNS
+                    
+                    # Parse date
+                    try:
+                        earnings_date = datetime.strptime(earnings_date_str, '%Y-%m-%d').date()
+                    except:
+                        continue
+                    
+                    # Check if entry exists
+                    existing = db.query(EarningsCalendar).filter(
+                        EarningsCalendar.company_id == company.id,
+                        EarningsCalendar.earnings_date == earnings_date
+                    ).first()
+                    
+                    if existing:
+                        # Update existing
+                        existing.earnings_time = earnings_time
+                        existing.eps_estimate = item.get('epsEstimated')
+                        existing.revenue_estimate = item.get('revenueEstimated')
+                        existing.updated_at = datetime.utcnow()
+                        existing.source = "fmp"
+                    else:
+                        # Create new
+                        new_earning = EarningsCalendar(
+                            company_id=company.id,
+                            earnings_date=earnings_date,
+                            earnings_time=earnings_time,
+                            fiscal_quarter=item.get('fiscalDateEnding', ''),
+                            fiscal_year=earnings_date.year,
+                            eps_estimate=item.get('epsEstimated'),
+                            revenue_estimate=item.get('revenueEstimated'),
+                            source="fmp"
+                        )
+                        db.add(new_earning)
+                    
+                    updated_count += 1
             
+            db.commit()
             logger.info(f"Updated {updated_count} earnings entries")
             return updated_count
             
         except Exception as e:
             logger.error(f"Error updating S&P 500 earnings: {e}")
+            db.rollback()
             return 0
     
     @staticmethod

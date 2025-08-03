@@ -1,16 +1,18 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, time
 from typing import Optional, Dict
 from app.services.edgar_scanner import edgar_scanner
+from app.services.earnings_calendar_service import EarningsCalendarService
+from app.core.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
 
 class FilingScheduler:
     """
-    Manages scheduled tasks for filing discovery
-    Optimized for RSS-based scanning (every 1 minute)
+    Manages scheduled tasks for filing discovery and earnings calendar updates
+    Optimized for RSS-based scanning (every 1 minute) and daily calendar updates
     """
     
     def __init__(self):
@@ -19,6 +21,8 @@ class FilingScheduler:
         self.task: Optional[asyncio.Task] = None
         self.scan_count = 0
         self.filings_found = 0
+        self.last_calendar_update = None
+        self.calendar_update_hour = 6  # Update calendar at 6 AM daily
         
     async def start(self):
         """Start the scheduler"""
@@ -42,11 +46,14 @@ class FilingScheduler:
         logger.info(f"Filing scheduler stopped. Total scans: {self.scan_count}, Filings found: {self.filings_found}")
         
     async def _run_scheduler(self):
-        """Main scheduler loop - optimized for RSS"""
+        """Main scheduler loop - optimized for RSS and daily tasks"""
         logger.info("RSS-based scheduler loop started")
         
         # Run initial scan immediately
         await self._perform_scan()
+        
+        # Check if we need to update earnings calendar on startup
+        await self._check_and_update_earnings_calendar()
         
         while self.is_running:
             try:
@@ -55,6 +62,11 @@ class FilingScheduler:
                 
                 # Perform scheduled scan
                 await self._perform_scan()
+                
+                # Check for daily tasks every hour
+                current_time = datetime.now()
+                if current_time.minute < 2:  # Within first 2 minutes of the hour
+                    await self._check_and_update_earnings_calendar()
                 
             except asyncio.CancelledError:
                 logger.info("Scheduler loop cancelled")
@@ -102,6 +114,49 @@ class FilingScheduler:
         except Exception as e:
             logger.error(f"Error during scan #{self.scan_count}: {e}", exc_info=True)
     
+    async def _check_and_update_earnings_calendar(self):
+        """Check if it's time to update earnings calendar"""
+        current_time = datetime.now()
+        
+        # Check if we should update (once per day at specified hour)
+        should_update = False
+        
+        if self.last_calendar_update is None:
+            # Never updated, do it now
+            should_update = True
+        elif current_time.hour == self.calendar_update_hour:
+            # Check if we haven't updated today
+            if self.last_calendar_update.date() < current_time.date():
+                should_update = True
+        
+        if should_update:
+            await self._update_earnings_calendar()
+    
+    async def _update_earnings_calendar(self):
+        """Update earnings calendar for all S&P 500 companies"""
+        logger.info("🗓️  Starting daily earnings calendar update...")
+        update_start = datetime.now()
+        
+        db = SessionLocal()
+        try:
+            # Update all S&P 500 earnings
+            updated_count = await EarningsCalendarService.update_all_sp500_earnings(db)
+            
+            # Update timestamp
+            self.last_calendar_update = datetime.now()
+            
+            # Log results
+            duration = (datetime.now() - update_start).total_seconds()
+            logger.info(
+                f"✅ Earnings calendar update completed in {duration:.2f}s. "
+                f"Updated {updated_count} entries."
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating earnings calendar: {e}", exc_info=True)
+        finally:
+            db.close()
+    
     async def run_single_scan(self):
         """Run a single scan immediately (for testing)"""
         logger.info("Running manual scan...")
@@ -122,6 +177,11 @@ class FilingScheduler:
             logger.error(f"Error during manual scan: {e}", exc_info=True)
             return []
     
+    async def update_earnings_calendar_now(self):
+        """Manually trigger earnings calendar update"""
+        logger.info("Manually triggering earnings calendar update...")
+        await self._update_earnings_calendar()
+    
     def get_status(self) -> Dict:
         """Get scheduler status"""
         return {
@@ -129,7 +189,9 @@ class FilingScheduler:
             "scan_interval_seconds": self.scan_interval,
             "total_scans": self.scan_count,
             "total_filings_found": self.filings_found,
-            "mode": "RSS (Efficient)"
+            "mode": "RSS (Efficient)",
+            "last_calendar_update": self.last_calendar_update.isoformat() if self.last_calendar_update else None,
+            "calendar_update_hour": self.calendar_update_hour
         }
 
 

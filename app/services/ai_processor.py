@@ -1,10 +1,12 @@
 # app/services/ai_processor.py
 """
-AI Processor Service - Enhanced Version
+AI Processor Service - Enhanced Version with FMP Integration
 Implements intelligent guidance approach with unified analysis
 Focus on goals over rules, quality over format
 ENHANCED: Smart content preprocessing and token management
 ENHANCED: Filing type awareness for better prompts
+UPDATED: Integrated FMP for analyst expectations
+FIXED: Use period_end_date for analyst estimates matching
 """
 import json
 import re
@@ -12,11 +14,6 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import logging
 from pathlib import Path
-import yfinance as yf
-import time
-from random import uniform
-import requests
-from bs4 import BeautifulSoup
 import asyncio
 import tiktoken
 
@@ -26,19 +23,10 @@ from sqlalchemy.orm import Session
 from app.models.filing import Filing, ProcessingStatus, ManagementTone, FilingType
 from app.core.config import settings
 from app.services.text_extractor import text_extractor
+from app.services.fmp_service import fmp_service
 from app.core.cache import cache
 
 logger = logging.getLogger(__name__)
-
-# Configure yfinance to use browser-like headers
-_headers = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Accept-Encoding': 'gzip, deflate',
-    'Connection': 'keep-alive',
-    'Upgrade-Insecure-Requests': '1'
-}
 
 # Initialize OpenAI client
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -48,6 +36,7 @@ class AIProcessor:
     """
     Process filings using OpenAI to generate unified analysis with intelligent guidance
     Enhanced with smart content preprocessing and token management
+    Updated with FMP integration for analyst expectations
     """
     
     def __init__(self):
@@ -184,16 +173,51 @@ class AIProcessor:
             # Log content quality
             logger.info(f"Extracted content - Primary: {len(primary_content)} chars, Full: {len(full_text)} chars")
             
-            # Get analyst expectations for 10-Q if enabled
+            # Get analyst expectations for 10-Q if enabled using FMP
             analyst_data = None
-            if filing.filing_type == FilingType.FORM_10Q and settings.ENABLE_EXPECTATIONS_COMPARISON:
-                logger.info(f"[AI Processor] Fetching analyst expectations for {filing.company.ticker}")
-                analyst_data = await self._fetch_analyst_expectations(filing.company.ticker)
+            if filing.filing_type == FilingType.FORM_10Q and settings.ENABLE_EXPECTATIONS_COMPARISON and settings.FMP_ENABLE:
+                logger.info(f"[AI Processor] Fetching analyst expectations from FMP for {filing.company.ticker}")
+                
+                # FIXED: 使用 period_end_date 而不是 period_date
+                target_date = None
+                if filing.period_end_date:
+                    target_date = filing.period_end_date.strftime('%Y-%m-%d')
+                    logger.info(f"[AI Processor] Using period end date {target_date} to fetch expectations")
+                elif filing.period_date:
+                    # 向后兼容：如果没有 period_end_date，尝试 period_date
+                    target_date = filing.period_date.strftime('%Y-%m-%d')
+                    logger.info(f"[AI Processor] Using period date {target_date} to fetch expectations (fallback)")
+                elif filing.filing_date:
+                    # 最后的备选：使用 filing_date
+                    target_date = filing.filing_date.strftime('%Y-%m-%d')
+                    logger.info(f"[AI Processor] Using filing date {target_date} to fetch expectations (last resort)")
+                
+                # 获取对应期间的预期数据
+                analyst_data = await fmp_service.get_analyst_estimates(
+                    filing.company.ticker,
+                    target_date=target_date
+                )
                 
                 if analyst_data:
-                    logger.info(f"[AI Processor] Retrieved analyst expectations for {filing.company.ticker}")
+                    logger.info(f"[AI Processor] Retrieved analyst expectations from FMP for {filing.company.ticker}")
+                    logger.info(f"[AI Processor] Expectations for period: {analyst_data.get('period')}")
+                    
+                    # 验证日期匹配质量
+                    if target_date and analyst_data.get('period'):
+                        target_dt = datetime.strptime(target_date, '%Y-%m-%d')
+                        estimate_dt = datetime.strptime(analyst_data['period'], '%Y-%m-%d')
+                        diff_days = abs((target_dt - estimate_dt).days)
+                        
+                        if diff_days <= 10:
+                            logger.info(f"[AI Processor] Excellent match: {diff_days} days difference")
+                        elif diff_days <= 30:
+                            logger.info(f"[AI Processor] Good match: {diff_days} days difference")
+                        elif diff_days <= 45:
+                            logger.warning(f"[AI Processor] Acceptable match: {diff_days} days difference")
+                        else:
+                            logger.warning(f"[AI Processor] Poor match: {diff_days} days difference - may affect accuracy")
                 else:
-                    logger.info(f"[AI Processor] No analyst expectations available for {filing.company.ticker}")
+                    logger.info(f"[AI Processor] No analyst expectations available from FMP for {filing.company.ticker}")
             
             # Generate unified analysis with intelligent retry
             unified_result = await self._generate_unified_analysis_with_retry(
@@ -374,178 +398,6 @@ class AIProcessor:
                 return True
         return False
     
-    async def _fetch_analyst_expectations(self, ticker: str) -> Optional[Dict]:
-        """
-        Fetch analyst expectations (revenue and EPS estimates)
-        """
-        if not settings.ENABLE_EXPECTATIONS_COMPARISON:
-            logger.info(f"[AI Processor] Expectations comparison disabled")
-            return None
-            
-        try:
-            # Check cache first
-            cache_key = f"analyst_expectations:{ticker}"
-            cached_data = cache.get(cache_key)
-            if cached_data:
-                logger.info(f"[YahooFinance] Cache hit for {ticker}")
-                return json.loads(cached_data)
-            
-            logger.info(f"[YahooFinance] Fetching analyst expectations for {ticker}")
-            
-            # Add random delay to avoid being detected as bot
-            await asyncio.sleep(uniform(1, 2))
-            
-            # Method 1: Try web scraping analyst page
-            result = await self._fetch_analyst_estimates_web(ticker)
-            if result:
-                cache.set(cache_key, json.dumps(result), ttl=settings.EXPECTATIONS_CACHE_TTL)
-                logger.info(f"[YahooFinance] Successfully fetched analyst estimates via web for {ticker}")
-                return result
-                
-            # Method 2: Try yfinance with safer approach
-            result = await self._fetch_analyst_estimates_yfinance(ticker)
-            if result:
-                cache.set(cache_key, json.dumps(result), ttl=settings.EXPECTATIONS_CACHE_TTL)
-                logger.info(f"[YahooFinance] Successfully fetched analyst estimates via yfinance for {ticker}")
-                return result
-            
-            logger.warning(f"[YahooFinance] No analyst estimates available for {ticker}")
-            return None
-            
-        except Exception as e:
-            logger.error(f"[YahooFinance] Error fetching expectations for {ticker}: {str(e)}")
-            return None
-    
-    async def _fetch_analyst_estimates_web(self, ticker: str) -> Optional[Dict]:
-        """
-        Fetch analyst estimates by scraping Yahoo Finance analysis page
-        """
-        try:
-            url = f"https://finance.yahoo.com/quote/{ticker}/analysis"
-            
-            response = requests.get(url, headers=_headers, timeout=10)
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            result = {
-                'revenue_estimate': {},
-                'eps_estimate': {},
-                'fetch_timestamp': datetime.utcnow().isoformat(),
-                'data_source': 'web_analysis_page'
-            }
-            
-            # Look for earnings estimate tables
-            tables = soup.find_all('table')
-            
-            for table in tables:
-                header_text = table.get_text()
-                
-                if 'Revenue Estimate' in header_text:
-                    rows = table.find_all('tr')
-                    for row in rows:
-                        cells = row.find_all('td')
-                        if len(cells) >= 2:
-                            label = cells[0].get_text().strip()
-                            if 'Avg. Estimate' in label:
-                                value_text = cells[1].get_text().strip()
-                                result['revenue_estimate']['value'] = self._parse_financial_value(value_text)
-                            elif 'No. of Analysts' in label:
-                                result['revenue_estimate']['analysts'] = int(cells[1].get_text().strip())
-                                
-                elif 'Earnings Estimate' in header_text:
-                    rows = table.find_all('tr')
-                    for row in rows:
-                        cells = row.find_all('td')
-                        if len(cells) >= 2:
-                            label = cells[0].get_text().strip()
-                            if 'Avg. Estimate' in label:
-                                value_text = cells[1].get_text().strip()
-                                result['eps_estimate']['value'] = float(value_text)
-                            elif 'No. of Analysts' in label:
-                                result['eps_estimate']['analysts'] = int(cells[1].get_text().strip())
-            
-            if (result['revenue_estimate'].get('value') or 
-                result['eps_estimate'].get('value')):
-                return result
-                
-            return None
-            
-        except Exception as e:
-            logger.debug(f"[YahooFinance] Web scraping analysis page failed for {ticker}: {str(e)}")
-            return None
-    
-    async def _fetch_analyst_estimates_yfinance(self, ticker: str) -> Optional[Dict]:
-        """
-        Fetch analyst estimates using yfinance with custom session
-        """
-        try:
-            session = requests.Session()
-            session.headers.update(_headers)
-            
-            await asyncio.sleep(1)
-            
-            stock = yf.Ticker(ticker, session=session)
-            
-            result = {
-                'revenue_estimate': {},
-                'eps_estimate': {},
-                'fetch_timestamp': datetime.utcnow().isoformat(),
-                'data_source': 'yfinance_custom_session'
-            }
-            
-            try:
-                analysis = stock.analysis
-                if analysis is not None and not analysis.empty:
-                    if 'Revenue Estimate' in analysis.index:
-                        revenue_row = analysis.loc['Revenue Estimate']
-                        if 'Current Qtr' in revenue_row:
-                            result['revenue_estimate']['value'] = revenue_row['Current Qtr'] / 1e9
-                            
-                    if 'Earnings Estimate' in analysis.index:
-                        eps_row = analysis.loc['Earnings Estimate']
-                        if 'Current Qtr' in eps_row:
-                            result['eps_estimate']['value'] = eps_row['Current Qtr']
-            except:
-                pass
-            
-            try:
-                info = stock.info
-                if info:
-                    if 'revenueEstimates' in info:
-                        result['revenue_estimate']['value'] = info['revenueEstimates'].get('avg', {}).get('raw', 0) / 1e9
-                    if 'epsEstimates' in info:
-                        result['eps_estimate']['value'] = info['epsEstimates'].get('avg', {}).get('raw', 0)
-            except:
-                pass
-            
-            if (result['revenue_estimate'].get('value') or 
-                result['eps_estimate'].get('value')):
-                return result
-                
-            return None
-            
-        except Exception as e:
-            logger.debug(f"[YahooFinance] yfinance method failed for {ticker}: {str(e)}")
-            return None
-    
-    def _parse_financial_value(self, text: str) -> float:
-        """
-        Parse financial values like '89.5B' or '1.23T' to float
-        """
-        try:
-            text = text.strip().upper()
-            if 'T' in text:
-                return float(text.replace('T', '').replace(',', '')) * 1000
-            elif 'B' in text:
-                return float(text.replace('B', '').replace(',', ''))
-            elif 'M' in text:
-                return float(text.replace('M', '').replace(',', '')) / 1000
-            else:
-                return float(text.replace(',', ''))
-        except:
-            return 0.0
-    
     async def _generate_unified_analysis(
         self, 
         filing: Filing, 
@@ -605,7 +457,7 @@ class AIProcessor:
         return f"""You are a seasoned equity analyst writing for retail investors who want professional insights in accessible language.
 
 CORE MISSION: 
-Create a 1000-1200 word analysis of this annual report that helps readers understand {filing.company.name}'s ({filing.company.ticker}) year in review and future prospects.
+Create a comprehensive 1000-1200 word analysis of this annual report that helps readers understand {filing.company.name}'s ({filing.company.ticker}) year in review and future prospects.
 
 CONTENT CONTEXT:
 This filing contains key sections including business overview, risk factors, management discussion & analysis (MD&A), and financial statements. Focus on the most material information provided.
@@ -615,16 +467,24 @@ KEY PRINCIPLES:
 2. **Clear Narrative**: Tell the story of the year - what worked, what didn't, what's changing
 3. **Professional Clarity**: Keep financial terms but explain their business significance
 4. **Natural Structure**: Use ## headers and --- breaks to guide readers through your analysis
-5. **Appropriate Emphasis**: Highlight truly important metrics with *markup*, not everything
+5. **Smart Emphasis**: 
+   - Use *asterisks* for key financial metrics
+   - Use **bold** for important strategic concepts
+   - Use +[positive developments] sparingly for major wins
+   - Use -[challenges] sparingly for significant concerns
 
 QUALITY GUIDANCE:
 - Start with your most compelling finding from the annual results
-- Balance between financial performance and strategic developments
-- Compare actual results to guidance when available
+- Tell the story of the year through a structured lens
+- Balance narrative flow with analytical rigor
+- Compare actual results to guidance when available in the filing
 - Identify 2-3 key risks or opportunities from the filing
 - Make the implications clear for investors
 
-Remember: You're writing for smart people who aren't finance experts. Be thorough but accessible.
+UNIFIED STYLE:
+Combine structured analysis with compelling narrative - let data tell the story within clear sections.
+
+TARGET READER: Sophisticated retail investors - smart individuals who aren't finance experts but understand business fundamentals.
 
 CONTEXT:
 Fiscal Year: {context.get('fiscal_year', 'FY2024')}
@@ -644,7 +504,7 @@ Now, tell the story of {filing.company.ticker}'s year and what it means for inve
             eps_est = analyst_data.get('eps_estimate', {})
             
             if rev_est.get('value') or eps_est.get('value'):
-                analyst_context = "\nANALYST CONTEXT:"
+                analyst_context = "\nANALYST EXPECTATIONS:"
                 
                 if rev_est.get('value'):
                     analyst_context += f"\nRevenue Consensus: ${rev_est.get('value')}B"
@@ -656,31 +516,43 @@ Now, tell the story of {filing.company.ticker}'s year and what it means for inve
                     if eps_est.get('analysts'):
                         analyst_context += f" ({eps_est.get('analysts')} analysts)"
                 
-                analyst_context += "\nIncorporate beat/miss analysis naturally if significant\n"
+                analyst_context += "\nCompare these expectations with actual results to identify beats or misses\n"
         
         return f"""You are a professional equity analyst writing for retail investors seeking clear quarterly insights.
 
 CORE MISSION:
-Write an 800-1000 word analysis of {filing.company.name}'s ({filing.company.ticker}) quarterly results that answers: What happened? Why does it matter? What's next?
+Write a comprehensive 800-1000 word analysis of {filing.company.name}'s ({filing.company.ticker}) quarterly results that answers: What happened? Why does it matter? What's next?
 
 CONTENT CONTEXT:
 This quarterly filing includes financial statements and management's discussion of the quarter's performance. Focus on the key drivers and changes.
 
 KEY PRINCIPLES:
-1. **Real Data Only**: Use numbers from THIS filing - no templates or examples
+1. **Data Integrity & Comparison**: 
+   - Use actual performance numbers from THIS filing
+   - When analyst consensus is provided, compare actuals vs. expectations
+   - Always clearly distinguish between reported results and analyst estimates
 2. **Clear Story Arc**: Performance → Drivers → Implications → Outlook
 3. **Professional Terms**: Keep Revenue, EBITDA, etc. but explain their significance
 4. **Visual Structure**: Use ## for major sections and --- for transitions
-5. **Smart Emphasis**: Mark key metrics with *asterisks* and important concepts with **bold**
+5. **Smart Emphasis**: 
+   - Use *asterisks* for key metrics from the filing
+   - Use **bold** for important concepts and strategic points
+   - Use +[positive trends] for beats or positive surprises
+   - Use -[negative trends] for misses or challenges
 
 ANALYSIS APPROACH:
 - Open with the quarter's defining moment or metric
-- Explain both what happened and why
-- Connect the numbers to business realities
-- If expectations data exists, note significant surprises
-- Close with concrete implications for investors
+- Present the quarter's story within a clear analytical framework
+- State actual results clearly, then compare with consensus when available
+- Explain both what happened and why it matters through cause-effect narrative
+- Connect the numbers to business realities and the bigger picture
+- Note significant surprises and their implications
+- Close with concrete takeaways for investors
 
-TARGET READER: Someone smart who wants to understand the investment implications quickly.
+UNIFIED STYLE:
+Balance structured sections with engaging narrative flow - each section should connect naturally to the next.
+
+TARGET READER: Sophisticated retail investors - smart individuals who want to understand the investment implications quickly.
 
 CONTEXT:
 Quarter: {context.get('fiscal_quarter', 'Q3 2024')}
@@ -705,16 +577,21 @@ This 8-K filing reports a material event or change. The content includes specifi
 KEY PRINCIPLES:
 1. **Event Focus**: What happened and why it matters - get to the point quickly
 2. **Impact Analysis**: Immediate and longer-term implications
-3. **Data Grounding**: Support your analysis with filing specifics
+3. **Data Grounding**: Support your analysis with specific details from the filing
 4. **News Style**: Direct, factual, implications-focused writing
+5. **Targeted Emphasis**: Use *asterisks* for key facts and **bold** for critical implications
 
 ANALYSIS FRAMEWORK:
-- Lead with what happened and its materiality
-- Explain the business/financial impact
-- Consider the strategic implications
+- Lead with what happened and its materiality (news hook)
+- Explain the business/financial impact through clear narrative
+- Consider the strategic implications within company context
 - Project likely market reaction and what to watch
+- Maintain analytical depth while keeping news-style urgency
 
-No need for extensive background - readers know the company. Focus on this event.
+UNIFIED STYLE:
+Even in shorter format, maintain narrative coherence - tell the complete event story.
+
+TARGET READER: Sophisticated retail investors who already know the company but need to understand this specific event.
 
 CONTEXT:
 Event Date: {context.get('filing_date', '')}
@@ -731,25 +608,29 @@ Analyze this event and its implications for investors."""
         return f"""You are an IPO analyst evaluating {filing.company.name}'s public offering for potential investors.
 
 CORE MISSION:
-Create an 800-1000 word analysis that helps investors understand the investment opportunity and risks.
+Create a comprehensive 800-1000 word analysis that helps investors understand the investment opportunity and risks.
 
 CONTENT CONTEXT:
 This S-1 registration statement includes business overview, risk factors, use of proceeds, and financial information for a company going public.
 
 KEY PRINCIPLES:
 1. **Investment Thesis**: What's the opportunity and why should investors care?
-2. **Business Reality**: Use S-1 data to show, not just tell
-3. **Balanced View**: Both opportunity and risk deserve attention
+2. **Business Reality**: Use specific data from the S-1 to support your analysis
+3. **Balanced View**: Both opportunity and risk deserve thorough attention
 4. **IPO Specifics**: Valuation indicators, use of proceeds, growth trajectory
+5. **Clear Emphasis**: Use *asterisks* for key metrics and **bold** for critical insights
 
 CRITICAL ELEMENTS TO ADDRESS:
-- Business model and competitive position (from filing)
-- Financial trajectory and unit economics
-- Cash burn rate and runway
-- Key risks from Risk Factors section
-- Management and governance insights
+- Business model and competitive position (tell their story)
+- Financial trajectory and unit economics (growth narrative)
+- Cash burn rate and runway (sustainability story)
+- Key risks from Risk Factors section (balanced reality)
+- Management and governance insights (leadership narrative)
 
-Write for someone considering an investment - what do they need to know?
+UNIFIED STYLE:
+Present the investment opportunity as a coherent story backed by rigorous analysis.
+
+TARGET READER: Sophisticated retail investors considering an IPO investment.
 
 CONTEXT:
 Filing Date: {context.get('filing_date', '')}
@@ -758,7 +639,7 @@ Current Date: {datetime.now().strftime('%B %d, %Y')}
 FILING CONTENT:
 {content}
 
-Evaluate this IPO opportunity with clear analysis and concrete insights."""
+Evaluate this IPO opportunity with clear analysis and concrete insights for potential investors."""
     
     def _build_generic_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
         """Build generic prompt for other filing types"""

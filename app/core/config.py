@@ -62,10 +62,18 @@ class Settings(BaseSettings):
     MAX_MARKUP_DENSITY: float = 0.15  # 最多15%的文本被标记
     MARKUP_TYPES: List[str] = ["number", "concept", "positive", "negative", "insight"]
     
-    # Analyst Expectations API (for 10-Q)
+    # ==================== FMP API CONFIGURATION ====================
+    # Financial Modeling Prep API
+    FMP_API_KEY: str
+    FMP_API_VERSION: str = "v3"
+    FMP_BASE_URL: str = "https://financialmodelingprep.com/api"
+    FMP_ENABLE: bool = True
+    FMP_CACHE_TTL: int = 3600  # 1 hour cache
     
-    ENABLE_EXPECTATIONS_COMPARISON: bool = False
+    # Analyst Expectations API (now using FMP)
+    ENABLE_EXPECTATIONS_COMPARISON: bool = True  # Re-enabled with FMP
     EXPECTATIONS_CACHE_TTL: int = 86400  # 24 hours
+    # ================================================================
     
     # Performance Optimization
     ENABLE_UNIFIED_PROCESSING: bool = True  # 启用统一处理模式

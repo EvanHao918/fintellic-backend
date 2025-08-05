@@ -9,7 +9,7 @@ from typing import Optional, Dict, List
 from urllib.parse import urlparse, parse_qs, unquote
 from sqlalchemy.orm import Session
 
-from app.models.filing import Filing, ProcessingStatus
+from app.models.filing import Filing, ProcessingStatus, FilingType
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ class FilingDownloader:
     - Multiple URL format attempts
     - Content validation
     - Proper error handling
+    - ENHANCED: Downloads Exhibit 99 files for 8-K filings
     """
     
     def __init__(self):
@@ -152,9 +153,9 @@ class FilingDownloader:
                             doc_type = cells[0].get_text(strip=True)
                             break
                 
-                # Skip exhibit files
-                if doc_type and 'EX-' in doc_type:
-                    continue
+                # REMOVED: Skip exhibit files - we want to process them separately
+                # if doc_type and 'EX-' in doc_type:
+                #     continue
                 
                 # Check if this is our target filing type
                 if doc_link and doc_type:
@@ -179,6 +180,58 @@ class FilingDownloader:
                         }
         
         return None
+    
+    def _parse_exhibit_99_files(self, html_content: str) -> List[Dict]:
+        """
+        Parse index.htm to find all Exhibit 99 files
+        
+        Returns:
+            List of exhibit file info dictionaries
+        """
+        exhibits = []
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # Find all table rows
+        tables = soup.find_all('table')
+        
+        for table in tables:
+            rows = table.find_all('tr')
+            for row in rows:
+                cells = row.find_all(['td', 'th'])
+                
+                if len(cells) < 3:
+                    continue
+                
+                # Look for EX-99 in any cell
+                row_text = ' '.join(cell.get_text(strip=True) for cell in cells)
+                
+                # Check if this row contains EX-99
+                if re.search(r'EX-99\.?\d*', row_text, re.IGNORECASE):
+                    # Find the link in this row
+                    for cell in cells:
+                        link = cell.find('a')
+                        if link and link.get('href'):
+                            href = link.get('href', '')
+                            # Skip if it's the viewer link
+                            if '/ix?doc=' in href:
+                                continue
+                                
+                            filename = link.get_text(strip=True) or href.split('/')[-1]
+                            
+                            # Extract exhibit number (e.g., "99.1" from "EX-99.1")
+                            exhibit_match = re.search(r'EX-99\.?(\d*)', row_text, re.IGNORECASE)
+                            exhibit_num = exhibit_match.group(1) if exhibit_match else ''
+                            exhibit_type = f"EX-99{f'.{exhibit_num}' if exhibit_num else ''}"
+                            
+                            exhibits.append({
+                                'filename': filename,
+                                'url': href,
+                                'type': exhibit_type,
+                                'description': f'Exhibit 99{f".{exhibit_num}" if exhibit_num else ""}'
+                            })
+                            break
+        
+        return exhibits
     
     def _validate_document_content(self, content: bytes, filing_type: str) -> bool:
         """
@@ -320,6 +373,7 @@ class FilingDownloader:
         """
         Main download method with 90%+ success rate
         Implements all fixes discovered during investigation
+        ENHANCED: Now downloads Exhibit 99 files for 8-K filings
         """
         try:
             # Update status
@@ -421,24 +475,64 @@ class FilingDownloader:
                                        f"({len(doc_content)/1024:.1f}KB)")
                             
                             # Update filing record
-                            filing.status = ProcessingStatus.PARSING
                             filing.primary_doc_url = doc_url
-                            db.commit()
-                            
-                            return True
                         else:
                             logger.error("Downloaded content failed validation")
                             raise Exception("Invalid document content")
                     else:
                         raise Exception(f"Failed to download document: HTTP {doc_response.status_code}")
-                else:
-                    # Even if we can't find main document, mark as parsing
-                    # Text extractor might be able to work with index.htm
-                    logger.warning("Could not find main document, proceeding with index only")
-                    filing.status = ProcessingStatus.PARSING
-                    filing.primary_doc_url = successful_url
-                    db.commit()
-                    return True
+                
+                # ENHANCED: Step 4 - Download Exhibit 99 files for 8-K filings
+                if filing.filing_type == FilingType.FORM_8K:
+                    logger.info("This is an 8-K filing, checking for Exhibit 99 files...")
+                    
+                    # Parse index to find Exhibit 99 files
+                    exhibit_files = self._parse_exhibit_99_files(index_text)
+                    
+                    if exhibit_files:
+                        logger.info(f"Found {len(exhibit_files)} Exhibit 99 file(s) to download")
+                        
+                        for exhibit in exhibit_files:
+                            try:
+                                # Build full URL for exhibit
+                                exhibit_url = exhibit['url']
+                                if not exhibit_url.startswith('http'):
+                                    if exhibit_url.startswith('/'):
+                                        exhibit_url = f"https://www.sec.gov{exhibit_url}"
+                                    else:
+                                        base_url_parts = successful_url.rsplit('/', 1)[0]
+                                        exhibit_url = f"{base_url_parts}/{exhibit_url}"
+                                
+                                logger.info(f"Downloading {exhibit['type']}: {exhibit['filename']} from {exhibit_url}")
+                                
+                                await self._rate_limit()
+                                exhibit_response = await client.get(exhibit_url, timeout=60.0)
+                                
+                                if exhibit_response.status_code == 200:
+                                    exhibit_content = exhibit_response.content
+                                    
+                                    # Save the exhibit file
+                                    exhibit_path = filing_dir / exhibit['filename']
+                                    with open(exhibit_path, 'wb') as f:
+                                        f.write(exhibit_content)
+                                    
+                                    logger.info(f"✅ Successfully downloaded {exhibit['filename']} "
+                                               f"({len(exhibit_content)/1024:.1f}KB)")
+                                else:
+                                    logger.warning(f"Failed to download {exhibit['filename']}: "
+                                                  f"HTTP {exhibit_response.status_code}")
+                                    
+                            except Exception as e:
+                                logger.error(f"Error downloading exhibit {exhibit['filename']}: {e}")
+                                # Continue with other exhibits even if one fails
+                    else:
+                        logger.info("No Exhibit 99 files found in index")
+                
+                # Update status to PARSING
+                filing.status = ProcessingStatus.PARSING
+                db.commit()
+                
+                return True
                     
         except Exception as e:
             logger.error(f"Error downloading filing {filing.accession_number}: {e}")
@@ -457,10 +551,10 @@ class FilingDownloader:
         if not filing_dir.exists():
             return None
         
-        # Look for main document (exclude index.htm)
+        # Look for main document (exclude index.htm and exhibit files)
         for pattern in ['*.htm', '*.html', '*.txt']:
             files = list(filing_dir.glob(pattern))
-            files = [f for f in files if f.name != 'index.htm' and not re.search(r'ex-?\d+', f.name, re.I)]
+            files = [f for f in files if f.name != 'index.htm' and not re.search(r'ex-?\d+|kex\d+', f.name, re.I)]
             if files:
                 # Return the largest file
                 return max(files, key=lambda f: f.stat().st_size)

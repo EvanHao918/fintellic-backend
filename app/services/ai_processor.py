@@ -7,6 +7,7 @@ ENHANCED: Smart content preprocessing and token management
 ENHANCED: Filing type awareness for better prompts
 UPDATED: Integrated FMP for analyst expectations
 FIXED: Use period_end_date for analyst estimates matching
+ENHANCED: Better 8-K processing with Exhibit 99 awareness
 """
 import json
 import re
@@ -81,7 +82,7 @@ class AIProcessor:
         priority_keywords = {
             'FORM_10K': ['management discussion', 'financial statements', 'risk factors', 'business'],
             'FORM_10Q': ['financial statements', 'management discussion', 'quarter', 'three months'],
-            'FORM_8K': ['item', 'event', 'agreement', 'announcement'],
+            'FORM_8K': ['item', 'event', 'agreement', 'announcement', 'exhibit 99'],
             'FORM_S1': ['summary', 'risk factors', 'use of proceeds', 'business']
         }
         
@@ -105,6 +106,10 @@ class AIProcessor:
             # Score based on section markers
             if re.search(r'^={3,}|^Item\s+\d+|^Part\s+[IVX]+', section):
                 score += 5
+            
+            # Special boost for Exhibit 99 content in 8-K
+            if filing_type == FilingType.FORM_8K and 'exhibit 99' in section_lower:
+                score += 20
             
             scored_sections.append((score, section))
         
@@ -166,6 +171,10 @@ class AIProcessor:
             
             primary_content = sections.get('primary_content', '')
             full_text = sections.get('full_text', '')
+            
+            # For 8-K, check if Exhibit 99 content was extracted
+            if filing.filing_type == FilingType.FORM_8K and 'exhibit_99_content' in sections:
+                logger.info(f"8-K includes Exhibit 99 content: {len(sections['exhibit_99_content'])} chars")
             
             if not primary_content or len(primary_content) < 100:
                 raise Exception("Insufficient text content extracted")
@@ -565,37 +574,85 @@ FILING CONTENT:
 Analyze this quarter's performance and tell investors what they need to know."""
     
     def _build_8k_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
-        """Build reformed prompt for 8-K filings - intelligent guidance approach"""
+        """Build enhanced prompt for 8-K filings - intelligent guidance approach with Exhibit 99 awareness"""
+        
+        # Detect if Exhibit 99 content is present
+        has_exhibit = "EXHIBIT 99 CONTENT" in content or "Exhibit 99:" in content
+        
+        # Identify the type of 8-K based on Item numbers and content
+        event_type = context.get('event_type', 'Material Event')
+        item_type = context.get('item_type', '')
+        
+        # Build type-specific guidance based on Item type
+        type_specific_guidance = ""
+        
+        if item_type and item_type.startswith('2.02'):  # Earnings Release
+            type_specific_guidance = """
+EARNINGS-SPECIFIC FOCUS:
+- Extract and highlight: Revenue (growth %), EPS (vs expectations if mentioned), key segment performance
+- Identify the primary drivers of performance (what caused beats/misses)
+- Note any guidance updates or management outlook changes
+- If Exhibit 99 contains detailed financials, mine it for segment breakdowns and margin trends"""
+        
+        elif item_type and item_type.startswith('1.01'):  # Material Agreement
+            type_specific_guidance = """
+AGREEMENT-SPECIFIC FOCUS:
+- Summarize the key terms: parties involved, duration, financial terms
+- Explain the strategic rationale and expected benefits
+- Identify any conditions, milestones, or termination clauses
+- Assess the potential financial and operational impact"""
+        
+        elif item_type and item_type.startswith('5.02'):  # Executive Changes
+            type_specific_guidance = """
+LEADERSHIP-SPECIFIC FOCUS:
+- Clearly state who is leaving/joining and their roles
+- Note effective dates and transition arrangements
+- Include relevant background on new appointees
+- Assess potential impact on strategy or operations"""
+        
+        elif item_type and item_type.startswith('8.01'):  # Other Events
+            type_specific_guidance = """
+EVENT-SPECIFIC FOCUS:
+- Clearly describe the nature of the event
+- Explain why management deemed it material
+- Assess immediate and potential long-term impacts
+- Note any required actions or timeline"""
+        
         return f"""You are a financial journalist analyzing a material event for {filing.company.name} ({filing.company.ticker}).
 
 CORE MISSION:
 In 600-800 words, explain this event's significance and likely impact on the company and its investors.
 
 CONTENT CONTEXT:
-This 8-K filing reports a material event or change. The content includes specific Item disclosures that describe what happened.
+This 8-K filing reports: {event_type}
+{f"Item {item_type} disclosure" if item_type else ""}
+{f"The filing includes Exhibit 99 with detailed supplementary information - this contains the meat of the announcement." if has_exhibit else ""}
 
 KEY PRINCIPLES:
 1. **Event Focus**: What happened and why it matters - get to the point quickly
-2. **Impact Analysis**: Immediate and longer-term implications
-3. **Data Grounding**: Support your analysis with specific details from the filing
+2. **Data Mining**: {f"Extract specific numbers, dates, and details from Exhibit 99" if has_exhibit else "Extract key facts from the Item disclosures"}
+3. **Impact Analysis**: Immediate and longer-term implications for the business and stock
 4. **News Style**: Direct, factual, implications-focused writing
-5. **Targeted Emphasis**: Use *asterisks* for key facts and **bold** for critical implications
+5. **Targeted Emphasis**: Use *asterisks* for key data points and **bold** for critical implications
+
+{type_specific_guidance}
 
 ANALYSIS FRAMEWORK:
-- Lead with what happened and its materiality (news hook)
-- Explain the business/financial impact through clear narrative
-- Consider the strategic implications within company context
-- Project likely market reaction and what to watch
-- Maintain analytical depth while keeping news-style urgency
+- Lead with the most newsworthy aspect {f"from Exhibit 99" if has_exhibit else "of the event"}
+- Provide essential context and details in descending order of importance
+- Explain the business/financial impact with specific examples
+- Consider the strategic implications and market positioning
+- Project likely market reaction and investor considerations
+- Close with what to watch for next
 
 UNIFIED STYLE:
-Even in shorter format, maintain narrative coherence - tell the complete event story.
+Write like a financial news story - hook the reader immediately, then build the complete picture with supporting details.
 
-TARGET READER: Sophisticated retail investors who already know the company but need to understand this specific event.
+TARGET READER: Sophisticated retail investors who need to quickly understand if this event affects their investment thesis.
 
 CONTEXT:
 Event Date: {context.get('filing_date', '')}
-Item Type: {context.get('event_type', 'Material Event')}
+{f"Item Type: {item_type}" if item_type else ""}
 Current Date: {datetime.now().strftime('%B %d, %Y')}
 
 FILING CONTENT:
@@ -668,8 +725,9 @@ FILING CONTENT:
         if analyst_data:
             context['analyst_data'] = analyst_data
         
-        if filing.filing_type == FilingType.FORM_8K and filing.event_type:
-            context['event_type'] = filing.event_type
+        if filing.filing_type == FilingType.FORM_8K:
+            context['event_type'] = self._identify_8k_event_type(filing.primary_content if hasattr(filing, 'primary_content') else '')
+            context['item_type'] = filing.item_type if hasattr(filing, 'item_type') else ''
             
         return context
     
@@ -931,14 +989,31 @@ Write in clear, flowing prose - not bullet points. Be specific with numbers."""
         """Identify the type of 8-K event from content"""
         content_lower = content.lower()
         
-        if 'item 1.01' in content_lower or 'entry into' in content_lower:
-            return "Material Agreement"
-        elif 'item 2.02' in content_lower or 'results of operations' in content_lower:
+        # Check for Item numbers first for more accurate classification
+        if 'item 2.02' in content_lower:
             return "Earnings Release"
-        elif 'item 5.02' in content_lower or ('departure' in content_lower and 'officer' in content_lower):
+        elif 'item 1.01' in content_lower:
+            return "Material Agreement"
+        elif 'item 5.02' in content_lower:
             return "Executive Change"
-        elif 'item 7.01' in content_lower or 'regulation fd' in content_lower:
+        elif 'item 7.01' in content_lower:
             return "Regulation FD Disclosure"
+        elif 'item 8.01' in content_lower:
+            return "Other Material Event"
+        elif 'item 5.03' in content_lower:
+            return "Bylaw/Charter Amendment"
+        elif 'item 3.01' in content_lower:
+            return "Delisting Notice"
+        elif 'item 4.01' in content_lower:
+            return "Accountant Change"
+        
+        # Fallback to content-based detection
+        elif 'results of operations' in content_lower or 'financial condition' in content_lower:
+            return "Earnings Release"
+        elif 'entry into' in content_lower and 'agreement' in content_lower:
+            return "Material Agreement"
+        elif ('departure' in content_lower or 'appointment' in content_lower) and 'officer' in content_lower:
+            return "Executive Change"
         elif 'merger' in content_lower or 'acquisition' in content_lower:
             return "M&A Activity"
         elif 'dividend' in content_lower:

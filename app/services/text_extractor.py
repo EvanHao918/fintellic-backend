@@ -1,11 +1,12 @@
 # app/services/text_extractor.py
 """
-Text Extractor Service - Enhanced Version
+Text Extractor Service - Enhanced Version with Exhibit 99 Support
 Extracts structured text from SEC filing HTML documents
 Enhanced for different filing types (10-K, 10-Q, 8-K, S-1)
 FIXED: Better document type identification with multiple patterns
 FIXED: Smart content extraction based on filing type
 FIXED: Improved iXBRL handling with content validation
+ENHANCED: Added Exhibit 99 extraction for 8-K filings
 """
 import re
 from pathlib import Path
@@ -105,7 +106,121 @@ class TextExtractor:
         main_doc = html_files[0]
         logger.info(f"Extracting text from {main_doc.name}")
         
-        return self.extract_from_html(main_doc)
+        # Extract from main document
+        sections = self.extract_from_html(main_doc)
+        
+        # ENHANCED: Extract Exhibit 99 for 8-K filings
+        if sections.get('filing_type') == '8-K':
+            exhibit_99_content = self._extract_exhibit_99(filing_dir)
+            if exhibit_99_content:
+                logger.info(f"Successfully extracted Exhibit 99 content: {len(exhibit_99_content)} chars")
+                
+                # Append Exhibit 99 content to primary content
+                if 'primary_content' in sections:
+                    sections['primary_content'] += f"\n\n{'='*50}\nEXHIBIT 99 CONTENT\n{'='*50}\n\n{exhibit_99_content}"
+                else:
+                    sections['primary_content'] = exhibit_99_content
+                
+                # Also append to full text
+                if 'full_text' in sections:
+                    sections['full_text'] += f"\n\n{exhibit_99_content}"
+                
+                # Store exhibit content separately for reference
+                sections['exhibit_99_content'] = exhibit_99_content
+        
+        return sections
+    
+    def _extract_exhibit_99(self, filing_dir: Path) -> Optional[str]:
+        """
+        Extract content from Exhibit 99 files in the filing directory
+        
+        Args:
+            filing_dir: Path to the filing directory
+            
+        Returns:
+            Combined text from all Exhibit 99 files, or None if not found
+        """
+        exhibit_99_content = []
+        
+        # Look for Exhibit 99 files with various naming patterns
+        # Based on actual data: kmi2025q28-kex991.htm format
+        exhibit_patterns = [
+            "*ex99*.htm",      # Covers most variants
+            "*ex99*.html",
+            "*kex99*.htm",     # KMI format: kmi2025q28-kex991.htm
+            "*kex99*.html",
+            "*dex99*.htm",     # Possible Dominion format
+            "*dex99*.html",
+            "ex-99*.htm",      # Standard format
+            "ex-99*.html",
+            "ex99*.htm",
+            "ex99*.html",
+            "exhibit99*.htm",
+            "exhibit99*.html",
+            "ex_99*.htm",
+            "ex_99*.html"
+        ]
+        
+        exhibit_files = []
+        for pattern in exhibit_patterns:
+            exhibit_files.extend(filing_dir.glob(pattern))
+        
+        # Remove duplicates and sort by filename
+        exhibit_files = sorted(set(exhibit_files), key=lambda x: x.name)
+        
+        if not exhibit_files:
+            logger.info("No Exhibit 99 files found")
+            return None
+        
+        logger.info(f"Found {len(exhibit_files)} Exhibit 99 file(s): {[f.name for f in exhibit_files]}")
+        
+        for exhibit_file in exhibit_files:
+            try:
+                # Check file size - skip if too large (>50MB)
+                if exhibit_file.stat().st_size > 50 * 1024 * 1024:
+                    logger.warning(f"Skipping {exhibit_file.name} - file too large (>50MB)")
+                    continue
+                
+                # Read and extract content
+                with open(exhibit_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    html_content = f.read()
+                
+                # Parse with BeautifulSoup
+                soup = BeautifulSoup(html_content, 'html.parser')
+                
+                # Remove script and style elements
+                for element in soup(['script', 'style', 'link', 'meta']):
+                    element.decompose()
+                
+                # Extract text
+                text = soup.get_text()
+                
+                # Clean up text
+                text = self._clean_text(text)
+                
+                # Add header for this exhibit
+                if text and len(text) > 100:  # Only include if substantial content
+                    header = f"\n{'='*40}\nExhibit 99: {exhibit_file.name}\n{'='*40}\n"
+                    exhibit_99_content.append(header + text)
+                    logger.info(f"Extracted {len(text)} chars from {exhibit_file.name}")
+                
+            except Exception as e:
+                logger.error(f"Error extracting from {exhibit_file.name}: {e}")
+                continue
+        
+        if exhibit_99_content:
+            # Combine all exhibit content
+            combined_content = '\n\n'.join(exhibit_99_content)
+            
+            # Limit total size to avoid overwhelming the AI
+            max_exhibit_chars = 100000  # 100K chars max for exhibits
+            if len(combined_content) > max_exhibit_chars:
+                logger.warning(f"Exhibit 99 content truncated from {len(combined_content)} to {max_exhibit_chars} chars")
+                combined_content = combined_content[:max_exhibit_chars] + "\n\n[Exhibit content truncated...]"
+            
+            return combined_content
+        
+        return None
     
     def extract_from_txt(self, txt_path: Path) -> Dict[str, str]:
         """

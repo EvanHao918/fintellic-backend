@@ -2,12 +2,12 @@
 """
 Service for fetching and managing earnings calendar data
 Updated to use FMP instead of yfinance
+FIXED: Removed async/await to match FMP service sync implementation
 """
 from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
 import logging
-import asyncio
 
 from app.models.company import Company
 from app.models.earnings_calendar import EarningsCalendar, EarningsTime
@@ -22,13 +22,14 @@ class EarningsCalendarService:
     """Service for managing earnings calendar data using FMP"""
     
     @staticmethod
-    async def fetch_earnings_calendar(
+    def fetch_earnings_calendar(
         ticker: str,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None
     ) -> List[Dict]:
         """
         Fetch earnings calendar data from FMP
+        FIXED: Changed from async to sync to match FMP service
         """
         try:
             # Default to next 3 months if not specified
@@ -37,17 +38,21 @@ class EarningsCalendarService:
             if not end_date:
                 end_date = start_date + timedelta(days=90)
             
-            # Get earnings data from FMP
-            earnings_data = await fmp_service.get_earnings_calendar(
+            # Get earnings data from FMP (sync call - no await)
+            earnings_data = fmp_service.get_earnings_calendar(
                 start_date.isoformat(),
                 end_date.isoformat()
             )
+            
+            if not earnings_data:
+                logger.warning(f"No earnings data returned from FMP for period {start_date} to {end_date}")
+                return []
             
             # Filter for specific ticker
             ticker_earnings = [e for e in earnings_data if e.get('symbol') == ticker]
             
             if not ticker_earnings:
-                logger.warning(f"No earnings data found for {ticker}")
+                logger.info(f"No earnings data found for {ticker} in the fetched data")
                 return []
             
             # Convert to expected format
@@ -68,7 +73,8 @@ class EarningsCalendarService:
                 # Parse date
                 try:
                     earnings_date = datetime.strptime(earnings_date_str, '%Y-%m-%d').date()
-                except:
+                except Exception as e:
+                    logger.warning(f"Failed to parse date {earnings_date_str}: {e}")
                     continue
                 
                 results.append({
@@ -80,6 +86,7 @@ class EarningsCalendarService:
                     "fiscal_year": earnings_date.year
                 })
             
+            logger.info(f"Found {len(results)} earnings entries for {ticker}")
             return results
             
         except Exception as e:
@@ -87,13 +94,14 @@ class EarningsCalendarService:
             return []
     
     @staticmethod
-    async def update_company_earnings(db: Session, company: Company) -> List[EarningsCalendar]:
+    def update_company_earnings(db: Session, company: Company) -> List[EarningsCalendar]:
         """
         Update earnings calendar for a specific company
+        FIXED: Changed from async to sync
         """
         try:
-            # Fetch latest earnings data
-            earnings_data = await EarningsCalendarService.fetch_earnings_calendar(
+            # Fetch latest earnings data (sync call - no await)
+            earnings_data = EarningsCalendarService.fetch_earnings_calendar(
                 company.ticker,
                 start_date=date.today(),
                 end_date=date.today() + timedelta(days=90)
@@ -145,10 +153,10 @@ class EarningsCalendarService:
             return []
     
     @staticmethod
-    async def update_all_sp500_earnings(db: Session) -> int:
+    def update_all_sp500_earnings(db: Session) -> int:
         """
         Update earnings calendar for all S&P 500 companies
-        This should be run as a scheduled task
+        FIXED: Removed async - this is now a sync method
         """
         try:
             # Get all S&P 500 companies
@@ -162,10 +170,16 @@ class EarningsCalendarService:
             end_date = start_date + timedelta(days=90)
             
             logger.info(f"Fetching earnings calendar from FMP: {start_date} to {end_date}")
-            all_earnings_data = await fmp_service.get_earnings_calendar(
+            
+            # FIXED: Direct sync call to FMP service (no await)
+            all_earnings_data = fmp_service.get_earnings_calendar(
                 start_date.isoformat(),
                 end_date.isoformat()
             )
+            
+            if not all_earnings_data:
+                logger.warning("No earnings data returned from FMP")
+                return 0
             
             logger.info(f"FMP returned {len(all_earnings_data)} total earnings entries")
             
@@ -181,7 +195,8 @@ class EarningsCalendarService:
             updated_count = 0
             
             for i, company in enumerate(companies):
-                logger.info(f"Updating earnings for {company.ticker} ({i+1}/{len(companies)})")
+                if i % 10 == 0:  # Log progress every 10 companies
+                    logger.info(f"Updating earnings for companies ({i+1}/{len(companies)})")
                 
                 ticker_earnings = earnings_by_ticker.get(company.ticker, [])
                 

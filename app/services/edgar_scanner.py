@@ -1,16 +1,26 @@
+# app/services/edgar_scanner.py
+"""
+EDGAR Scanner Service - Enhanced with ticker management
+FIXED: 
+1. Ensure ticker is populated when creating filing records
+2. Use lowercase status values consistently
+3. Better validation before creating filing records
+4. Auto-populate ticker from company relationship
+"""
 from typing import List, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 import logging
 import json
 from pathlib import Path
+import re
 
 from app.services.sec_client import sec_client
 from app.models.company import Company
 from app.models.filing import Filing, FilingType, ProcessingStatus
 from app.core.database import SessionLocal
 from app.core.config import settings
-from app.tasks.filing_tasks import process_filing_task  # Added for auto-triggering
+from app.tasks.filing_tasks import process_filing_task
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +28,7 @@ logger = logging.getLogger(__name__)
 class EDGARScanner:
     """
     Scans SEC EDGAR for new filings using RSS feeds
-    More efficient than polling individual companies
+    ENHANCED: Better ticker management and validation
     """
     
     def __init__(self):
@@ -29,19 +39,17 @@ class EDGARScanner:
         self.sp500_companies = self._load_sp500_companies()
         self.sp500_ciks = {company['cik'] for company in self.sp500_companies}
         
-        # NEW: Load all monitored CIKs from database (S&P 500 + NASDAQ 100)
+        # Load all monitored CIKs from database (S&P 500 + NASDAQ 100)
         self.monitored_ciks = self._load_monitored_ciks()
         
         # Debug output
         if self.monitored_ciks:
             logger.info(f"✅ Loaded {len(self.monitored_ciks)} companies for monitoring (S&P 500 + NASDAQ 100)")
-            # Show breakdown
             sp500_only = len(self.sp500_ciks)
             total = len(self.monitored_ciks)
             logger.info(f"   - S&P 500 from JSON: {sp500_only}")
             logger.info(f"   - Total monitored (including NASDAQ 100): {total}")
             logger.info(f"   - Additional from database: {total - sp500_only}")
-            # Show sample CIKs
             sample = list(self.monitored_ciks)[:5]
             logger.info(f"Sample monitored CIKs: {sample}")
         else:
@@ -105,10 +113,50 @@ class EDGARScanner:
             db.close()
         
         return monitored
+    
+    def _validate_filing_data(self, filing_data: Dict) -> bool:
+        """
+        Validate filing data before creating record
+        Prevents empty filing records from being created
+        """
+        # Check required fields
+        required_fields = ['accession_number', 'cik', 'form', 'filing_date']
+        for field in required_fields:
+            if not filing_data.get(field):
+                logger.warning(f"Filing missing required field: {field}")
+                return False
+        
+        # Validate accession number format (should be like 0000037996-25-000141)
+        accession = filing_data.get('accession_number', '')
+        if not re.match(r'^\d{10}-\d{2}-\d{6}$', accession):
+            logger.warning(f"Invalid accession number format: {accession}")
+            return False
+        
+        # Validate CIK (should be numeric)
+        cik = filing_data.get('cik', '')
+        if not cik.isdigit() or len(cik) > 10:
+            logger.warning(f"Invalid CIK format: {cik}")
+            return False
+        
+        # Validate form type
+        form_type = filing_data.get('form', '')
+        if form_type not in self.supported_forms:
+            logger.warning(f"Unsupported form type: {form_type}")
+            return False
+        
+        # Validate filing date
+        try:
+            datetime.strptime(filing_data['filing_date'], '%Y-%m-%d')
+        except:
+            logger.warning(f"Invalid filing date format: {filing_data.get('filing_date')}")
+            return False
+        
+        return True
         
     async def scan_for_new_filings(self) -> List[Dict]:
         """
         Main scanning method - uses RSS for efficiency
+        ENHANCED: Better ticker management
         
         Returns:
             List of new filings discovered
@@ -116,11 +164,11 @@ class EDGARScanner:
         logger.info("Starting EDGAR RSS scan...")
         logger.info(f"DEBUG: Monitoring {len(self.monitored_ciks)} companies (S&P 500 + NASDAQ 100)")
         
-        # Get recent filings from RSS (last 2 minutes to ensure overlap)
+        # Get recent filings from RSS (last 60 minutes to ensure overlap)
         all_rss_filings = await sec_client.get_rss_filings(
             form_type="all",
-            lookback_minutes=60  # 或者 120，看更长时间范围
-)
+            lookback_minutes=60
+        )
         
         if not all_rss_filings:
             logger.info("No new filings found in RSS feed")
@@ -129,6 +177,11 @@ class EDGARScanner:
         # Filter for monitored companies (S&P 500 + NASDAQ 100)
         relevant_filings = []
         for f in all_rss_filings:
+            # Validate filing data first
+            if not self._validate_filing_data(f):
+                logger.warning(f"Skipping invalid filing entry from {f.get('company_name', 'Unknown')}")
+                continue
+                
             # S-1 filings (IPOs) are not limited to our indices
             if f['form'] == 'S-1':
                 relevant_filings.append(f)
@@ -159,10 +212,11 @@ class EDGARScanner:
         
         # Process each filing
         new_filings = []
-        db = SessionLocal()
         
-        try:
-            for rss_filing in relevant_filings:
+        # Process each filing in its own transaction
+        for rss_filing in relevant_filings:
+            db = SessionLocal()
+            try:
                 # Check if we already have this filing
                 existing = db.query(Filing).filter(
                     Filing.accession_number == rss_filing["accession_number"]
@@ -170,6 +224,10 @@ class EDGARScanner:
                 
                 if existing:
                     logger.debug(f"Filing {rss_filing['accession_number']} already exists")
+                    # ENHANCED: Ensure ticker is populated even for existing filings
+                    if existing and not existing.ticker and existing.company:
+                        existing.ticker = existing.company.ticker
+                        db.commit()
                     continue
                 
                 # Get or create company
@@ -181,62 +239,95 @@ class EDGARScanner:
                     logger.warning(f"Could not find/create company for CIK {rss_filing['cik']}")
                     continue
                 
-                # Create new filing record
-                filing = self._create_filing_record(company.id, rss_filing)
+                # Additional validation before creating filing
+                if not self._validate_before_creation(rss_filing, company):
+                    logger.warning(f"Skipping filing creation for {company.ticker} - failed pre-creation validation")
+                    continue
+                
+                # ENHANCED: Create new filing record with ticker
+                filing = self._create_filing_record(company, rss_filing)
                 db.add(filing)
                 
-                # Need to flush to get the filing ID before triggering task
-                db.flush()
+                # Commit immediately to make filing available to other processes
+                db.commit()
+                
+                # Now the filing is persisted and has an ID
+                filing_id = filing.id
                 
                 new_filings.append({
+                    "id": filing_id,
                     "company": company.name,
-                    "ticker": company.ticker,
+                    "ticker": filing.ticker or company.ticker,  # Use filing ticker or company ticker
                     "form_type": rss_filing["form"],
                     "filing_date": rss_filing["filing_date"],
                     "accession_number": rss_filing["accession_number"],
                     "discovery_method": "RSS",
-                    "indices": company.indices  # Include index info
+                    "indices": company.indices
                 })
                 
                 logger.info(
-                    f"New filing discovered: {company.ticker} ({company.indices}) - {rss_filing['form']} "
-                    f"({rss_filing['filing_date']}) via RSS"
+                    f"New filing discovered: {filing.ticker or company.ticker} ({company.indices}) - {rss_filing['form']} "
+                    f"({rss_filing['filing_date']}) via RSS - Filing ID: {filing_id}"
                 )
                 
                 # Automatically trigger Celery task to process this filing
                 try:
                     # Queue the filing for processing
-                    task = process_filing_task.delay(filing.id)
+                    task = process_filing_task.delay(filing_id)
                     
                     logger.info(
-                        f"✅ Queued filing {filing.id} for processing. "
+                        f"✅ Queued filing {filing_id} for processing. "
                         f"Celery task ID: {task.id}"
                     )
                     
-                    # Optional: Store task ID in filing record for tracking
-                    # filing.celery_task_id = task.id
-                    
                 except Exception as e:
-                    logger.error(f"❌ Failed to queue filing for processing: {e}")
+                    logger.error(f"❌ Failed to queue filing {filing_id} for processing: {e}")
                     # Continue even if queueing fails - filing is still saved
-            
-            # Commit all new filings
-            if new_filings:
-                db.commit()
-                logger.info(f"Added {len(new_filings)} new filings to database")
-            
-            return new_filings
-            
-        except Exception as e:
-            logger.error(f"Error during scan: {e}")
-            db.rollback()
-            return []
-        finally:
-            db.close()
+                    
+            except Exception as e:
+                logger.error(f"Error processing filing {rss_filing.get('accession_number', 'unknown')}: {e}")
+                db.rollback()
+                # Continue with next filing
+            finally:
+                db.close()
+        
+        logger.info(f"Successfully processed {len(new_filings)} new filings")
+        
+        # ENHANCED: Update any filings with missing tickers
+        self._update_missing_tickers()
+        
+        return new_filings
+    
+    def _validate_before_creation(self, rss_filing: Dict, company: Company) -> bool:
+        """
+        Additional validation before creating filing record
+        """
+        # Don't create filings for inactive companies
+        if not company.is_active:
+            logger.warning(f"Company {company.ticker} is marked inactive")
+            return False
+        
+        # Verify the filing date is reasonable (not too far in the future)
+        filing_date = datetime.strptime(rss_filing['filing_date'], '%Y-%m-%d')
+        filing_date_utc = filing_date.replace(tzinfo=timezone.utc)
+        current_time_utc = datetime.now(timezone.utc)
+        
+        # Allow up to 1 day in the future (for timezone differences)
+        if filing_date_utc > current_time_utc + timedelta(days=1):
+            logger.warning(f"Filing date {filing_date_utc} is too far in the future")
+            return False
+        
+        # Check if we have a valid document URL or can construct one
+        if not rss_filing.get('rss_link') and not rss_filing.get('accession_number'):
+            logger.warning("No valid document URL or accession number")
+            return False
+        
+        return True
     
     async def _get_or_create_company(self, db: Session, cik: str, company_name: str = "") -> Company:
         """
         Get company from database or create if doesn't exist
+        ENHANCED: Ensure ticker is populated
         
         Args:
             db: Database session
@@ -249,6 +340,9 @@ class EDGARScanner:
         # Check if company exists
         company = db.query(Company).filter(Company.cik == cik).first()
         if company:
+            # ENHANCED: Update filings with missing tickers if company has ticker
+            if company.ticker:
+                company.update_filings_ticker(db)
             return company
         
         # Look up company in our S&P 500 list first
@@ -268,10 +362,11 @@ class EDGARScanner:
             company_info = await sec_client.get_company_info(cik)
             if not company_info:
                 logger.warning(f"Could not fetch info for CIK {cik}")
+                # For S-1 filings without ticker, use company name as temporary identifier
                 company_info = {
                     "cik": cik,
                     "name": company_name,
-                    "ticker": f"CIK{cik}"
+                    "ticker": None  # Allow NULL for S-1 filings
                 }
             is_sp500 = False
             is_nasdaq100 = False
@@ -279,7 +374,7 @@ class EDGARScanner:
         # Create new company record
         company = Company(
             cik=cik,
-            ticker=company_info.get("ticker", f"CIK{cik}"),
+            ticker=company_info.get("ticker"),  # Can be NULL for S-1
             name=company_info.get("name", company_name),
             legal_name=company_info.get("name", company_name),
             sic=company_info.get("sic"),
@@ -295,20 +390,14 @@ class EDGARScanner:
         db.add(company)
         db.flush()  # Get the ID without committing
         
-        logger.info(f"Created new company: {company.ticker} - {company.name} ({company.indices})")
+        logger.info(f"Created new company: {company.ticker or 'NO_TICKER'} - {company.name} ({company.indices})")
         
         return company
     
-    def _create_filing_record(self, company_id: int, rss_filing: Dict) -> Filing:
+    def _create_filing_record(self, company: Company, rss_filing: Dict) -> Filing:
         """
         Create a new filing record from RSS data
-        
-        Args:
-            company_id: Company database ID
-            rss_filing: Filing data from RSS
-            
-        Returns:
-            Filing object
+        ENHANCED: Ensure ticker is populated from company
         """
         # Map form type
         form_mapping = {
@@ -318,50 +407,70 @@ class EDGARScanner:
             "S-1": FilingType.FORM_S1
         }
         
-        # Parse filing date
+        # Parse filing date and make it timezone-aware
         filing_date = datetime.strptime(
             rss_filing["filing_date"], "%Y-%m-%d"
         )
+        # Store as UTC timezone-aware datetime
+        filing_date_utc = filing_date.replace(tzinfo=timezone.utc)
         
-        # Build primary document URL (will be updated when we fetch details)
-        acc_no_clean = rss_filing["accession_number"].replace("-", "")
-        primary_doc_url = (
-            f"{settings.SEC_ARCHIVE_URL}/{rss_filing['cik']}/"
-            f"{acc_no_clean}/index.htm"
-        )
-        
-        return Filing(
-            company_id=company_id,
+        # ENHANCED: Create Filing with ticker from company
+        filing = Filing(
+            company_id=company.id,
+            ticker=company.ticker,  # Set ticker from company
             accession_number=rss_filing["accession_number"],
             filing_type=form_mapping.get(rss_filing["form"], FilingType.FORM_10K),
-            filing_date=filing_date,
-            primary_doc_url=primary_doc_url,
-            full_text_url=rss_filing.get("rss_link", ""),
-            status=ProcessingStatus.PENDING
+            filing_date=filing_date_utc,
+            status=ProcessingStatus.PENDING  # Using lowercase enum value
         )
+        
+        # Set URL fields as attributes after creation
+        if rss_filing.get('rss_link'):
+            filing.filing_url = rss_filing['rss_link']
+            filing.full_text_url = rss_filing['rss_link']
+        
+        # Ensure ticker is populated
+        if not filing.ticker and company.ticker:
+            filing.ticker = company.ticker
+        
+        return filing
+    
+    def _update_missing_tickers(self):
+        """
+        ENHANCED: Update all filings with missing tickers
+        Run periodically to fix any filings that don't have tickers
+        """
+        db = SessionLocal()
+        try:
+            # Find filings with missing tickers
+            filings_without_ticker = db.query(Filing).filter(
+                (Filing.ticker == None) | (Filing.ticker == '')
+            ).all()
+            
+            if filings_without_ticker:
+                logger.info(f"Found {len(filings_without_ticker)} filings without ticker")
+                
+                updated_count = 0
+                for filing in filings_without_ticker:
+                    if filing.company and filing.company.ticker:
+                        filing.ticker = filing.company.ticker
+                        updated_count += 1
+                
+                if updated_count > 0:
+                    db.commit()
+                    logger.info(f"Updated {updated_count} filings with ticker information")
+        except Exception as e:
+            logger.error(f"Error updating missing tickers: {e}")
+            db.rollback()
+        finally:
+            db.close()
     
     def is_monitored_company(self, cik: str) -> bool:
-        """
-        Check if CIK belongs to a monitored company (S&P 500 or NASDAQ 100)
-        
-        Args:
-            cik: Company CIK
-            
-        Returns:
-            True if monitored company
-        """
+        """Check if CIK belongs to a monitored company (S&P 500 or NASDAQ 100)"""
         return cik in self.monitored_ciks
     
     def is_sp500_company(self, cik: str) -> bool:
-        """
-        Check if CIK belongs to S&P 500 company
-        
-        Args:
-            cik: Company CIK
-            
-        Returns:
-            True if S&P 500 company
-        """
+        """Check if CIK belongs to S&P 500 company"""
         return cik in self.sp500_ciks
     
     async def get_monitoring_stats(self) -> Dict:
@@ -392,15 +501,12 @@ class EDGARScanner:
     
     def get_sp500_stats(self) -> Dict:
         """
-        获取 S&P 500 和 NASDAQ 100 公司的统计信息
-        用于健康检查和监控
-        
-        Returns:
-            Dictionary with statistics
+        Get statistics for S&P 500 and NASDAQ 100 companies
+        Used for health checks and monitoring
         """
         db = SessionLocal()
         try:
-            # 获取各种统计数据
+            # Get various statistics
             sp500_count = db.query(Company).filter(Company.is_sp500 == True).count()
             nasdaq100_count = db.query(Company).filter(Company.is_nasdaq100 == True).count()
             both_count = db.query(Company).filter(
@@ -408,18 +514,20 @@ class EDGARScanner:
                 Company.is_nasdaq100 == True
             ).count()
             
-            # 获取今日的 filing 数量
-            today = datetime.now().date()
+            # Get today's filings
+            today_start_utc = datetime.now(timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
             today_filings = db.query(Filing).filter(
-                Filing.filing_date >= today
+                Filing.filing_date >= today_start_utc
             ).count()
             
-            # 获取待处理的 filing 数量
+            # Get pending filings count
             pending_filings = db.query(Filing).filter(
                 Filing.status == ProcessingStatus.PENDING
             ).count()
             
-            # 获取最近处理的 filing
+            # Get latest filing
             latest_filing = db.query(Filing).order_by(
                 Filing.created_at.desc()
             ).first()
@@ -430,7 +538,7 @@ class EDGARScanner:
                     Company.id == latest_filing.company_id
                 ).first()
                 if company:
-                    latest_filing_info = f"{company.ticker} - {latest_filing.filing_type.value}"
+                    latest_filing_info = f"{company.ticker or latest_filing.ticker} - {latest_filing.filing_type.value}"
             
             return {
                 'total_monitored': len(self.monitored_ciks),
@@ -443,11 +551,10 @@ class EDGARScanner:
                 'pending_filings': pending_filings,
                 'latest_filing': latest_filing_info,
                 'status': 'active',
-                'last_check': datetime.now().isoformat()
+                'last_check': datetime.now(timezone.utc).isoformat()
             }
         except Exception as e:
             logger.error(f"Error getting S&P 500 stats: {e}")
-            # 返回默认值，让健康检查能通过
             return {
                 'total_monitored': len(self.monitored_ciks) if self.monitored_ciks else 0,
                 'sp500_companies': len(self.sp500_companies) if self.sp500_companies else 0,

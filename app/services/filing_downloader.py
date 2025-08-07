@@ -26,6 +26,8 @@ class FilingDownloader:
     - Content validation
     - Proper error handling
     - ENHANCED: Downloads Exhibit 99 files for 8-K filings
+    - FIXED: iXBRL parser now correctly identifies main documents
+    - FIXED: Uses correct field name primary_document_url instead of primary_doc_url
     """
     
     def __init__(self):
@@ -95,23 +97,58 @@ class FilingDownloader:
         """
         Enhanced index parser that handles various table layouts
         Including Ford's 5-column layout: Seq | Description | Document | Type | Size
+        FIXED: Now correctly identifies iXBRL main documents without relying on filename patterns
         """
         soup = BeautifulSoup(html_content, 'html.parser')
         
         # Priority 1: Look for iXBRL links
+        # FIXED: Don't filter by filing_type in filename - just get the first/main iXBRL document
         ixbrl_links = soup.find_all('a', href=re.compile(r'/ix\?doc='))
         for link in ixbrl_links:
             href = link.get('href', '')
-            if filing_type.lower() in href.lower() or filing_type.replace('-', '').lower() in href.lower():
-                actual_url = self._extract_url_from_ixbrl_link(href)
-                filename = actual_url.split('/')[-1] if '/' in actual_url else actual_url
-                logger.info(f"Found iXBRL link: {href} -> {actual_url}")
+            link_text = link.get_text(strip=True)
+            
+            # Skip if it's clearly an exhibit or amendment
+            if re.search(r'ex-?\d+|exhibit|amendment', link_text, re.IGNORECASE):
+                continue
+            
+            # FIXED: For iXBRL, we trust it's the main document if:
+            # 1. It's the first non-exhibit iXBRL link
+            # 2. The filename contains a date pattern (common for main docs)
+            # 3. Or it matches the company ticker pattern
+            actual_url = self._extract_url_from_ixbrl_link(href)
+            filename = actual_url.split('/')[-1] if '/' in actual_url else actual_url
+            
+            # Check if filename has date pattern (YYYYMMDD or YYYY-MM-DD)
+            has_date = re.search(r'\d{8}|\d{4}-\d{2}-\d{2}', filename)
+            
+            # Check if filename starts with ticker-like pattern
+            has_ticker = re.match(r'^[a-z]{1,5}[-_]', filename, re.IGNORECASE)
+            
+            # Accept if it has date or ticker pattern (main documents usually have these)
+            if has_date or has_ticker:
+                logger.info(f"Found iXBRL main document: {href} -> {actual_url}")
                 return {
                     'filename': filename,
                     'url': actual_url,
                     'type': filing_type,
                     'description': 'Main Document (iXBRL)'
                 }
+        
+        # If no suitable iXBRL found, but there are iXBRL links, take the first one
+        # (it's likely the main document)
+        if ixbrl_links:
+            link = ixbrl_links[0]
+            href = link.get('href', '')
+            actual_url = self._extract_url_from_ixbrl_link(href)
+            filename = actual_url.split('/')[-1] if '/' in actual_url else actual_url
+            logger.info(f"Using first iXBRL link as main document: {actual_url}")
+            return {
+                'filename': filename,
+                'url': actual_url,
+                'type': filing_type,
+                'description': 'Main Document (iXBRL)'
+            }
         
         # Priority 2: Standard table parsing
         tables = soup.find_all('table')
@@ -152,10 +189,6 @@ class FilingDownloader:
                             # Type is usually in first column for 3-column layout
                             doc_type = cells[0].get_text(strip=True)
                             break
-                
-                # REMOVED: Skip exhibit files - we want to process them separately
-                # if doc_type and 'EX-' in doc_type:
-                #     continue
                 
                 # Check if this is our target filing type
                 if doc_link and doc_type:
@@ -315,7 +348,7 @@ class FilingDownloader:
         """
         # Generate various possible patterns
         date_str = filing.filing_date.strftime('%Y%m%d')
-        ticker = filing.company.ticker.lower()
+        ticker = filing.company.ticker.lower() if filing.company.ticker else ""
         form_type = filing.filing_type.value.lower().replace('-', '')
         
         patterns = [
@@ -324,10 +357,10 @@ class FilingDownloader:
             f"form{form_type}.htm",
             f"{form_type}.htm",
             
-            # Company-specific patterns
-            f"{ticker}-{date_str}.htm",
-            f"{ticker}_{date_str}.htm",
-            f"{ticker}{date_str}.htm",
+            # Company-specific patterns (only if ticker exists)
+            f"{ticker}-{date_str}.htm" if ticker else None,
+            f"{ticker}_{date_str}.htm" if ticker else None,
+            f"{ticker}{date_str}.htm" if ticker else None,
             
             # Date-based patterns
             f"{form_type}_{date_str}.htm",
@@ -374,6 +407,7 @@ class FilingDownloader:
         Main download method with 90%+ success rate
         Implements all fixes discovered during investigation
         ENHANCED: Now downloads Exhibit 99 files for 8-K filings
+        FIXED: Uses correct field name primary_document_url instead of primary_doc_url
         """
         try:
             # Update status
@@ -474,13 +508,22 @@ class FilingDownloader:
                             logger.info(f"✅ Successfully downloaded {filename} "
                                        f"({len(doc_content)/1024:.1f}KB)")
                             
-                            # Update filing record
-                            filing.primary_doc_url = doc_url
+                            # FIXED: Set both URL fields for compatibility
+                            # Database has both primary_doc_url (old) and primary_document_url (new)
+                            # We set both to maintain compatibility with all code
+                            filing.primary_doc_url = doc_url  # Old field
+                            filing.primary_document_url = doc_url  # New field
+                            
+                            # Commit the URL updates
+                            db.commit()
                         else:
                             logger.error("Downloaded content failed validation")
                             raise Exception("Invalid document content")
                     else:
                         raise Exception(f"Failed to download document: HTTP {doc_response.status_code}")
+                else:
+                    logger.warning("Could not find main document in any format")
+                    # Don't fail completely - we still have the index
                 
                 # ENHANCED: Step 4 - Download Exhibit 99 files for 8-K filings
                 if filing.filing_type == FilingType.FORM_8K:
@@ -532,6 +575,7 @@ class FilingDownloader:
                 filing.status = ProcessingStatus.PARSING
                 db.commit()
                 
+                logger.info(f"Successfully completed download for {filing.accession_number}")
                 return True
                     
         except Exception as e:

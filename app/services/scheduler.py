@@ -1,3 +1,4 @@
+# app/services/scheduler.py
 import asyncio
 import logging
 from datetime import datetime, time
@@ -133,14 +134,17 @@ class FilingScheduler:
             await self._update_earnings_calendar()
     
     async def _update_earnings_calendar(self):
-        """Update earnings calendar for all S&P 500 companies"""
+        """
+        Update earnings calendar for all S&P 500 companies
+        FIXED: Removed await since update_all_sp500_earnings is now sync
+        """
         logger.info("🗓️  Starting daily earnings calendar update...")
         update_start = datetime.now()
         
         db = SessionLocal()
         try:
-            # Update all S&P 500 earnings
-            updated_count = await EarningsCalendarService.update_all_sp500_earnings(db)
+            # FIXED: Direct sync call (no await)
+            updated_count = EarningsCalendarService.update_all_sp500_earnings(db)
             
             # Update timestamp
             self.last_calendar_update = datetime.now()
@@ -178,9 +182,26 @@ class FilingScheduler:
             return []
     
     async def update_earnings_calendar_now(self):
-        """Manually trigger earnings calendar update"""
+        """
+        Manually trigger earnings calendar update
+        FIXED: Call sync method properly
+        """
         logger.info("Manually triggering earnings calendar update...")
-        await self._update_earnings_calendar()
+        
+        db = SessionLocal()
+        try:
+            # FIXED: Direct sync call (no await)
+            updated_count = EarningsCalendarService.update_all_sp500_earnings(db)
+            
+            # Update timestamp
+            self.last_calendar_update = datetime.now()
+            
+            logger.info(f"Manual earnings update completed. Updated {updated_count} entries.")
+            
+        except Exception as e:
+            logger.error(f"Error in manual earnings update: {e}", exc_info=True)
+        finally:
+            db.close()
     
     def get_status(self) -> Dict:
         """Get scheduler status"""

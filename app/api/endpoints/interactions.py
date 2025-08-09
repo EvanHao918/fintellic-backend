@@ -1,11 +1,13 @@
 """
 User interaction endpoints - votes, comments, watchlist
+FIXED: Removed references to deprecated filing vote count fields
+Now uses UserVote table for all vote management
 """
 from typing import List, Optional, Dict
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_, func
 from pydantic import BaseModel
 
 from app.api import deps
@@ -29,6 +31,28 @@ class VoteResponse(BaseModel):
 class WatchResponse(BaseModel):
     message: str
     is_watching: bool
+
+
+def get_vote_counts_for_filing(db: Session, filing_id: int) -> Dict[str, int]:
+    """
+    Get vote counts for a filing from UserVote table
+    Returns dict with bullish, neutral, bearish counts
+    """
+    # Get all votes for this filing
+    votes = db.query(UserVote).filter(UserVote.filing_id == filing_id).all()
+    
+    # Count by type
+    counts = {
+        "bullish": 0,
+        "neutral": 0,
+        "bearish": 0
+    }
+    
+    for vote in votes:
+        if vote.vote_type in counts:
+            counts[vote.vote_type] += 1
+    
+    return counts
 
 
 @router.post("/filings/{filing_id}/vote", response_model=VoteResponse)
@@ -57,7 +81,9 @@ async def vote_on_filing(
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")
     
-    print(f"[DEBUG] Current vote counts - Bullish: {filing.bullish_votes}, Neutral: {filing.neutral_votes}, Bearish: {filing.bearish_votes}")
+    # Get current vote counts from UserVote table
+    vote_counts = get_vote_counts_for_filing(db, filing_id)
+    print(f"[DEBUG] Current vote counts - Bullish: {vote_counts['bullish']}, Neutral: {vote_counts['neutral']}, Bearish: {vote_counts['bearish']}")
     
     # Check if user already voted
     existing_vote = db.query(UserVote).filter(
@@ -77,26 +103,13 @@ async def vote_on_filing(
             print(f"[DEBUG] Same vote, no change")
             message = f"You already voted {sentiment_lower}"
         else:
-            print(f"[DEBUG] Changing vote from {existing_vote.vote_type} to {sentiment_lower}")
-            # Decrease old vote count
-            if existing_vote.vote_type == "bullish":
-                filing.bullish_votes = max(0, (filing.bullish_votes or 0) - 1)
-            elif existing_vote.vote_type == "neutral":
-                filing.neutral_votes = max(0, (filing.neutral_votes or 0) - 1)
-            else:  # bearish
-                filing.bearish_votes = max(0, (filing.bearish_votes or 0) - 1)
-            
-            # Increase new vote count
-            if sentiment_lower == "bullish":
-                filing.bullish_votes = (filing.bullish_votes or 0) + 1
-            elif sentiment_lower == "neutral":
-                filing.neutral_votes = (filing.neutral_votes or 0) + 1
-            else:  # bearish
-                filing.bearish_votes = (filing.bearish_votes or 0) + 1
+            old_vote = existing_vote.vote_type
+            print(f"[DEBUG] Changing vote from {old_vote} to {sentiment_lower}")
             
             # Update vote type
             existing_vote.vote_type = sentiment_lower
-            message = f"Vote changed from {existing_vote.vote_type} to {sentiment_lower}"
+            existing_vote.created_at = datetime.utcnow()  # Update timestamp
+            message = f"Vote changed from {old_vote} to {sentiment_lower}"
     else:
         print(f"[DEBUG] New vote: {sentiment_lower}")
         # Create new vote record
@@ -106,18 +119,7 @@ async def vote_on_filing(
             vote_type=sentiment_lower  # 使用小写字符串
         )
         db.add(new_vote)
-        
-        # Increase vote count for new vote only
-        if sentiment_lower == "bullish":
-            filing.bullish_votes = (filing.bullish_votes or 0) + 1
-        elif sentiment_lower == "neutral":
-            filing.neutral_votes = (filing.neutral_votes or 0) + 1
-        else:  # bearish
-            filing.bearish_votes = (filing.bearish_votes or 0) + 1
-            
         message = f"Successfully voted {sentiment_lower}"
-    
-    print(f"[DEBUG] Before commit - Bullish: {filing.bullish_votes}, Neutral: {filing.neutral_votes}, Bearish: {filing.bearish_votes}")
     
     try:
         db.commit()
@@ -126,6 +128,10 @@ async def vote_on_filing(
         print(f"[ERROR] Commit failed: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to save vote")
+    
+    # Get updated vote counts
+    updated_counts = get_vote_counts_for_filing(db, filing_id)
+    print(f"[DEBUG] After commit - Bullish: {updated_counts['bullish']}, Neutral: {updated_counts['neutral']}, Bearish: {updated_counts['bearish']}")
     
     # Verify vote was saved
     saved_vote = db.query(UserVote).filter(
@@ -142,11 +148,7 @@ async def vote_on_filing(
     
     return VoteResponse(
         message=message,
-        vote_counts={
-            "bullish": filing.bullish_votes or 0,
-            "neutral": filing.neutral_votes or 0,
-            "bearish": filing.bearish_votes or 0
-        },
+        vote_counts=updated_counts,
         user_vote=sentiment_lower
     )
 
@@ -164,6 +166,9 @@ async def get_filing_votes(
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")
     
+    # Get vote counts from UserVote table
+    vote_counts = get_vote_counts_for_filing(db, filing_id)
+    
     # Check if current user has voted
     user_vote = db.query(UserVote).filter(
         UserVote.user_id == current_user.id,
@@ -174,12 +179,8 @@ async def get_filing_votes(
     
     return {
         "filing_id": filing_id,
-        "vote_counts": {
-            "bullish": filing.bullish_votes or 0,
-            "neutral": filing.neutral_votes or 0,
-            "bearish": filing.bearish_votes or 0
-        },
-        "total_votes": (filing.bullish_votes or 0) + (filing.neutral_votes or 0) + (filing.bearish_votes or 0),
+        "vote_counts": vote_counts,
+        "total_votes": sum(vote_counts.values()),
         "user_vote": user_vote.vote_type if user_vote else None
     }
 
@@ -202,21 +203,99 @@ async def remove_vote(
     if not user_vote:
         raise HTTPException(status_code=404, detail="No vote found for this filing")
     
-    # Get filing to update counts
+    # Get filing to ensure it exists
     filing = db.query(Filing).filter(Filing.id == filing_id).first()
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")
     
-    # Decrease vote count
-    if user_vote.vote_type == "bullish":
-        filing.bullish_votes = max(0, (filing.bullish_votes or 0) - 1)
-    elif user_vote.vote_type == "neutral":
-        filing.neutral_votes = max(0, (filing.neutral_votes or 0) - 1)
-    else:  # bearish
-        filing.bearish_votes = max(0, (filing.bearish_votes or 0) - 1)
+    vote_type = user_vote.vote_type
     
     # Delete vote record
     db.delete(user_vote)
     db.commit()
     
-    return {"message": "Vote removed successfully"}
+    # Get updated counts
+    updated_counts = get_vote_counts_for_filing(db, filing_id)
+    
+    print(f"[DEBUG] Vote removed - type: {vote_type}, new counts: {updated_counts}")
+    
+    return {
+        "message": "Vote removed successfully",
+        "vote_counts": updated_counts
+    }
+
+
+@router.get("/user/votes")
+async def get_user_votes(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(deps.get_current_active_user)
+):
+    """
+    Get all votes by the current user
+    """
+    # Get user's votes with filing information
+    votes = db.query(UserVote).filter(
+        UserVote.user_id == current_user.id
+    ).order_by(desc(UserVote.created_at)).offset(skip).limit(limit).all()
+    
+    # Get total count
+    total = db.query(func.count(UserVote.id)).filter(
+        UserVote.user_id == current_user.id
+    ).scalar()
+    
+    # Format response
+    result = []
+    for vote in votes:
+        filing = db.query(Filing).filter(Filing.id == vote.filing_id).first()
+        if filing:
+            result.append({
+                "filing_id": vote.filing_id,
+                "vote_type": vote.vote_type,
+                "created_at": vote.created_at.isoformat() if vote.created_at else None,
+                "filing": {
+                    "ticker": filing.ticker,
+                    "form_type": filing.filing_type.value if filing.filing_type else None,
+                    "filing_date": filing.filing_date.isoformat() if filing.filing_date else None
+                }
+            })
+    
+    return {
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "votes": result
+    }
+
+
+@router.get("/filings/{filing_id}/vote-distribution")
+async def get_vote_distribution(
+    filing_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get vote distribution for a filing (public endpoint)
+    """
+    filing = db.query(Filing).filter(Filing.id == filing_id).first()
+    if not filing:
+        raise HTTPException(status_code=404, detail="Filing not found")
+    
+    # Get vote counts
+    vote_counts = get_vote_counts_for_filing(db, filing_id)
+    total = sum(vote_counts.values())
+    
+    # Calculate percentages
+    distribution = {}
+    for sentiment, count in vote_counts.items():
+        percentage = (count / total * 100) if total > 0 else 0
+        distribution[sentiment] = {
+            "count": count,
+            "percentage": round(percentage, 1)
+        }
+    
+    return {
+        "filing_id": filing_id,
+        "total_votes": total,
+        "distribution": distribution
+    }

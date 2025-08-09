@@ -1,13 +1,16 @@
-# app/api/endpoints/filings.py
 """
-Filing-related API endpoints with unified analysis support
+Filing-related API endpoints with unified analysis support and enhanced company info
 Handles both v1 (legacy) and v2 (unified) analysis formats
+Enhanced to return full company details for mature companies
+FIXED: Changed all file_url to filing_url
+FIXED: Use getattr to safely access key_tags
 """
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
+import json
 
 from app.api import deps
 from app.models.filing import Filing, ProcessingStatus
@@ -18,6 +21,105 @@ from app.schemas.filing import FilingBrief, FilingDetail, FilingList
 from app.core.cache import cache, FilingCache, StatsCache, CACHE_TTL
 
 router = APIRouter()
+
+
+def safe_json_to_string(value):
+    """Convert JSON value to string safely, handling empty dicts"""
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        if not value:  # Empty dict
+            return None
+        return json.dumps(value)
+    if isinstance(value, str):
+        return value if value else None
+    return str(value) if value else None
+
+
+def get_vote_counts_for_filing(db: Session, filing_id: int) -> Dict[str, int]:
+    """
+    Get vote counts for a filing from UserVote table
+    Returns dict with bullish, neutral, bearish counts
+    """
+    # Get all votes for this filing
+    votes = db.query(UserVote).filter(UserVote.filing_id == filing_id).all()
+    
+    # Count by type
+    counts = {
+        "bullish": 0,
+        "neutral": 0,
+        "bearish": 0
+    }
+    
+    for vote in votes:
+        if vote.vote_type in counts:
+            counts[vote.vote_type] += 1
+    
+    return counts
+
+
+def get_company_info_dict(company: Company, filing_type: str) -> dict:
+    """
+    获取公司信息字典，根据filing类型决定返回详细程度
+    对于S-1返回基础信息，对于成熟公司返回完整信息
+    """
+    # 基础信息（所有公司都有）
+    base_info = {
+        "id": company.id,
+        "name": company.name,
+        "ticker": company.ticker or f"IPO-{company.cik[-4:]}",  # IPO公司可能没有ticker
+        "cik": company.cik,
+        "is_sp500": company.is_sp500,
+        "is_nasdaq100": company.is_nasdaq100,
+        "is_public": getattr(company, 'is_public', True),
+        "has_s1_filing": getattr(company, 'has_s1_filing', False)
+    }
+    
+    # 如果是S-1文件或公司数据不完整，只返回基础信息
+    if filing_type == "S-1" or not company.ticker:
+        base_info["company_type"] = "Pre-IPO" if filing_type == "S-1" else "Public Company"
+        return base_info
+    
+    # 成熟公司返回完整信息
+    full_info = base_info.copy()
+    full_info.update({
+        # 分类信息
+        "legal_name": company.legal_name,
+        "sector": getattr(company, 'sector', company.sic_description),  # 优先使用sector，否则用sic_description
+        "industry": getattr(company, 'industry', None),
+        "sic": company.sic,
+        "sic_description": company.sic_description,
+        
+        # 位置信息
+        "headquarters": getattr(company, 'headquarters', None),
+        "country": getattr(company, 'country', 'United States'),
+        "state": company.state,
+        "state_of_incorporation": company.state_of_incorporation,
+        
+        # 公司详情
+        "founded_year": getattr(company, 'founded_year', None),
+        "employees": getattr(company, 'employees', None),
+        "employee_size": company.employee_size_category if hasattr(company, 'employee_size_category') else None,
+        "market_cap": getattr(company, 'market_cap', None),
+        
+        # 市场信息
+        "exchange": company.exchange,
+        "indices": company.indices_list if hasattr(company, 'indices_list') else [],
+        "company_type": company.company_type if hasattr(company, 'company_type') else "Public Company",
+        
+        # 其他信息
+        "website": getattr(company, 'website', None),
+        "fiscal_year_end": company.fiscal_year_end,
+        "business_phone": company.business_phone,
+        
+        # IPO相关
+        "ipo_date": company.ipo_date.isoformat() if getattr(company, 'ipo_date', None) else None
+    })
+    
+    # 移除None值以减少响应大小
+    full_info = {k: v for k, v in full_info.items() if v is not None}
+    
+    return full_info
 
 
 @router.get("/", response_model=FilingList)
@@ -33,6 +135,7 @@ async def get_filings(
     Get list of filings with optional filters
     Results are cached for 5 minutes
     Authentication is optional - public endpoint
+    Enhanced to return more company information
     """
     # Generate cache key
     cache_key = FilingCache.get_filing_list_key(skip, limit, form_type, ticker)
@@ -66,40 +169,32 @@ async def get_filings(
         # Get stats from cache
         view_count = StatsCache.get_view_count(str(filing.id))
         
-        # Get vote counts from database
-        vote_counts = {
-            "bullish": filing.bullish_votes or 0,
-            "neutral": filing.neutral_votes or 0,
-            "bearish": filing.bearish_votes or 0
-        }
+        # Get vote counts from UserVote table
+        vote_counts = get_vote_counts_for_filing(db, filing.id)
         
         # Use unified feed summary if available, fallback to legacy
         one_liner = filing.unified_feed_summary if filing.unified_feed_summary else (
-            filing.ai_summary[:100] + "..." if filing.ai_summary else None
+            getattr(filing, 'ai_summary', '')[:100] + "..." if getattr(filing, 'ai_summary', None) else None
         )
+        
+        # 获取公司信息（Feed流使用简化版）
+        company_info = get_company_info_dict(filing.company, filing.filing_type.value)
         
         filing_brief = FilingBrief(
             id=filing.id,
             form_type=filing.filing_type.value,
             filing_date=filing.filing_date,
             accession_number=filing.accession_number,
-            file_url=filing.primary_doc_url or "",
-            company={
-                "id": filing.company.id,
-                "name": filing.company.name,
-                "ticker": filing.company.ticker,
-                "cik": filing.company.cik,
-                "is_sp500": filing.company.is_sp500,
-                "is_nasdaq100": filing.company.is_nasdaq100
-            },
+            filing_url=filing.primary_document_url or filing.filing_url or "",  # FIXED: file_url -> filing_url
+            company=company_info,
             one_liner=one_liner,
             sentiment=filing.management_tone.value if filing.management_tone else None,
-            tags=filing.key_tags or [],
+            tags=filing.key_tags if filing.key_tags else [],  # 直接使用，SQLAlchemy已自动解析JSON
             vote_counts=vote_counts,
-            comment_count=filing.comment_count or 0,
+            comment_count=getattr(filing, 'comment_count', 0) or 0,
             view_count=view_count,
             event_type=filing.event_type,  # For 8-K
-            has_unified_analysis=filing.analysis_version == "v2"
+            has_unified_analysis=filing.analysis_version == "v2" if filing.analysis_version else False
         )
         filing_responses.append(filing_brief)
     
@@ -128,6 +223,7 @@ async def get_filing(
     Returns unified analysis if available (v2), otherwise legacy format
     Results are cached for 1 hour
     Enforces daily view limits for free users
+    Enhanced to return full company details for mature companies
     """
     # Check if user can view this filing
     view_check = ViewTrackingService.can_view_filing(db, current_user, filing_id)
@@ -199,12 +295,11 @@ async def get_filing(
         if vote:
             user_vote = vote.vote_type
     
-    # Get vote counts from database
-    vote_counts = {
-        "bullish": filing.bullish_votes or 0,
-        "neutral": filing.neutral_votes or 0,
-        "bearish": filing.bearish_votes or 0
-    }
+    # Get vote counts from UserVote table
+    vote_counts = get_vote_counts_for_filing(db, filing_id)
+    
+    # 获取增强的公司信息（详情页使用完整版）
+    company_info = get_company_info_dict(filing.company, filing.filing_type.value)
     
     # Prepare base response data
     response_data = {
@@ -212,36 +307,29 @@ async def get_filing(
         "form_type": filing.filing_type.value,
         "filing_date": filing.filing_date,
         "accession_number": filing.accession_number,
-        "file_url": filing.primary_doc_url or "",
+        "filing_url": filing.primary_document_url or filing.filing_url or "",  # FIXED: file_url -> filing_url
         "cik": filing.company.cik,
-        "company": {
-            "id": filing.company.id,
-            "name": filing.company.name,
-            "ticker": filing.company.ticker,
-            "cik": filing.company.cik,
-            "is_sp500": filing.company.is_sp500,
-            "is_nasdaq100": filing.company.is_nasdaq100
-        },
+        "company": company_info,  # 使用增强的公司信息
         "status": filing.status.value,
         
         # ==================== UNIFIED ANALYSIS FIELDS ====================
         "unified_analysis": filing.unified_analysis,
         "unified_feed_summary": filing.unified_feed_summary,
         "analysis_version": filing.analysis_version,
-        "smart_markup_data": filing.smart_markup_data,
-        "analyst_expectations": filing.analyst_expectations,
+        "smart_markup_data": filing.safe_json_get('smart_markup_data'),
+        "analyst_expectations": filing.safe_json_get('analyst_expectations'),
         
         # ==================== LEGACY FIELDS ====================
-        "ai_summary": filing.ai_summary,
-        "one_liner": filing.unified_feed_summary or (filing.ai_summary[:100] + "..." if filing.ai_summary else None),
+        "ai_summary": getattr(filing, 'ai_summary', None),
+        "one_liner": filing.unified_feed_summary or (getattr(filing, 'ai_summary', '')[:100] + "..." if getattr(filing, 'ai_summary', None) else None),
         "sentiment": filing.management_tone.value if filing.management_tone else None,
-        "sentiment_explanation": filing.tone_explanation,
+        "sentiment_explanation": getattr(filing, 'tone_explanation', None),
         "key_points": extract_key_points(filing),
         "risks": extract_risks(filing),
         "opportunities": extract_opportunities(filing),
-        "questions_answers": filing.key_questions or [],
-        "tags": filing.key_tags or [],
-        "financial_metrics": filing.financial_highlights,
+        "questions_answers": filing.safe_json_get('key_questions', []) or [],
+        "tags": filing.key_tags if filing.key_tags else [],  # 直接使用，SQLAlchemy已自动解析JSON
+        "financial_metrics": safe_json_to_string(filing.financial_metrics),
         
         # Metadata
         "processed_at": filing.processing_completed_at,
@@ -250,7 +338,7 @@ async def get_filing(
         
         # Interaction stats
         "vote_counts": vote_counts,
-        "comment_count": filing.comment_count or 0,
+        "comment_count": getattr(filing, 'comment_count', 0) or 0,
         "view_count": view_count,
         "user_vote": user_vote,
         
@@ -262,14 +350,14 @@ async def get_filing(
         },
         
         # Existing differentiated fields
-        "specific_data": filing.filing_specific_data if filing.filing_specific_data else {},
-        "chart_data": filing.chart_data if include_charts and filing.chart_data else None,
+        "specific_data": filing.safe_json_get('filing_specific_data', {}) or {},
+        "chart_data": filing.safe_json_get('chart_data') if include_charts else None,
     }
     
-    # Add common fields
+    # Add common fields (safe access for potentially missing columns)
     response_data.update({
-        "fiscal_year": filing.fiscal_year,
-        "fiscal_quarter": filing.fiscal_quarter,
+        "fiscal_year": getattr(filing, 'fiscal_year', None),
+        "fiscal_quarter": getattr(filing, 'fiscal_quarter', None),
         "period_end_date": filing.period_end_date,
     })
     
@@ -278,55 +366,56 @@ async def get_filing(
     
     if filing_type == "10-K":
         response_data.update({
-            "auditor_opinion": filing.auditor_opinion,
-            "three_year_financials": filing.three_year_financials,
-            "business_segments": filing.business_segments,
-            "risk_summary": filing.risk_summary,
-            "growth_drivers": filing.growth_drivers,
-            "management_outlook": filing.management_outlook,
-            "strategic_adjustments": filing.strategic_adjustments,
-            "market_impact_10k": filing.market_impact_10k,
-            "financial_highlights": filing.financial_highlights
+            "auditor_opinion": getattr(filing, 'auditor_opinion', None),
+            "three_year_financials": getattr(filing, 'three_year_financials', None),
+            "business_segments": getattr(filing, 'business_segments', None),
+            "risk_summary": getattr(filing, 'risk_summary', None),
+            "growth_drivers": getattr(filing, 'growth_drivers', None),
+            "management_outlook": getattr(filing, 'management_outlook', None),
+            "strategic_adjustments": getattr(filing, 'strategic_adjustments', None),
+            "market_impact_10k": getattr(filing, 'market_impact_10k', None),
+            "financial_highlights": safe_json_to_string(filing.financial_highlights)
         })
     
     elif filing_type == "10-Q":
         response_data.update({
-            "expectations_comparison": filing.expectations_comparison,
-            "cost_structure": filing.cost_structure,
-            "guidance_update": filing.guidance_update,
-            "growth_decline_analysis": filing.growth_decline_analysis,
-            "management_tone_analysis": filing.management_tone_analysis,
-            "beat_miss_analysis": filing.beat_miss_analysis,
-            "market_impact_10q": filing.market_impact_10q,
-            # FIXED: Use financial_highlights instead of non-existent core_metrics
-            "core_metrics": filing.financial_highlights  # 修复: 使用 financial_highlights
+            "expectations_comparison": getattr(filing, 'expectations_comparison', None),
+            "cost_structure": getattr(filing, 'cost_structure', None),
+            "guidance_update": getattr(filing, 'guidance_update', None),
+            "growth_decline_analysis": getattr(filing, 'growth_decline_analysis', None),
+            "management_tone_analysis": getattr(filing, 'management_tone_analysis', None),
+            "beat_miss_analysis": getattr(filing, 'beat_miss_analysis', None),
+            "market_impact_10q": getattr(filing, 'market_impact_10q', None),
+            # Use either core_metrics or financial_highlights
+            "core_metrics": safe_json_to_string(filing.core_metrics) or safe_json_to_string(filing.financial_highlights),
+            "financial_highlights": safe_json_to_string(filing.financial_highlights)
         })
     
     elif filing_type == "8-K":
         response_data.update({
-            "item_type": filing.item_type,
-            "items": filing.items,
-            "event_timeline": filing.event_timeline,
-            "event_nature_analysis": filing.event_nature_analysis,
-            "market_impact_analysis": filing.market_impact_analysis,
-            "key_considerations": filing.key_considerations,
+            "item_type": getattr(filing, 'item_type', None),
+            "items": getattr(filing, 'items', None),
+            "event_timeline": getattr(filing, 'event_timeline', None),
+            "event_nature_analysis": getattr(filing, 'event_nature_analysis', None),
+            "market_impact_analysis": getattr(filing, 'market_impact_analysis', None),
+            "key_considerations": getattr(filing, 'key_considerations', None),
             "event_type": filing.event_type,
             "event_summary": extract_event_summary(filing),
-            "event_details": {  # For backward compatibility
+            "event_details": {
                 "type": filing.event_type,
-                "items": filing.items
+                "items": getattr(filing, 'items', None)
             }
         })
     
     elif filing_type == "S-1":
         response_data.update({
-            "ipo_details": filing.ipo_details,
-            "company_overview": filing.company_overview,
-            "financial_summary": filing.financial_summary,
-            "risk_categories": filing.risk_categories,
-            "growth_path_analysis": filing.growth_path_analysis,
-            "competitive_moat_analysis": filing.competitive_moat_analysis,
-            "financial_highlights": filing.financial_highlights
+            "ipo_details": getattr(filing, 'ipo_details', None),
+            "company_overview": getattr(filing, 'company_overview', None),
+            "financial_summary": getattr(filing, 'financial_summary', None),
+            "risk_categories": getattr(filing, 'risk_categories', None),
+            "growth_path_analysis": getattr(filing, 'growth_path_analysis', None),
+            "competitive_moat_analysis": getattr(filing, 'competitive_moat_analysis', None),
+            "financial_highlights": safe_json_to_string(filing.financial_highlights)
         })
     
     # Cache the result without view_limit_info and user_vote (since they're user-specific)
@@ -377,6 +466,7 @@ async def get_popular_filings(
     Get popular filings based on view count
     Results are cached for 10 minutes
     Authentication is optional - public endpoint
+    Enhanced to return company information
     """
     # Validate period
     if period not in ["day", "week", "month"]:
@@ -391,7 +481,6 @@ async def get_popular_filings(
         return cached_result
     
     # Calculate date range
-    from datetime import timedelta
     now = datetime.utcnow()
     
     if period == "day":
@@ -426,22 +515,26 @@ async def get_popular_filings(
     for item in filing_views:
         filing = item["filing"]
         
-        # Get vote counts from database
-        vote_counts = {
-            "bullish": filing.bullish_votes or 0,
-            "neutral": filing.neutral_votes or 0,
-            "bearish": filing.bearish_votes or 0
-        }
+        # Get vote counts from UserVote table
+        vote_counts = get_vote_counts_for_filing(db, filing.id)
         
         # Use unified content if available
         summary = filing.unified_analysis[:200] + "..." if filing.unified_analysis else (
-            filing.ai_summary[:200] + "..." if filing.ai_summary else None
+            getattr(filing, 'ai_summary', '')[:200] + "..." if getattr(filing, 'ai_summary', None) else None
         )
+        
+        # 获取公司基础信息
+        company_info = {
+            "ticker": filing.company.ticker,
+            "name": filing.company.name,
+            "is_sp500": filing.company.is_sp500,
+            "is_nasdaq100": filing.company.is_nasdaq100,
+            "sector": getattr(filing.company, 'sector', filing.company.sic_description)
+        }
         
         result.append({
             "id": filing.id,
-            "company_name": filing.company.name,
-            "company_ticker": filing.company.ticker,
+            "company": company_info,
             "form_type": filing.filing_type.value,
             "filing_date": filing.filing_date.isoformat(),
             "ai_summary": summary,
@@ -464,36 +557,57 @@ def extract_event_summary(filing: Filing) -> str:
     if filing.unified_analysis:
         # Take first paragraph
         return filing.unified_analysis.split('\n')[0]
-    elif filing.ai_summary:
+    elif getattr(filing, 'ai_summary', None):
         return filing.ai_summary.split('\n')[0]
     return None
 
 
 def extract_key_points(filing: Filing) -> List[str]:
     """Extract key points from filing"""
-    # If we have smart markup data, extract key insights
-    if filing.smart_markup_data and filing.smart_markup_data.get('insights'):
-        return filing.smart_markup_data['insights']
+    # Check new field first
+    if filing.key_points:
+        if isinstance(filing.key_points, list):
+            return filing.key_points
+        elif isinstance(filing.key_points, dict) and not filing.key_points:  # Empty dict
+            return []
     
-    # TODO: Implement legacy extraction logic if needed
+    # If we have smart markup data, extract key insights
+    smart_data = filing.safe_json_get('smart_markup_data')
+    if smart_data and isinstance(smart_data, dict) and smart_data.get('insights'):
+        return smart_data['insights']
+    
     return []
 
 
 def extract_risks(filing: Filing) -> List[str]:
     """Extract risks from filing"""
-    # If we have smart markup data, extract negative items
-    if filing.smart_markup_data and filing.smart_markup_data.get('negative'):
-        return filing.smart_markup_data['negative']
+    # Check new field first
+    if filing.risks:
+        if isinstance(filing.risks, list):
+            return filing.risks
+        elif isinstance(filing.risks, dict) and not filing.risks:  # Empty dict
+            return []
     
-    # TODO: Implement legacy extraction logic if needed
+    # If we have smart markup data, extract negative items
+    smart_data = filing.safe_json_get('smart_markup_data')
+    if smart_data and isinstance(smart_data, dict) and smart_data.get('negative'):
+        return smart_data['negative']
+    
     return []
 
 
 def extract_opportunities(filing: Filing) -> List[str]:
     """Extract opportunities from filing"""
-    # If we have smart markup data, extract positive items
-    if filing.smart_markup_data and filing.smart_markup_data.get('positive'):
-        return filing.smart_markup_data['positive']
+    # Check new field first
+    if filing.opportunities:
+        if isinstance(filing.opportunities, list):
+            return filing.opportunities
+        elif isinstance(filing.opportunities, dict) and not filing.opportunities:  # Empty dict
+            return []
     
-    # TODO: Implement legacy extraction logic if needed
+    # If we have smart markup data, extract positive items
+    smart_data = filing.safe_json_get('smart_markup_data')
+    if smart_data and isinstance(smart_data, dict) and smart_data.get('positive'):
+        return smart_data['positive']
+    
     return []

@@ -1,5 +1,6 @@
 """
 Comment schemas for request/response validation
+ENHANCED: Added reply support
 """
 from typing import Optional, List
 from datetime import datetime
@@ -13,9 +14,10 @@ class CommentBase(BaseModel):
     content: str = Field(..., min_length=1, max_length=1000)
 
 
-class CommentCreate(CommentBase):
-    """Schema for creating a comment"""
-    pass
+class CommentCreate(BaseModel):
+    """Schema for creating a comment with optional reply"""
+    content: str = Field(..., min_length=1, max_length=1000)
+    reply_to_comment_id: Optional[int] = None
 
 
 class CommentUpdate(BaseModel):
@@ -28,8 +30,16 @@ class CommentVoteRequest(BaseModel):
     vote_type: str = Field(..., pattern="^(upvote|downvote|none)$")
 
 
+class ReplyInfo(BaseModel):
+    """Schema for reply information"""
+    comment_id: int
+    user_id: int
+    username: str
+    content_preview: str
+
+
 class CommentResponse(BaseModel):
-    """Schema for comment response"""
+    """Schema for comment response with reply info"""
     id: int
     filing_id: int
     user_id: int
@@ -43,6 +53,9 @@ class CommentResponse(BaseModel):
     downvotes: int = 0
     net_votes: int = 0
     user_vote: int = 0  # -1, 0, or 1
+    
+    # Reply information (ENHANCED)
+    reply_to: Optional[ReplyInfo] = None
     
     class Config:
         from_attributes = True

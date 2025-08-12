@@ -210,6 +210,13 @@ async def get_filings(
     
     return result
 
+@router.get("/user/view-stats")
+async def get_user_view_stats(
+    db: Session = Depends(deps.get_db),
+    current_user = Depends(deps.get_current_user)
+):
+    """Get user's view statistics"""
+    return ViewTrackingService.get_user_view_stats(db, current_user.id)
 
 @router.get("/{filing_id}", response_model=FilingDetail)
 async def get_filing(

@@ -56,12 +56,15 @@ class TextExtractor:
                 (r'REGISTRATION\s+STATEMENT', 90),
                 (r'PROSPECTUS', 80),
                 (r'Under\s+the\s+Securities\s+Act\s+of\s+1933', 70),
+                (r'IPO\s+REGISTRATION', 60),
+                (r'INITIAL\s+PUBLIC\s+OFFERING', 60),
             ]
         }
         
         # Key sections for each filing type
         self.key_sections = {
             '10-K': {
+                'Item 1': {'pattern': r'Item\s*1[.\s]+Business', 'max_chars': 30000},
                 'Item 1A': {'pattern': r'Item\s*1A[.\s]+Risk\s+Factors', 'max_chars': 30000},
                 'Item 7': {'pattern': r'Item\s*7[.\s]+Management.{0,50}Discussion', 'max_chars': 40000},
                 'Item 8': {'pattern': r'Item\s*8[.\s]+Financial\s+Statements', 'max_chars': 50000},
@@ -74,64 +77,66 @@ class TextExtractor:
                 'Items': {'pattern': r'Item\s+\d+\.\d+', 'max_chars': 10000},
             },
             'S-1': {
-                'Summary': {'pattern': r'(?:Prospectus\s+)?Summary', 'max_chars': 20000},
-                'Risk Factors': {'pattern': r'Risk\s+Factors', 'max_chars': 25000},
-                'Business': {'pattern': r'(?:Our\s+)?Business', 'max_chars': 20000},
-                'Use of Proceeds': {'pattern': r'Use\s+of\s+Proceeds', 'max_chars': 10000},
+                'Prospectus Summary': {'pattern': r'(?:PROSPECTUS\s+)?SUMMARY', 'max_chars': 20000},
+                'Risk Factors': {'pattern': r'RISK\s+FACTORS', 'max_chars': 30000},
+                'Business': {'pattern': r'(?:OUR\s+)?BUSINESS|BUSINESS\s+OVERVIEW', 'max_chars': 25000},
+                'Use of Proceeds': {'pattern': r'USE\s+OF\s+PROCEEDS', 'max_chars': 10000},
+                'Management': {'pattern': r'MANAGEMENT|DIRECTORS\s+AND\s+EXECUTIVE', 'max_chars': 15000},
+                'Financial Statements': {'pattern': r'FINANCIAL\s+STATEMENTS', 'max_chars': 40000},
             }
         }
         
         # S-1 critical sections based on actual TOC structure
         self.s1_critical_sections = {
             'PROSPECTUS SUMMARY': {
-                'patterns': [r'PROSPECTUS\s+SUMMARY', r'SUMMARY\s+OF\s+THE\s+OFFERING'],
-                'keywords': ['overview', 'investment', 'highlights', 'summary'],
+                'patterns': [r'PROSPECTUS\s+SUMMARY', r'SUMMARY\s+OF\s+THE\s+OFFERING', r'INVESTMENT\s+HIGHLIGHTS'],
+                'keywords': ['overview', 'investment', 'highlights', 'summary', 'opportunity'],
                 'priority': 100
             },
             'RISK FACTORS': {
-                'patterns': [r'RISK\s+FACTORS'],
-                'keywords': ['risks', 'uncertainties', 'challenges', 'risk factors'],
+                'patterns': [r'RISK\s+FACTORS', r'INVESTMENT\s+RISKS'],
+                'keywords': ['risks', 'uncertainties', 'challenges', 'risk factors', 'may adversely affect'],
                 'priority': 95
             },
             'USE OF PROCEEDS': {
-                'patterns': [r'USE\s+OF\s+PROCEEDS'],
-                'keywords': ['proceeds', 'allocation', 'purposes', 'use of proceeds'],
+                'patterns': [r'USE\s+OF\s+PROCEEDS', r'PROCEEDS\s+FROM\s+THE\s+OFFERING'],
+                'keywords': ['proceeds', 'allocation', 'purposes', 'use of proceeds', 'intend to use'],
                 'priority': 90
             },
             'BUSINESS': {
-                'patterns': [r'BUSINESS(?:\s+OVERVIEW)?', r'OUR\s+BUSINESS'],
-                'keywords': ['business model', 'revenue', 'operations', 'products', 'services'],
+                'patterns': [r'BUSINESS(?:\s+OVERVIEW)?', r'OUR\s+BUSINESS', r'COMPANY\s+OVERVIEW'],
+                'keywords': ['business model', 'revenue', 'operations', 'products', 'services', 'competitive'],
                 'priority': 85
             },
             'MANAGEMENT\'S DISCUSSION AND ANALYSIS': {
                 'patterns': [r'MANAGEMENT.{0,5}S?\s+DISCUSSION\s+AND\s+ANALYSIS', r'MD&A'],
-                'keywords': ['financial condition', 'results of operations', 'liquidity'],
+                'keywords': ['financial condition', 'results of operations', 'liquidity', 'capital resources'],
                 'priority': 80
             },
             'FINANCIAL STATEMENTS': {
                 'patterns': [r'FINANCIAL\s+STATEMENTS', r'CONSOLIDATED\s+FINANCIAL\s+STATEMENTS'],
-                'keywords': ['balance sheet', 'income statement', 'cash flow'],
+                'keywords': ['balance sheet', 'income statement', 'cash flow', 'statement of operations'],
                 'priority': 75
             },
             'MANAGEMENT': {
-                'patterns': [r'MANAGEMENT(?:\s+TEAM)?', r'DIRECTORS\s+AND\s+EXECUTIVE\s+OFFICERS'],
-                'keywords': ['executive', 'directors', 'management team', 'leadership'],
+                'patterns': [r'MANAGEMENT(?:\s+TEAM)?', r'DIRECTORS\s+AND\s+EXECUTIVE\s+OFFICERS', r'OUR\s+TEAM'],
+                'keywords': ['executive', 'directors', 'management team', 'leadership', 'officers'],
                 'priority': 70
             },
-            'EXECUTIVE AND DIRECTORS\' COMPENSATION': {
-                'patterns': [r'EXECUTIVE\s+(?:AND\s+DIRECTORS?\s+)?COMPENSATION', r'COMPENSATION\s+DISCUSSION'],
-                'keywords': ['compensation', 'salary', 'equity', 'benefits'],
-                'priority': 65
-            },
-            'PRINCIPAL AND SELLING STOCKHOLDERS': {
-                'patterns': [r'PRINCIPAL\s+(?:AND\s+SELLING\s+)?STOCKHOLDERS', r'OWNERSHIP'],
-                'keywords': ['ownership', 'shareholders', 'equity holders'],
+            'PRINCIPAL STOCKHOLDERS': {
+                'patterns': [r'PRINCIPAL\s+(?:AND\s+SELLING\s+)?STOCKHOLDERS', r'OWNERSHIP', r'SECURITY\s+OWNERSHIP'],
+                'keywords': ['ownership', 'shareholders', 'equity holders', 'beneficial ownership'],
                 'priority': 60
             },
-            'DETERMINATION OF OFFERING PRICE': {
-                'patterns': [r'DETERMINATION\s+OF\s+OFFERING\s+PRICE', r'PRICING'],
-                'keywords': ['offering price', 'valuation', 'pricing'],
+            'DESCRIPTION OF CAPITAL STOCK': {
+                'patterns': [r'DESCRIPTION\s+OF\s+(?:CAPITAL\s+)?STOCK', r'CAPITALIZATION'],
+                'keywords': ['common stock', 'preferred stock', 'shares', 'capital structure'],
                 'priority': 55
+            },
+            'UNDERWRITING': {
+                'patterns': [r'UNDERWRITING', r'PLAN\s+OF\s+DISTRIBUTION'],
+                'keywords': ['underwriters', 'offering price', 'commission', 'distribution'],
+                'priority': 50
             }
         }
     
@@ -145,10 +150,9 @@ class TextExtractor:
         Returns:
             Dictionary with extracted text sections
         """
-        # FIXED: Check if directory exists
+        # Check if directory exists
         if not filing_dir.exists():
             logger.warning(f"Filing directory does not exist: {filing_dir}")
-            # Return minimal content instead of error to allow processing to continue
             return {
                 'error': 'Filing directory not found',
                 'full_text': '',
@@ -159,17 +163,32 @@ class TextExtractor:
         # First, check if we have a TXT file (preferred)
         txt_files = list(filing_dir.glob("*.txt"))
         if txt_files:
-            txt_file = txt_files[0]  # Use first TXT file
+            txt_file = txt_files[0]
             logger.info(f"Found TXT file, using {txt_file.name}")
             return self.extract_from_txt(txt_file)
         
-        # Otherwise, find the main HTML document (not index.htm)
-        html_files = [f for f in filing_dir.glob("*.htm") if f.name != "index.htm"]
-        html_files.extend([f for f in filing_dir.glob("*.html") if f.name != "index.html"])
+        # For S-1, prioritize correct document patterns
+        html_files = []
+        if filing_dir.exists():
+            # Check for S-1 specific patterns first
+            s1_patterns = ['forms-1.htm', '*-s1*.htm', '*s1.htm', 's-1.htm', 's1.htm']
+            for pattern in s1_patterns:
+                matching_files = list(filing_dir.glob(pattern))
+                # Exclude fee tables
+                matching_files = [f for f in matching_files if not self._is_fee_table(f.name)]
+                if matching_files:
+                    html_files = matching_files
+                    break
+        
+        # If no S-1 specific files, find general HTML documents
+        if not html_files:
+            html_files = [f for f in filing_dir.glob("*.htm") if f.name != "index.htm"]
+            html_files.extend([f for f in filing_dir.glob("*.html") if f.name != "index.html"])
+            # Exclude fee tables
+            html_files = [f for f in html_files if not self._is_fee_table(f.name)]
         
         if not html_files:
             logger.warning(f"No filing documents found in {filing_dir}")
-            # FIXED: Return minimal content instead of error
             return {
                 'error': 'No filing documents found',
                 'full_text': '',
@@ -177,67 +196,73 @@ class TextExtractor:
                 'filing_type': 'UNKNOWN'
             }
         
-        # Use the first non-index HTML file
+        # Use the first non-fee HTML file
         main_doc = html_files[0]
         logger.info(f"Extracting text from {main_doc.name}")
         
         # Extract from main document
         sections = self.extract_from_html(main_doc)
         
-        # ENHANCED: Extract Exhibit 99 for 8-K filings
+        # Enhanced: Extract Exhibit 99 for 8-K filings
         if sections.get('filing_type') == '8-K':
             exhibit_99_content = self._extract_exhibit_99(filing_dir)
             if exhibit_99_content:
                 logger.info(f"Successfully extracted Exhibit 99 content: {len(exhibit_99_content)} chars")
                 
-                # Append Exhibit 99 content to primary content
                 if 'primary_content' in sections:
                     sections['primary_content'] += f"\n\n{'='*50}\nEXHIBIT 99 CONTENT\n{'='*50}\n\n{exhibit_99_content}"
                 else:
                     sections['primary_content'] = exhibit_99_content
                 
-                # Also append to full text
                 if 'full_text' in sections:
                     sections['full_text'] += f"\n\n{exhibit_99_content}"
                 
-                # Store exhibit content separately for reference
                 sections['exhibit_99_content'] = exhibit_99_content
         
         return sections
     
+    def _is_fee_table(self, filename: str) -> bool:
+        """Check if a file is a fee calculation table"""
+        filename_lower = filename.lower()
+        fee_indicators = [
+            'ex-fee', 'exfee', 'ex_fee',
+            'ex-filingfees', 'exfilingfees',
+            'filing-fees', 'filingfees',
+            'fee-table', 'feetable',
+            'ex107', 'ex_107', 'ex-107',
+            'calculation'
+        ]
+        
+        for indicator in fee_indicators:
+            if indicator in filename_lower:
+                return True
+        
+        # Check if it's an exhibit (except S-1 main docs)
+        if re.match(r'^ex[_-]?\d+', filename_lower) and 's1' not in filename_lower:
+            return True
+        
+        return False
+    
     def _extract_exhibit_99(self, filing_dir: Path) -> Optional[str]:
         """
         Extract content from Exhibit 99 files in the filing directory
-        
-        Args:
-            filing_dir: Path to the filing directory
-            
-        Returns:
-            Combined text from all Exhibit 99 files, or None if not found
         """
         exhibit_99_content = []
         
         # Look for Exhibit 99 files with various naming patterns
         exhibit_patterns = [
-            "*ex99*.htm",
-            "*ex99*.html",
-            "*kex99*.htm",     # KMI format
-            "*kex99*.html",
-            "*dex99*.htm",
-            "*dex99*.html",
-            "ex-99*.htm",
-            "ex-99*.html",
-            "exhibit99*.htm",
-            "exhibit99*.html",
-            "ex_99*.htm",
-            "ex_99*.html"
+            "*ex99*.htm", "*ex99*.html",
+            "*kex99*.htm", "*kex99*.html",
+            "*dex99*.htm", "*dex99*.html",
+            "ex-99*.htm", "ex-99*.html",
+            "exhibit99*.htm", "exhibit99*.html"
         ]
         
         exhibit_files = []
         for pattern in exhibit_patterns:
             exhibit_files.extend(filing_dir.glob(pattern))
         
-        # Remove duplicates and sort by filename
+        # Remove duplicates and sort
         exhibit_files = sorted(set(exhibit_files), key=lambda x: x.name)
         
         if not exhibit_files:
@@ -248,7 +273,7 @@ class TextExtractor:
         
         for exhibit_file in exhibit_files:
             try:
-                # Check file size - skip if too large (>50MB)
+                # Check file size
                 if exhibit_file.stat().st_size > 50 * 1024 * 1024:
                     logger.warning(f"Skipping {exhibit_file.name} - file too large (>50MB)")
                     continue
@@ -271,7 +296,7 @@ class TextExtractor:
                 text = self._clean_text(text)
                 
                 # Add header for this exhibit
-                if text and len(text) > 100:  # Only include if substantial content
+                if text and len(text) > 100:
                     header = f"\n{'='*40}\nExhibit 99: {exhibit_file.name}\n{'='*40}\n"
                     exhibit_99_content.append(header + text)
                     logger.info(f"Extracted {len(text)} chars from {exhibit_file.name}")
@@ -284,8 +309,8 @@ class TextExtractor:
             # Combine all exhibit content
             combined_content = '\n\n'.join(exhibit_99_content)
             
-            # Limit total size to avoid overwhelming the AI
-            max_exhibit_chars = 100000  # 100K chars max for exhibits
+            # Limit total size
+            max_exhibit_chars = 100000
             if len(combined_content) > max_exhibit_chars:
                 logger.warning(f"Exhibit 99 content truncated from {len(combined_content)} to {max_exhibit_chars} chars")
                 combined_content = combined_content[:max_exhibit_chars] + "\n\n[Exhibit content truncated...]"
@@ -297,12 +322,6 @@ class TextExtractor:
     def extract_from_txt(self, txt_path: Path) -> Dict[str, str]:
         """
         Extract text from SEC TXT filing
-        
-        Args:
-            txt_path: Path to the TXT file
-            
-        Returns:
-            Dictionary with extracted text
         """
         try:
             with open(txt_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -366,12 +385,6 @@ class TextExtractor:
     def extract_from_html(self, html_path: Path) -> Dict[str, str]:
         """
         Extract structured text sections from an HTML filing
-        
-        Args:
-            html_path: Path to the HTML file
-            
-        Returns:
-            Dictionary with keys: 'full_text', 'primary_content', 'filing_type'
         """
         try:
             with open(html_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -385,6 +398,16 @@ class TextExtractor:
                     'primary_content': '',
                     'filing_type': 'UNKNOWN'
                 }
+            
+            # Check if this is just a fee calculation table (for S-1)
+            if len(html_content) < 5000 and 'CALCULATION OF FILING FEE' in html_content:
+                logger.warning(f"File appears to be only a fee calculation table: {html_path}")
+                # Try to find the real S-1 document in the same directory
+                parent_dir = html_path.parent
+                alt_files = [f for f in parent_dir.glob("*.htm") if not self._is_fee_table(f.name) and f != html_path]
+                if alt_files:
+                    logger.info(f"Found alternative file: {alt_files[0].name}")
+                    return self.extract_from_html(alt_files[0])
             
             # Identify filing type from raw HTML first
             filing_type = self._identify_filing_type_enhanced(html_content)
@@ -444,11 +467,10 @@ class TextExtractor:
         """
         Enhanced filing type identification using multiple patterns and scoring
         """
-        # Handle empty text
         if not text:
             return 'UNKNOWN'
             
-        # Expand search range to catch more patterns
+        # Expand search range
         search_text = text[:20000] if len(text) > 20000 else text
         search_text_upper = search_text.upper()
         
@@ -503,6 +525,7 @@ class TextExtractor:
     def _extract_smart_content(self, text: str, filing_type: str) -> str:
         """
         Smart content extraction when standard methods fail
+        Prioritizes content-rich sections
         """
         if not text:
             return ''
@@ -522,7 +545,18 @@ class TextExtractor:
         
         # Add filing-specific keywords
         if filing_type == 'S-1':
-            value_keywords.extend(['offering', 'proceeds', 'shares', 'ipo', 'registration'])
+            value_keywords.extend([
+                'offering', 'proceeds', 'shares', 'ipo', 'registration',
+                'prospectus', 'underwriting', 'market', 'competitive', 'strategy'
+            ])
+        elif filing_type == '10-K':
+            value_keywords.extend([
+                'annual', 'fiscal', 'consolidated', 'comprehensive', 'segment'
+            ])
+        elif filing_type == '10-Q':
+            value_keywords.extend([
+                'quarterly', 'three months', 'nine months', 'interim'
+            ])
         
         for para in paragraphs:
             if len(para) < 100:  # Skip short paragraphs
@@ -533,11 +567,15 @@ class TextExtractor:
             
             # Score based on keyword presence
             for keyword in value_keywords:
-                score += para_lower.count(keyword)
+                score += para_lower.count(keyword) * 2
             
             # Bonus for financial numbers
-            score += len(re.findall(r'\$[\d,]+', para)) * 2
-            score += len(re.findall(r'\d+\.\d+%', para)) * 2
+            score += len(re.findall(r'\$[\d,]+', para)) * 3
+            score += len(re.findall(r'\d+\.\d+%', para)) * 3
+            
+            # Bonus for section headers
+            if re.search(r'^[A-Z][A-Z\s]{5,}$', para.split('\n')[0]):
+                score += 10
             
             # Penalty for legal boilerplate
             if any(term in para_lower for term in ['pursuant to', 'securities act', 'incorporated by reference']):
@@ -564,7 +602,6 @@ class TextExtractor:
         
         return result if result else text[:50000]  # Fallback
     
-    # Rest of the methods remain the same...
     def _extract_8k_sections_enhanced(self, text: str) -> Dict[str, str]:
         """
         Enhanced 8-K extraction with better Item detection
@@ -576,7 +613,6 @@ class TextExtractor:
         item_patterns = [
             r'Item\s+(\d+\.\d+)\s*[:\-\s]*([^\n]{0,200})',
             r'ITEM\s+(\d+\.\d+)\s*[:\-\s]*([^\n]{0,200})',
-            r'Item\s+(\d+\.\d+)',
         ]
         
         all_matches = []
@@ -642,7 +678,6 @@ class TextExtractor:
         
         return sections
     
-    # Continue with the rest of the unchanged methods...
     def _extract_10k_sections_enhanced(self, text: str) -> Dict[str, str]:
         """
         Enhanced 10-K extraction focusing on key business sections
@@ -780,11 +815,9 @@ class TextExtractor:
         
         return sections
     
-    # All other methods remain the same...
     def _extract_s1_table_of_contents(self, text: str) -> Optional[Dict[str, int]]:
         """
         Extract table of contents from S-1 document
-        Returns dictionary mapping section names to page numbers
         """
         toc = {}
         
@@ -805,8 +838,8 @@ class TextExtractor:
         if not toc_start:
             return None
         
-        # Extract TOC entries (looking for pattern like "SECTION_NAME....PAGE_NUMBER")
-        toc_section = text[toc_start:toc_start + 5000]  # TOC usually within first 5000 chars
+        # Extract TOC entries
+        toc_section = text[toc_start:toc_start + 5000]
         
         # Pattern for TOC entries
         toc_entry_pattern = r'([A-Z][A-Z\s\',\-&]+?)[\s\.]+(\d+)\s*$'
@@ -825,7 +858,6 @@ class TextExtractor:
         
         return toc if toc else None
     
-    # Continue with all other unchanged methods...
     def _extract_sections_from_toc(self, text: str, toc: Dict[str, int]) -> Dict[str, str]:
         """
         Extract sections based on table of contents
@@ -842,7 +874,6 @@ class TextExtractor:
             # Add patterns based on section name
             clean_name = re.escape(section_name)
             section_patterns.append(rf'{clean_name}')
-            # Create space pattern outside of f-string
             space_pattern = clean_name.replace(" ", r"\s+")
             section_patterns.append(space_pattern)
             
@@ -862,7 +893,7 @@ class TextExtractor:
                     if next_match:
                         section_end = section_start + next_match.start()
                     else:
-                        section_end = section_start + 50000  # Default max length
+                        section_end = section_start + 50000
                 else:
                     section_end = min(section_start + 50000, len(text))
                 
@@ -913,7 +944,7 @@ class TextExtractor:
         """
         sections = {}
         
-        # Look for sections by font styling (often headers are bold or larger)
+        # Look for sections by font styling
         headers = []
         
         # Find potential headers by various methods
@@ -1145,7 +1176,6 @@ class TextExtractor:
         """
         Alternative extraction method for difficult documents
         """
-        # Get all text nodes
         texts = []
         
         for element in soup.descendants:

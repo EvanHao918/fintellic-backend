@@ -13,6 +13,9 @@ from app.models.user_vote import UserVote, VoteType
 from app.models.comment_vote import CommentVote
 from app.models.watchlist import Watchlist
 from app.models.user_filing_view import UserFilingView
+from app.models.subscription import Subscription
+from app.models.payment_record import PaymentRecord
+from app.models.pricing_plan import PricingPlan
 
 __all__ = [
     "Base",

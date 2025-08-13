@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import verify_token
-from app.models.user import User, UserTier
+from app.models.user import User
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -92,32 +92,47 @@ async def get_current_active_user(
 
 
 async def get_current_pro_user(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> User:
     """
-    Get current user with Pro subscription
+    Get current user with active Pro subscription
     
     Args:
         current_user: Active user from get_current_active_user
+        db: Database session for checking subscription status
         
     Returns:
         Pro user object
         
     Raises:
-        HTTPException: If user is not Pro tier
+        HTTPException: If user is not Pro tier or subscription expired
     """
-    if current_user.tier != UserTier.PRO:
+    # Check if user has PRO tier
+    if current_user.tier != "PRO":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Pro subscription required"
         )
     
+    # Check if subscription is active
+    if not current_user.is_subscription_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Pro subscription is not active"
+        )
+    
     # Check if subscription is still valid
     if current_user.subscription_expires_at:
         if current_user.subscription_expires_at < datetime.utcnow():
+            # Update user status if subscription expired
+            current_user.tier = "FREE"
+            current_user.is_subscription_active = False
+            db.commit()
+            
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Pro subscription expired"
+                detail="Pro subscription expired. Please renew your subscription."
             )
     
     return current_user
@@ -140,7 +155,8 @@ async def check_daily_limit(
     Raises:
         HTTPException: If daily limit reached
     """
-    if current_user.tier == UserTier.PRO:
+    # Pro users have unlimited access
+    if current_user.tier == "PRO" and current_user.is_subscription_active:
         return current_user
     
     # Check if daily limit needs reset
@@ -151,12 +167,23 @@ async def check_daily_limit(
                 hour=0, minute=0, second=0, microsecond=0
             ) + timedelta(days=1)
             db.commit()
+    else:
+        # Set initial reset time
+        current_user.daily_reports_reset_at = datetime.utcnow().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ) + timedelta(days=1)
+        db.commit()
     
     # Check daily limit
     if current_user.daily_reports_count >= settings.FREE_USER_DAILY_LIMIT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Daily limit of {settings.FREE_USER_DAILY_LIMIT} reports reached. Upgrade to Pro for unlimited access."
+            detail=f"Daily limit of {settings.FREE_USER_DAILY_LIMIT} reports reached. Upgrade to Pro for unlimited access.",
+            headers={
+                "X-Daily-Limit": str(settings.FREE_USER_DAILY_LIMIT),
+                "X-Reports-Used": str(current_user.daily_reports_count),
+                "X-Reset-Time": current_user.daily_reports_reset_at.isoformat()
+            }
         )
     
     return current_user
@@ -201,3 +228,70 @@ async def get_current_user_optional(
     except:
         # If any error occurs, treat as anonymous user
         return None
+
+
+async def get_subscription_user(
+    current_user: User = Depends(get_current_active_user)
+) -> User:
+    """
+    Get user with active subscription (alias for get_current_pro_user)
+    Used for endpoints that require an active subscription
+    
+    Args:
+        current_user: Active user
+        
+    Returns:
+        User with active subscription
+        
+    Raises:
+        HTTPException: If user doesn't have active subscription
+    """
+    if not current_user.is_subscription_active:
+        # Provide helpful information about subscription status
+        if current_user.is_early_bird:
+            message = "Subscription required. As an early bird user, you can get special pricing!"
+        else:
+            message = "Subscription required. Upgrade to Pro for unlimited access."
+        
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=message,
+            headers={
+                "X-Subscription-Required": "true",
+                "X-Is-Early-Bird": str(current_user.is_early_bird).lower(),
+                "X-Pricing-Tier": current_user.pricing_tier or "STANDARD"
+            }
+        )
+    
+    return current_user
+
+
+async def check_subscription_validity(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Check if user's subscription is still valid and update status if expired
+    
+    Args:
+        current_user: Active user
+        db: Database session
+        
+    Returns:
+        User object with updated subscription status
+    """
+    if current_user.is_subscription_active and current_user.subscription_expires_at:
+        if current_user.subscription_expires_at < datetime.utcnow():
+            # Subscription has expired
+            current_user.tier = "FREE"
+            current_user.is_subscription_active = False
+            current_user.subscription_type = None
+            
+            # Log the expiration
+            if current_user.subscription_metadata is None:
+                current_user.subscription_metadata = {}
+            current_user.subscription_metadata["last_expired_at"] = datetime.utcnow().isoformat()
+            
+            db.commit()
+    
+    return current_user

@@ -3,6 +3,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import secrets
 import json
 
@@ -24,8 +25,8 @@ from app.schemas.auth import (
     BiometricAuthRequest,
     RefreshTokenRequest
 )
-from app.schemas.user import UserCreate
-from app.models.user import User
+from app.schemas.user import UserCreate, UserDetailResponse
+from app.models.user import User, PricingTier
 
 router = APIRouter()
 
@@ -57,6 +58,21 @@ def create_tokens(user_id: int, device_id: Optional[str] = None) -> dict:
     }
 
 
+def get_early_bird_stats(db: Session) -> dict:
+    """获取早鸟统计信息"""
+    early_bird_count = db.query(func.count(User.id)).filter(
+        User.is_early_bird == True
+    ).scalar()
+    
+    slots_remaining = max(0, settings.EARLY_BIRD_LIMIT - early_bird_count)
+    
+    return {
+        "early_bird_users": early_bird_count,
+        "early_bird_slots_remaining": slots_remaining,
+        "is_early_bird_available": slots_remaining > 0
+    }
+
+
 @router.post("/register", response_model=RegisterResponse)
 def register(
     *,
@@ -64,7 +80,7 @@ def register(
     user_in: RegisterRequest
 ) -> Any:
     """
-    Register new user
+    Register new user with automatic early bird eligibility check
     """
     # Check if user already exists
     user = crud_user.get_by_email(db, email=user_in.email)
@@ -83,28 +99,46 @@ def register(
                 detail="This username is already taken"
             )
     
-    # Create new user
+    # Create new user (数据库触发器会自动设置user_sequence_number和早鸟状态)
     user_create = UserCreate(
         email=user_in.email,
         password=user_in.password,
         full_name=user_in.full_name,
         username=user_in.username,
+        promo_code=user_in.promo_code if hasattr(user_in, 'promo_code') else None,
+        referral_code=user_in.referral_code if hasattr(user_in, 'referral_code') else None,
         registration_source=user_in.registration_source or "email",
         registration_device_type=user_in.device_type or "web"
     )
     user = crud_user.create(db, obj_in=user_create)
     
+    # 刷新用户对象以获取触发器设置的值
+    db.refresh(user)
+    
     # Create tokens
     tokens = create_tokens(user.id, user_in.device_id)
     
-    return RegisterResponse(
-        id=user.id,
-        email=user.email,
-        full_name=user.full_name,
-        username=user.username,
-        access_token=tokens["access_token"],
-        refresh_token=tokens["refresh_token"]
-    )
+    # Get early bird stats
+    early_bird_stats = get_early_bird_stats(db)
+    
+    # Build response with subscription info
+    response_data = {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "username": user.username,
+        "access_token": tokens["access_token"],
+        "refresh_token": tokens["refresh_token"],
+        "tier": user.tier,
+        "is_early_bird": user.is_early_bird,
+        "pricing_tier": user.pricing_tier,
+        "user_sequence_number": user.user_sequence_number,
+        "monthly_price": user.monthly_price,
+        "yearly_price": user.yearly_price,
+        "early_bird_slots_remaining": early_bird_stats["early_bird_slots_remaining"]
+    }
+    
+    return RegisterResponse(**response_data)
 
 
 @router.post("/login", response_model=Token)
@@ -114,7 +148,7 @@ def login(
     device_id: Optional[str] = None
 ) -> Any:
     """
-    OAuth2 compatible token login, get an access token for future requests
+    OAuth2 compatible token login with subscription info
     """
     # Authenticate user
     user = crud_user.authenticate(
@@ -138,6 +172,17 @@ def login(
     # Create access token
     tokens = create_tokens(user.id, device_id)
     
+    # Add subscription info to response
+    tokens["user_info"] = {
+        "id": user.id,
+        "email": user.email,
+        "tier": user.tier.value,
+        "is_early_bird": user.is_early_bird,
+        "pricing_tier": user.pricing_tier.value if user.pricing_tier else None,
+        "is_subscription_active": user.is_subscription_active,
+        "subscription_expires_at": user.subscription_expires_at.isoformat() if user.subscription_expires_at else None
+    }
+    
     return Token(**tokens)
 
 
@@ -160,7 +205,7 @@ async def apple_sign_in(
     apple_data: AppleSignInRequest
 ) -> Any:
     """
-    Apple Sign In authentication
+    Apple Sign In authentication with early bird check
     """
     # In production, verify the identity token with Apple's servers
     # For now, we'll extract the email from the token payload
@@ -179,7 +224,7 @@ async def apple_sign_in(
     user = crud_user.get_by_email(db, email=email)
     
     if not user:
-        # Create new user
+        # Create new user (触发器会自动设置早鸟状态)
         user_create = UserCreate(
             email=email,
             full_name=apple_data.full_name,
@@ -189,6 +234,7 @@ async def apple_sign_in(
             apple_user_id=apple_user_id
         )
         user = crud_user.create(db, obj_in=user_create)
+        db.refresh(user)  # 刷新以获取触发器设置的值
     else:
         # Update Apple user ID if not set
         if not user.apple_user_id:
@@ -197,6 +243,16 @@ async def apple_sign_in(
     
     # Create tokens
     tokens = create_tokens(user.id, apple_data.device_id)
+    
+    # Add user info
+    tokens["user_info"] = {
+        "id": user.id,
+        "email": user.email,
+        "tier": user.tier.value,
+        "is_early_bird": user.is_early_bird,
+        "pricing_tier": user.pricing_tier.value if user.pricing_tier else None,
+        "is_subscription_active": user.is_subscription_active
+    }
     
     return Token(**tokens)
 
@@ -209,7 +265,7 @@ async def google_sign_in(
     google_data: GoogleSignInRequest
 ) -> Any:
     """
-    Google Sign In authentication
+    Google Sign In authentication with early bird check
     """
     # In production, verify the ID token with Google's servers
     # For now, we'll trust the provided data
@@ -227,7 +283,7 @@ async def google_sign_in(
     user = crud_user.get_by_email(db, email=email)
     
     if not user:
-        # Create new user
+        # Create new user (触发器会自动设置早鸟状态)
         user_create = UserCreate(
             email=email,
             full_name=google_data.full_name,
@@ -238,6 +294,7 @@ async def google_sign_in(
             google_user_id=google_user_id
         )
         user = crud_user.create(db, obj_in=user_create)
+        db.refresh(user)  # 刷新以获取触发器设置的值
     else:
         # Update Google user ID if not set
         if not user.google_user_id:
@@ -246,6 +303,16 @@ async def google_sign_in(
     
     # Create tokens
     tokens = create_tokens(user.id, google_data.device_id)
+    
+    # Add user info
+    tokens["user_info"] = {
+        "id": user.id,
+        "email": user.email,
+        "tier": user.tier.value,
+        "is_early_bird": user.is_early_bird,
+        "pricing_tier": user.pricing_tier.value if user.pricing_tier else None,
+        "is_subscription_active": user.is_subscription_active
+    }
     
     return Token(**tokens)
 
@@ -289,6 +356,16 @@ async def biometric_auth(
     # Create new tokens
     tokens = create_tokens(user.id, biometric_data.device_id)
     
+    # Add user info
+    tokens["user_info"] = {
+        "id": user.id,
+        "email": user.email,
+        "tier": user.tier.value,
+        "is_early_bird": user.is_early_bird,
+        "pricing_tier": user.pricing_tier.value if user.pricing_tier else None,
+        "is_subscription_active": user.is_subscription_active
+    }
+    
     return Token(**tokens)
 
 
@@ -328,4 +405,35 @@ async def refresh_token(
     # Create new tokens
     tokens = create_tokens(user.id, payload.get("device_id"))
     
+    # Add user info
+    tokens["user_info"] = {
+        "id": user.id,
+        "email": user.email,
+        "tier": user.tier.value,
+        "is_early_bird": user.is_early_bird,
+        "pricing_tier": user.pricing_tier.value if user.pricing_tier else None,
+        "is_subscription_active": user.is_subscription_active,
+        "subscription_expires_at": user.subscription_expires_at.isoformat() if user.subscription_expires_at else None
+    }
+    
     return Token(**tokens)
+
+
+# New endpoint: Get early bird status
+@router.get("/early-bird-status")
+def get_early_bird_status(db: Session = Depends(get_db)) -> Any:
+    """
+    Get current early bird availability status
+    """
+    stats = get_early_bird_stats(db)
+    
+    return {
+        "early_bird_limit": settings.EARLY_BIRD_LIMIT,
+        "early_bird_users": stats["early_bird_users"],
+        "slots_remaining": stats["early_bird_slots_remaining"],
+        "is_available": stats["is_early_bird_available"],
+        "early_bird_monthly_price": settings.EARLY_BIRD_MONTHLY_PRICE,
+        "early_bird_yearly_price": settings.EARLY_BIRD_YEARLY_PRICE,
+        "standard_monthly_price": settings.STANDARD_MONTHLY_PRICE,
+        "standard_yearly_price": settings.STANDARD_YEARLY_PRICE
+    }

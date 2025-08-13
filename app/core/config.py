@@ -36,6 +36,43 @@ class Settings(BaseSettings):
     # Limits
     FREE_USER_DAILY_LIMIT: int = 3
     
+    # ==================== SUBSCRIPTION SETTINGS ====================
+    # Pricing Configuration
+    EARLY_BIRD_LIMIT: int = 10000  # 前10,000名用户享受早鸟价
+    EARLY_BIRD_MONTHLY_PRICE: float = 39.00  # 早鸟月付价格
+    EARLY_BIRD_YEARLY_PRICE: float = 280.80  # 早鸟年付价格 (39 * 12 * 0.6)
+    STANDARD_MONTHLY_PRICE: float = 49.00  # 标准月付价格
+    STANDARD_YEARLY_PRICE: float = 352.80  # 标准年付价格 (49 * 12 * 0.6)
+    YEARLY_DISCOUNT: float = 0.6  # 年付折扣 (60% of yearly)
+    
+    # Payment Configuration
+    STRIPE_API_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    STRIPE_PUBLISHABLE_KEY: Optional[str] = None
+    
+    # Apple In-App Purchase
+    APPLE_SHARED_SECRET: Optional[str] = None
+    APPLE_SANDBOX: bool = True  # Use sandbox for development
+    
+    # Google Play Billing
+    GOOGLE_PLAY_SERVICE_ACCOUNT_KEY: Optional[str] = None
+    GOOGLE_PLAY_PACKAGE_NAME: Optional[str] = None
+    
+    # Subscription Features
+    ENABLE_SUBSCRIPTION: bool = True
+    ENABLE_TRIAL_PERIOD: bool = False  # 暂不启用试用期
+    TRIAL_PERIOD_DAYS: int = 7
+    GRACE_PERIOD_DAYS: int = 3  # 支付失败后的宽限期
+    
+    # Subscription Notifications
+    SUBSCRIPTION_EXPIRY_REMINDER_DAYS: List[int] = [7, 3, 1]  # 到期前提醒天数
+    ENABLE_SUBSCRIPTION_EMAILS: bool = True
+    
+    # Early Bird Marketing
+    SHOW_EARLY_BIRD_COUNTDOWN: bool = True  # 显示早鸟名额倒计时
+    EARLY_BIRD_MARKETING_MESSAGE: str = "🔥 Limited Early Bird Offer: Only {slots} spots left!"
+    # ================================================================
+    
     # Scheduler settings
     SCHEDULER_INTERVAL_MINUTES: int = 1
     FILING_LOOKBACK_MINUTES: int = 2

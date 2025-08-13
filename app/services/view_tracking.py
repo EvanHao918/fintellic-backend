@@ -1,14 +1,14 @@
 """
 View tracking service for implementing daily report limits
 Tracks user views and enforces free tier limitations
-FIXED: 统一改为2份限制
+FIXED: 统一Pro用户判断逻辑，确保返回一致的数据格式
 """
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, List, Set
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, Date
 import pytz
-from app.models.user import User
+from app.models.user import User, UserTier
 from app.models.filing import Filing
 from app.models.user_filing_view import UserFilingView
 from app.core.cache import cache
@@ -17,8 +17,8 @@ from app.core.cache import cache
 class ViewTrackingService:
     """Service for tracking and limiting user filing views"""
     
-    # Free tier daily limit - 修改为2
-    DAILY_FREE_LIMIT = 2  # 👈 关键修改：从3改为2
+    # Free tier daily limit
+    DAILY_FREE_LIMIT = 2  # 每日限制2份
     
     # EST timezone (UTC-5)
     EST_TZ = pytz.timezone('US/Eastern')
@@ -35,6 +35,19 @@ class ViewTrackingService:
         now = datetime.now(cls.EST_TZ)
         midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
         return midnight
+    
+    @classmethod
+    def _is_pro_user(cls, user: User) -> bool:
+        """
+        统一的Pro用户判断逻辑
+        检查多个条件以确保正确识别Pro用户
+        """
+        return (
+            user.tier == UserTier.PRO or  # 枚举比较
+            user.tier == 'PRO' or  # 字符串比较（兼容性）
+            user.is_subscription_active == True or  # 订阅激活状态
+            (hasattr(user, 'is_pro') and user.is_pro)  # is_pro属性
+        )
     
     @classmethod
     def get_user_views_today(cls, db: Session, user_id: int) -> Dict[str, any]:
@@ -86,17 +99,21 @@ class ViewTrackingService:
         Returns:
             Dict with can_view (bool), reason (str), and additional info
         """
-        # Pro users have unlimited access - 注意用字符串比较
-        if user.tier == 'pro':  # 👈 注意：用字符串比较，因为枚举返回字符串值
+        # 🔥 关键修复：使用统一的Pro用户判断
+        is_pro = cls._is_pro_user(user)
+        
+        # Pro users have unlimited access
+        if is_pro:
             return {
                 'can_view': True,
                 'reason': 'Pro user - unlimited access',
                 'is_pro': True,
                 'views_today': 0,
-                'views_remaining': -1  # Unlimited
+                'views_remaining': -1,  # Unlimited
+                'daily_limit': -1  # Unlimited
             }
         
-        # Get today's views
+        # Get today's views for Free users
         views_data = cls.get_user_views_today(db, user.id)
         unique_count = views_data['unique_filings_viewed']
         viewed_filing_ids = views_data['filing_ids']
@@ -108,7 +125,8 @@ class ViewTrackingService:
                 'reason': 'Already viewed today - no additional charge',
                 'is_pro': False,
                 'views_today': unique_count,
-                'views_remaining': max(0, cls.DAILY_FREE_LIMIT - unique_count)
+                'views_remaining': max(0, cls.DAILY_FREE_LIMIT - unique_count),
+                'daily_limit': cls.DAILY_FREE_LIMIT
             }
         
         # Check if limit reached
@@ -118,7 +136,8 @@ class ViewTrackingService:
                 'reason': 'Daily limit reached',
                 'is_pro': False,
                 'views_today': unique_count,
-                'views_remaining': 0
+                'views_remaining': 0,
+                'daily_limit': cls.DAILY_FREE_LIMIT
             }
         
         # User can view
@@ -127,7 +146,8 @@ class ViewTrackingService:
             'reason': 'Within daily limit',
             'is_pro': False,
             'views_today': unique_count,
-            'views_remaining': cls.DAILY_FREE_LIMIT - unique_count
+            'views_remaining': cls.DAILY_FREE_LIMIT - unique_count,
+            'daily_limit': cls.DAILY_FREE_LIMIT
         }
     
     @classmethod
@@ -138,6 +158,10 @@ class ViewTrackingService:
         Returns:
             bool: True if view was recorded, False if already viewed today
         """
+        # Pro users don't need to record views for limiting
+        if cls._is_pro_user(user):
+            return True
+        
         today_est = cls.get_est_date()
         
         # Check if already viewed today
@@ -189,14 +213,15 @@ class ViewTrackingService:
                 'next_reset': cls.get_est_midnight()
             }
         
-        # Check if Pro user - 注意用字符串比较
-        is_pro = user.tier == 'pro'  # 👈 字符串比较
+        # 🔥 关键修复：使用统一的Pro用户判断
+        is_pro = cls._is_pro_user(user)
         
         if is_pro:
+            # Pro用户返回特殊值表示无限制
             return {
                 'views_today': 0,
-                'daily_limit': -1,  # Unlimited
-                'views_remaining': -1,  # Unlimited
+                'daily_limit': -1,  # -1 表示无限制
+                'views_remaining': -1,  # -1 表示无限制
                 'is_pro': True,
                 'next_reset': None
             }

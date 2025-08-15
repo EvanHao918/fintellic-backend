@@ -1,10 +1,13 @@
-from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import Any, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Body
 from sqlalchemy.orm import Session
+import json
+import logging
 
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.services.subscription_service import subscription_service
+from app.core.config import settings
 from app.schemas.subscription import (
     SubscriptionCreate,
     SubscriptionUpdate,
@@ -19,7 +22,12 @@ from app.schemas.subscription import (
     CheckoutSessionResponse
 )
 
+# 导入支付验证服务
+from app.services.apple_iap_service import apple_iap_service
+from app.services.google_play_service import google_play_service
+
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/pricing", response_model=PricingInfo)
@@ -52,7 +60,7 @@ def create_subscription(
     subscription_data: SubscriptionCreate
 ) -> Any:
     """
-    Create a new subscription
+    Create a new subscription (Mock in development, real in production)
     """
     if current_user.is_subscription_active:
         raise HTTPException(
@@ -60,7 +68,15 @@ def create_subscription(
             detail="You already have an active subscription"
         )
     
-    return subscription_service.create_subscription(db, current_user, subscription_data)
+    # 在开发环境使用Mock
+    if settings.ENABLE_MOCK_PAYMENTS and settings.ENVIRONMENT == "development":
+        return subscription_service.create_subscription(db, current_user, subscription_data)
+    else:
+        # 生产环境需要真实支付验证
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Please complete payment through the mobile app"
+        )
 
 
 @router.put("/update", response_model=SubscriptionResponse)
@@ -133,74 +149,294 @@ def get_early_bird_status(db: Session = Depends(get_db)) -> Any:
     return subscription_service.get_early_bird_status(db)
 
 
-# Stripe Checkout Integration (placeholder)
-@router.post("/create-checkout-session", response_model=CheckoutSessionResponse)
-async def create_checkout_session(
+# ==================== Apple IAP 验证端点 ====================
+
+@router.post("/verify/apple")
+async def verify_apple_purchase(
     *,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    checkout_data: CreateCheckoutSession
+    receipt_data: str = Body(..., description="Base64 encoded receipt"),
+    product_id: str = Body(..., description="Product ID from the purchase"),
+    transaction_id: Optional[str] = Body(None, description="Transaction ID")
 ) -> Any:
     """
-    Create Stripe checkout session
+    Verify Apple In-App Purchase receipt
     """
-    # This is a placeholder - actual Stripe integration would go here
-    # import stripe
-    # stripe.api_key = settings.STRIPE_API_KEY
-    
-    pricing_info = subscription_service.get_user_pricing(db, current_user)
-    
-    if checkout_data.subscription_type == "MONTHLY":
-        price = pricing_info.monthly_price
-        interval = "month"
-    else:
-        price = pricing_info.yearly_price
-        interval = "year"
-    
-    # Simulated response
-    return CheckoutSessionResponse(
-        session_id="cs_test_123456",
-        checkout_url=f"https://checkout.stripe.com/pay/cs_test_123456",
-        publishable_key="pk_test_123456"
-    )
+    try:
+        # 验证收据
+        verification_result = await apple_iap_service.verify_receipt(
+            receipt_data=receipt_data,
+            exclude_old_transactions=True
+        )
+        
+        if not verification_result.get("is_valid"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid receipt: {verification_result.get('error', 'Unknown error')}"
+            )
+        
+        # 处理订阅
+        result = await subscription_service.process_apple_subscription(
+            db=db,
+            user=current_user,
+            receipt_info=verification_result,
+            product_id=product_id,
+            transaction_id=transaction_id
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Apple IAP verification error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Verification failed: {str(e)}"
+        )
 
 
-# Webhook endpoints for payment providers
-@router.post("/webhook/stripe")
-async def stripe_webhook(
-    request: dict,
-    db: Session = Depends(get_db)
+@router.post("/restore/apple")
+async def restore_apple_purchases(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    receipt_data: str = Body(..., description="Base64 encoded receipt")
 ) -> Any:
     """
-    Handle Stripe webhook events
+    Restore Apple purchases
     """
-    # Placeholder for Stripe webhook handling
-    # Would verify webhook signature and process events
-    return {"status": "ok"}
+    try:
+        # 验证收据并恢复所有购买
+        verification_result = await apple_iap_service.verify_receipt(
+            receipt_data=receipt_data,
+            exclude_old_transactions=False
+        )
+        
+        if not verification_result.get("is_valid"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid receipt"
+            )
+        
+        # 恢复订阅
+        result = await subscription_service.restore_apple_subscription(
+            db=db,
+            user=current_user,
+            receipt_info=verification_result
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Apple restore error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Restore failed: {str(e)}"
+        )
 
+
+# ==================== Google Play 验证端点 ====================
+
+@router.post("/verify/google")
+async def verify_google_purchase(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    purchase_token: str = Body(..., description="Purchase token from Google"),
+    product_id: str = Body(..., description="Product ID"),
+    order_id: Optional[str] = Body(None, description="Order ID")
+) -> Any:
+    """
+    Verify Google Play purchase
+    """
+    try:
+        # 验证购买
+        verification_result = await google_play_service.verify_subscription(
+            product_id=product_id,
+            purchase_token=purchase_token
+        )
+        
+        if not verification_result.get("is_valid"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid purchase: {verification_result.get('error', 'Unknown error')}"
+            )
+        
+        # 处理订阅
+        result = await subscription_service.process_google_subscription(
+            db=db,
+            user=current_user,
+            purchase_info=verification_result,
+            product_id=product_id,
+            order_id=order_id
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Google Play verification error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Verification failed: {str(e)}"
+        )
+
+
+# ==================== Webhook 端点 ====================
 
 @router.post("/webhook/apple")
 async def apple_webhook(
-    request: dict,
+    request: Request,
     db: Session = Depends(get_db)
 ) -> Any:
     """
-    Handle Apple In-App Purchase notifications
+    Handle Apple Server-to-Server notifications
     """
-    # Placeholder for Apple IAP webhook handling
-    return {"status": "ok"}
+    try:
+        # 获取请求体
+        body = await request.body()
+        
+        # 解析通知
+        try:
+            notification = json.loads(body)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON in Apple webhook")
+            return {"status": "error", "message": "Invalid JSON"}
+        
+        # 验证通知签名
+        if not apple_iap_service.verify_notification(notification):
+            logger.warning("Invalid Apple notification signature")
+            # 不返回错误状态码，避免重试
+            return {"status": "error", "message": "Invalid signature"}
+        
+        # 处理不同类型的通知
+        notification_type = notification.get("notification_type") or notification.get("notificationType")
+        
+        logger.info(f"Processing Apple webhook: {notification_type}")
+        
+        if notification_type in ["DID_RENEW", "INTERACTIVE_RENEWAL"]:
+            await subscription_service.handle_apple_renewal(db, notification)
+        elif notification_type in ["DID_FAIL_TO_RENEW", "GRACE_PERIOD_EXPIRED"]:
+            await subscription_service.handle_apple_renewal_failure(db, notification)
+        elif notification_type in ["CANCEL", "DID_CHANGE_RENEWAL_STATUS"]:
+            await subscription_service.handle_apple_cancellation(db, notification)
+        elif notification_type == "REFUND":
+            await subscription_service.handle_apple_refund(db, notification)
+        elif notification_type == "REVOKE":
+            await subscription_service.handle_apple_revocation(db, notification)
+        else:
+            logger.info(f"Unhandled Apple notification type: {notification_type}")
+        
+        return {"status": "ok"}
+        
+    except Exception as e:
+        logger.error(f"Apple webhook error: {str(e)}", exc_info=True)
+        # Webhook应该总是返回200，避免重试
+        return {"status": "error", "message": str(e)}
 
 
 @router.post("/webhook/google")
 async def google_webhook(
-    request: dict,
+    request: Request,
     db: Session = Depends(get_db)
 ) -> Any:
     """
-    Handle Google Play billing notifications
+    Handle Google Play Real-time Developer Notifications
     """
-    # Placeholder for Google Play webhook handling
-    return {"status": "ok"}
+    try:
+        # 获取请求体
+        body = await request.body()
+        
+        # 解析通知
+        try:
+            notification = json.loads(body)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON in Google webhook")
+            return {"status": "error", "message": "Invalid JSON"}
+        
+        # Google使用Cloud Pub/Sub，消息在message.data中
+        message = notification.get("message", {})
+        data = message.get("data", "")
+        
+        if not data:
+            logger.warning("No data in Google notification")
+            return {"status": "error", "message": "No data"}
+        
+        # 解码base64数据
+        import base64
+        try:
+            decoded_data = json.loads(base64.b64decode(data))
+        except Exception as e:
+            logger.error(f"Failed to decode Google notification data: {e}")
+            return {"status": "error", "message": "Invalid data encoding"}
+        
+        # 获取通知类型
+        subscription_notification = decoded_data.get("subscriptionNotification", {})
+        notification_type = subscription_notification.get("notificationType")
+        
+        logger.info(f"Processing Google webhook: {notification_type}")
+        
+        # 处理不同类型的通知
+        if notification_type == 1:  # SUBSCRIPTION_RECOVERED
+            await subscription_service.handle_google_recovery(db, decoded_data)
+        elif notification_type == 2:  # SUBSCRIPTION_RENEWED
+            await subscription_service.handle_google_renewal(db, decoded_data)
+        elif notification_type == 3:  # SUBSCRIPTION_CANCELED
+            await subscription_service.handle_google_cancellation(db, decoded_data)
+        elif notification_type == 4:  # SUBSCRIPTION_PURCHASED
+            await subscription_service.handle_google_purchase(db, decoded_data)
+        elif notification_type == 5:  # SUBSCRIPTION_ON_HOLD
+            await subscription_service.handle_google_hold(db, decoded_data)
+        elif notification_type == 6:  # SUBSCRIPTION_IN_GRACE_PERIOD
+            await subscription_service.handle_google_grace_period(db, decoded_data)
+        elif notification_type == 7:  # SUBSCRIPTION_RESTARTED
+            await subscription_service.handle_google_restart(db, decoded_data)
+        elif notification_type == 12:  # SUBSCRIPTION_REVOKED
+            await subscription_service.handle_google_revocation(db, decoded_data)
+        elif notification_type == 13:  # SUBSCRIPTION_EXPIRED
+            await subscription_service.handle_google_expiration(db, decoded_data)
+        else:
+            logger.info(f"Unhandled Google notification type: {notification_type}")
+        
+        return {"status": "ok"}
+        
+    except Exception as e:
+        logger.error(f"Google webhook error: {str(e)}", exc_info=True)
+        # Webhook应该总是返回200，避免重试
+        return {"status": "error", "message": str(e)}
+
+
+# ==================== 开发测试端点 ====================
+
+@router.post("/mock/upgrade")
+async def mock_upgrade_to_pro(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    subscription_type: str = Body("MONTHLY", description="MONTHLY or YEARLY")
+) -> Any:
+    """
+    Mock upgrade to Pro (development only)
+    """
+    if not settings.ENABLE_MOCK_PAYMENTS or settings.ENVIRONMENT != "development":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Mock payments are disabled in production"
+        )
+    
+    # 创建Mock订阅
+    subscription_data = SubscriptionCreate(
+        subscription_type=subscription_type,
+        payment_method="mock",
+        auto_renew=True
+    )
+    
+    return subscription_service.create_subscription(db, current_user, subscription_data)
 
 
 # Admin endpoints (if needed)

@@ -4,6 +4,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from fastapi import HTTPException, status
+import logging
 
 from app.core.config import settings
 from app.models.user import User, UserTier, PricingTier, SubscriptionType
@@ -21,6 +22,8 @@ from app.schemas.subscription import (
     PaymentHistory,
     SubscriptionHistory
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SubscriptionService:
@@ -67,14 +70,14 @@ class SubscriptionService:
                 }
             )
         except Exception as e:
-            print(f"Error in get_user_pricing: {str(e)}")
+            logger.error(f"Error in get_user_pricing: {str(e)}")
             raise
     
     @staticmethod
     def get_current_subscription(db: Session, user: User) -> SubscriptionInfo:
         """获取用户当前订阅信息"""
         try:
-            # 先尝试从用户表获取订阅信息（避免直接查询 subscriptions 表）
+            # 先尝试从用户表获取订阅信息
             if not user.is_subscription_active:
                 # 用户没有活跃订阅，返回默认信息
                 return SubscriptionInfo(
@@ -110,7 +113,7 @@ class SubscriptionService:
             )
             
         except Exception as e:
-            print(f"Error in get_current_subscription: {str(e)}")
+            logger.error(f"Error in get_current_subscription: {str(e)}")
             # 如果查询失败，返回基本信息
             return SubscriptionInfo(
                 is_active=user.tier == UserTier.PRO,
@@ -146,7 +149,7 @@ class SubscriptionService:
                 price = pricing_info.yearly_price
                 expires_at = datetime.now() + timedelta(days=365)
             
-            # 在 Phase 2，我们直接更新用户表（不创建 Subscription 记录）
+            # 在 Phase 2，我们直接更新用户表
             user.tier = UserTier.PRO
             user.is_subscription_active = True
             user.subscription_type = subscription_data.subscription_type
@@ -169,7 +172,7 @@ class SubscriptionService:
             )
             
         except Exception as e:
-            print(f"Error in create_subscription: {str(e)}")
+            logger.error(f"Error in create_subscription: {str(e)}")
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -225,7 +228,7 @@ class SubscriptionService:
             )
             
         except Exception as e:
-            print(f"Error in update_subscription: {str(e)}")
+            logger.error(f"Error in update_subscription: {str(e)}")
             db.rollback()
             raise
     
@@ -266,7 +269,7 @@ class SubscriptionService:
             )
             
         except Exception as e:
-            print(f"Error in cancel_subscription: {str(e)}")
+            logger.error(f"Error in cancel_subscription: {str(e)}")
             db.rollback()
             raise
     
@@ -276,7 +279,7 @@ class SubscriptionService:
         user: User,
         limit: int = 10
     ) -> List[PaymentHistory]:
-        """获取支付历史（从用户表模拟）"""
+        """获取支付历史"""
         # Phase 2: 返回模拟数据
         history = []
         if user.last_payment_date and user.last_payment_amount:
@@ -299,7 +302,7 @@ class SubscriptionService:
         db: Session,
         user: User
     ) -> List[SubscriptionHistory]:
-        """获取订阅历史（从用户表模拟）"""
+        """获取订阅历史"""
         # Phase 2: 返回模拟数据
         history = []
         if user.subscription_started_at:
@@ -343,7 +346,7 @@ class SubscriptionService:
                 marketing_message = f"🎯 Limited offer: {slots_remaining} early bird spots available"
             else:
                 urgency_level = "low"
-                marketing_message = f"🐦 Early bird special: Save $10/month forever!"
+                marketing_message = f"🦅 Early bird special: Save $10/month forever!"
             
             return EarlyBirdStatus(
                 early_bird_limit=settings.EARLY_BIRD_LIMIT,
@@ -359,7 +362,7 @@ class SubscriptionService:
                 urgency_level=urgency_level
             )
         except Exception as e:
-            print(f"Error in get_early_bird_status: {str(e)}")
+            logger.error(f"Error in get_early_bird_status: {str(e)}")
             # 返回默认值
             return EarlyBirdStatus(
                 early_bird_limit=10000,
@@ -395,7 +398,7 @@ class SubscriptionService:
                 "conversion_rate": (pro_users / total_users * 100) if total_users > 0 else 0
             }
         except Exception as e:
-            print(f"Error in get_subscription_statistics: {str(e)}")
+            logger.error(f"Error in get_subscription_statistics: {str(e)}")
             return {
                 "total_users": 0,
                 "pro_users": 0,
@@ -403,6 +406,641 @@ class SubscriptionService:
                 "early_bird_users": 0,
                 "conversion_rate": 0
             }
+    
+    # ==================== Apple IAP 处理方法 ====================
+    
+    @staticmethod
+    async def process_apple_subscription(
+        db: Session,
+        user: User,
+        receipt_info: Dict[str, Any],
+        product_id: str,
+        transaction_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """处理Apple订阅"""
+        try:
+            # 检查收据是否有效且活跃
+            if not receipt_info.get("is_valid"):
+                return {
+                    "success": False,
+                    "message": "Invalid receipt",
+                    "error": receipt_info.get("error")
+                }
+            
+            if not receipt_info.get("is_active"):
+                return {
+                    "success": False,
+                    "message": "Subscription is not active",
+                    "expires_date": receipt_info.get("expires_date")
+                }
+            
+            # 获取订阅信息
+            subscription_type = "YEARLY" if "yearly" in product_id.lower() else "MONTHLY"
+            expires_date = datetime.fromisoformat(receipt_info["expires_date"]) if receipt_info.get("expires_date") else None
+            
+            # 确定价格
+            pricing_info = SubscriptionService.get_user_pricing(db, user)
+            if subscription_type == "YEARLY":
+                price = pricing_info.yearly_price
+            else:
+                price = pricing_info.monthly_price
+            
+            # 更新用户订阅状态
+            user.tier = UserTier.PRO
+            user.is_subscription_active = True
+            user.subscription_type = subscription_type
+            user.subscription_started_at = user.subscription_started_at or datetime.now()
+            user.subscription_expires_at = expires_date
+            user.next_billing_date = expires_date
+            user.subscription_price = price
+            user.subscription_auto_renew = receipt_info.get("auto_renew", True)
+            user.payment_method = "apple"
+            user.apple_subscription_id = receipt_info.get("original_transaction_id")
+            user.last_payment_date = datetime.now()
+            user.last_payment_amount = price
+            user.total_payment_amount = (user.total_payment_amount or 0) + price
+            
+            # 记录交易ID
+            if transaction_id:
+                user.last_transaction_id = transaction_id
+            
+            db.commit()
+            
+            logger.info(f"Apple subscription processed successfully for user {user.id}")
+            
+            return {
+                "success": True,
+                "message": "Subscription activated successfully",
+                "subscription_info": SubscriptionService.get_current_subscription(db, user).__dict__
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing Apple subscription: {str(e)}")
+            db.rollback()
+            return {
+                "success": False,
+                "message": "Failed to process subscription",
+                "error": str(e)
+            }
+    
+    @staticmethod
+    async def restore_apple_subscription(
+        db: Session,
+        user: User,
+        receipt_info: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """恢复Apple订阅"""
+        try:
+            # 检查收据是否有效
+            if not receipt_info.get("is_valid"):
+                return {
+                    "success": False,
+                    "message": "Invalid receipt",
+                    "error": receipt_info.get("error")
+                }
+            
+            # 如果有活跃订阅，恢复它
+            if receipt_info.get("is_active"):
+                product_id = receipt_info.get("product_id", "")
+                return await SubscriptionService.process_apple_subscription(
+                    db, user, receipt_info, product_id
+                )
+            
+            return {
+                "success": False,
+                "message": "No active subscription found to restore"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error restoring Apple subscription: {str(e)}")
+            return {
+                "success": False,
+                "message": "Failed to restore subscription",
+                "error": str(e)
+            }
+    
+    @staticmethod
+    async def handle_apple_renewal(db: Session, notification: Dict[str, Any]):
+        """处理Apple续订通知"""
+        try:
+            from app.services.apple_iap_service import apple_iap_service
+            
+            # 提取通知信息
+            info = apple_iap_service.extract_notification_info(notification)
+            original_transaction_id = info.get("original_transaction_id")
+            
+            if not original_transaction_id:
+                logger.warning("No original_transaction_id in Apple renewal notification")
+                return
+            
+            # 查找用户
+            user = db.query(User).filter(
+                User.apple_subscription_id == original_transaction_id
+            ).first()
+            
+            if not user:
+                logger.warning(f"User not found for Apple subscription: {original_transaction_id}")
+                return
+            
+            # 更新订阅信息
+            expires_date = info.get("expires_date")
+            if expires_date:
+                user.subscription_expires_at = datetime.fromisoformat(expires_date)
+                user.next_billing_date = user.subscription_expires_at
+            
+            user.last_payment_date = datetime.now()
+            user.last_payment_amount = user.subscription_price
+            user.total_payment_amount = (user.total_payment_amount or 0) + user.subscription_price
+            
+            db.commit()
+            logger.info(f"Apple subscription renewed for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Apple renewal: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_apple_renewal_failure(db: Session, notification: Dict[str, Any]):
+        """处理Apple续订失败通知"""
+        try:
+            from app.services.apple_iap_service import apple_iap_service
+            
+            info = apple_iap_service.extract_notification_info(notification)
+            original_transaction_id = info.get("original_transaction_id")
+            
+            if not original_transaction_id:
+                return
+            
+            user = db.query(User).filter(
+                User.apple_subscription_id == original_transaction_id
+            ).first()
+            
+            if not user:
+                return
+            
+            # 标记续订失败
+            user.subscription_auto_renew = False
+            user.subscription_renewal_failed_at = datetime.now()
+            
+            db.commit()
+            logger.info(f"Apple subscription renewal failed for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Apple renewal failure: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_apple_cancellation(db: Session, notification: Dict[str, Any]):
+        """处理Apple取消通知"""
+        try:
+            from app.services.apple_iap_service import apple_iap_service
+            
+            info = apple_iap_service.extract_notification_info(notification)
+            original_transaction_id = info.get("original_transaction_id")
+            
+            if not original_transaction_id:
+                return
+            
+            user = db.query(User).filter(
+                User.apple_subscription_id == original_transaction_id
+            ).first()
+            
+            if not user:
+                return
+            
+            # 标记订阅已取消
+            user.subscription_cancelled_at = datetime.now()
+            user.subscription_auto_renew = False
+            
+            db.commit()
+            logger.info(f"Apple subscription cancelled for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Apple cancellation: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_apple_refund(db: Session, notification: Dict[str, Any]):
+        """处理Apple退款通知"""
+        try:
+            from app.services.apple_iap_service import apple_iap_service
+            
+            info = apple_iap_service.extract_notification_info(notification)
+            original_transaction_id = info.get("original_transaction_id")
+            
+            if not original_transaction_id:
+                return
+            
+            user = db.query(User).filter(
+                User.apple_subscription_id == original_transaction_id
+            ).first()
+            
+            if not user:
+                return
+            
+            # 处理退款：降级为免费用户
+            user.tier = UserTier.FREE
+            user.is_subscription_active = False
+            user.subscription_refunded_at = datetime.now()
+            
+            db.commit()
+            logger.info(f"Apple subscription refunded for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Apple refund: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_apple_revocation(db: Session, notification: Dict[str, Any]):
+        """处理Apple撤销通知"""
+        try:
+            from app.services.apple_iap_service import apple_iap_service
+            
+            info = apple_iap_service.extract_notification_info(notification)
+            original_transaction_id = info.get("original_transaction_id")
+            
+            if not original_transaction_id:
+                return
+            
+            user = db.query(User).filter(
+                User.apple_subscription_id == original_transaction_id
+            ).first()
+            
+            if not user:
+                return
+            
+            # 撤销订阅：立即失效
+            user.tier = UserTier.FREE
+            user.is_subscription_active = False
+            user.subscription_expires_at = datetime.now()
+            user.subscription_revoked_at = datetime.now()
+            
+            db.commit()
+            logger.info(f"Apple subscription revoked for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Apple revocation: {str(e)}")
+            db.rollback()
+    
+    # ==================== Google Play 处理方法 ====================
+    
+    @staticmethod
+    async def process_google_subscription(
+        db: Session,
+        user: User,
+        purchase_info: Dict[str, Any],
+        product_id: str,
+        order_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """处理Google Play订阅"""
+        try:
+            # 检查购买是否有效且活跃
+            if not purchase_info.get("is_valid"):
+                return {
+                    "success": False,
+                    "message": "Invalid purchase",
+                    "error": purchase_info.get("error")
+                }
+            
+            if not purchase_info.get("is_active"):
+                return {
+                    "success": False,
+                    "message": "Subscription is not active",
+                    "expiry_time": purchase_info.get("expiry_time")
+                }
+            
+            # 获取订阅信息
+            subscription_type = purchase_info.get("subscription_type", "MONTHLY")
+            expiry_time = datetime.fromisoformat(purchase_info["expiry_time"]) if purchase_info.get("expiry_time") else None
+            
+            # 确定价格
+            price = purchase_info.get("price")
+            if not price:
+                pricing_info = SubscriptionService.get_user_pricing(db, user)
+                if subscription_type == "YEARLY":
+                    price = pricing_info.yearly_price
+                else:
+                    price = pricing_info.monthly_price
+            
+            # 更新用户订阅状态
+            user.tier = UserTier.PRO
+            user.is_subscription_active = True
+            user.subscription_type = subscription_type
+            user.subscription_started_at = user.subscription_started_at or datetime.now()
+            user.subscription_expires_at = expiry_time
+            user.next_billing_date = expiry_time
+            user.subscription_price = price
+            user.subscription_auto_renew = purchase_info.get("auto_renewing", True)
+            user.payment_method = "google"
+            user.google_subscription_id = purchase_info.get("purchase_token")
+            user.google_order_id = order_id or purchase_info.get("order_id")
+            user.last_payment_date = datetime.now()
+            user.last_payment_amount = price
+            user.total_payment_amount = (user.total_payment_amount or 0) + price
+            
+            db.commit()
+            
+            logger.info(f"Google subscription processed successfully for user {user.id}")
+            
+            return {
+                "success": True,
+                "message": "Subscription activated successfully",
+                "subscription_info": SubscriptionService.get_current_subscription(db, user).__dict__
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing Google subscription: {str(e)}")
+            db.rollback()
+            return {
+                "success": False,
+                "message": "Failed to process subscription",
+                "error": str(e)
+            }
+    
+    @staticmethod
+    async def handle_google_recovery(db: Session, notification_data: Dict[str, Any]):
+        """处理Google订阅恢复通知"""
+        try:
+            from app.services.google_play_service import google_play_service
+            
+            info = google_play_service.process_rtdn_notification(notification_data)
+            purchase_token = info.get("purchase_token")
+            
+            if not purchase_token:
+                return
+            
+            user = db.query(User).filter(
+                User.google_subscription_id == purchase_token
+            ).first()
+            
+            if not user:
+                logger.warning(f"User not found for Google subscription token")
+                return
+            
+            # 恢复订阅
+            user.tier = UserTier.PRO
+            user.is_subscription_active = True
+            user.subscription_recovered_at = datetime.now()
+            
+            db.commit()
+            logger.info(f"Google subscription recovered for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Google recovery: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_google_renewal(db: Session, notification_data: Dict[str, Any]):
+        """处理Google续订通知"""
+        try:
+            from app.services.google_play_service import google_play_service
+            
+            info = google_play_service.process_rtdn_notification(notification_data)
+            purchase_token = info.get("purchase_token")
+            product_id = info.get("product_id")
+            
+            if not purchase_token:
+                return
+            
+            user = db.query(User).filter(
+                User.google_subscription_id == purchase_token
+            ).first()
+            
+            if not user:
+                return
+            
+            # 验证最新的订阅状态
+            verification = await google_play_service.verify_subscription(product_id, purchase_token)
+            
+            if verification.get("is_valid") and verification.get("is_active"):
+                # 更新订阅信息
+                if verification.get("expiry_time"):
+                    user.subscription_expires_at = datetime.fromisoformat(verification["expiry_time"])
+                    user.next_billing_date = user.subscription_expires_at
+                
+                user.last_payment_date = datetime.now()
+                user.last_payment_amount = user.subscription_price
+                user.total_payment_amount = (user.total_payment_amount or 0) + user.subscription_price
+                
+                db.commit()
+                logger.info(f"Google subscription renewed for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Google renewal: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_google_cancellation(db: Session, notification_data: Dict[str, Any]):
+        """处理Google取消通知"""
+        try:
+            from app.services.google_play_service import google_play_service
+            
+            info = google_play_service.process_rtdn_notification(notification_data)
+            purchase_token = info.get("purchase_token")
+            
+            if not purchase_token:
+                return
+            
+            user = db.query(User).filter(
+                User.google_subscription_id == purchase_token
+            ).first()
+            
+            if not user:
+                return
+            
+            # 标记订阅已取消
+            user.subscription_cancelled_at = datetime.now()
+            user.subscription_auto_renew = False
+            
+            db.commit()
+            logger.info(f"Google subscription cancelled for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Google cancellation: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_google_purchase(db: Session, notification_data: Dict[str, Any]):
+        """处理Google新购买通知"""
+        try:
+            from app.services.google_play_service import google_play_service
+            
+            info = google_play_service.process_rtdn_notification(notification_data)
+            purchase_token = info.get("purchase_token")
+            product_id = info.get("product_id")
+            
+            if not purchase_token or not product_id:
+                return
+            
+            # 验证购买
+            verification = await google_play_service.verify_subscription(product_id, purchase_token)
+            
+            if verification.get("is_valid"):
+                # 找到用户（可能需要通过其他方式关联）
+                # 这里假设用户已经在应用中发起了购买请求
+                logger.info(f"New Google subscription purchase: {product_id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Google purchase: {str(e)}")
+    
+    @staticmethod
+    async def handle_google_hold(db: Session, notification_data: Dict[str, Any]):
+        """处理Google账号保留通知"""
+        try:
+            from app.services.google_play_service import google_play_service
+            
+            info = google_play_service.process_rtdn_notification(notification_data)
+            purchase_token = info.get("purchase_token")
+            
+            if not purchase_token:
+                return
+            
+            user = db.query(User).filter(
+                User.google_subscription_id == purchase_token
+            ).first()
+            
+            if not user:
+                return
+            
+            # 暂停订阅（账号保留）
+            user.subscription_on_hold = True
+            user.subscription_hold_at = datetime.now()
+            
+            db.commit()
+            logger.info(f"Google subscription on hold for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Google hold: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_google_grace_period(db: Session, notification_data: Dict[str, Any]):
+        """处理Google宽限期通知"""
+        try:
+            from app.services.google_play_service import google_play_service
+            
+            info = google_play_service.process_rtdn_notification(notification_data)
+            purchase_token = info.get("purchase_token")
+            
+            if not purchase_token:
+                return
+            
+            user = db.query(User).filter(
+                User.google_subscription_id == purchase_token
+            ).first()
+            
+            if not user:
+                return
+            
+            # 标记进入宽限期
+            user.subscription_in_grace_period = True
+            user.grace_period_started_at = datetime.now()
+            
+            db.commit()
+            logger.info(f"Google subscription in grace period for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Google grace period: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_google_restart(db: Session, notification_data: Dict[str, Any]):
+        """处理Google重新启动通知"""
+        try:
+            from app.services.google_play_service import google_play_service
+            
+            info = google_play_service.process_rtdn_notification(notification_data)
+            purchase_token = info.get("purchase_token")
+            
+            if not purchase_token:
+                return
+            
+            user = db.query(User).filter(
+                User.google_subscription_id == purchase_token
+            ).first()
+            
+            if not user:
+                return
+            
+            # 重新激活订阅
+            user.tier = UserTier.PRO
+            user.is_subscription_active = True
+            user.subscription_auto_renew = True
+            user.subscription_restarted_at = datetime.now()
+            
+            # 清除保留和宽限期标记
+            user.subscription_on_hold = False
+            user.subscription_in_grace_period = False
+            
+            db.commit()
+            logger.info(f"Google subscription restarted for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Google restart: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_google_revocation(db: Session, notification_data: Dict[str, Any]):
+        """处理Google撤销通知"""
+        try:
+            from app.services.google_play_service import google_play_service
+            
+            info = google_play_service.process_rtdn_notification(notification_data)
+            purchase_token = info.get("purchase_token")
+            
+            if not purchase_token:
+                return
+            
+            user = db.query(User).filter(
+                User.google_subscription_id == purchase_token
+            ).first()
+            
+            if not user:
+                return
+            
+            # 撤销订阅：立即失效
+            user.tier = UserTier.FREE
+            user.is_subscription_active = False
+            user.subscription_expires_at = datetime.now()
+            user.subscription_revoked_at = datetime.now()
+            
+            db.commit()
+            logger.info(f"Google subscription revoked for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Google revocation: {str(e)}")
+            db.rollback()
+    
+    @staticmethod
+    async def handle_google_expiration(db: Session, notification_data: Dict[str, Any]):
+        """处理Google过期通知"""
+        try:
+            from app.services.google_play_service import google_play_service
+            
+            info = google_play_service.process_rtdn_notification(notification_data)
+            purchase_token = info.get("purchase_token")
+            
+            if not purchase_token:
+                return
+            
+            user = db.query(User).filter(
+                User.google_subscription_id == purchase_token
+            ).first()
+            
+            if not user:
+                return
+            
+            # 订阅过期
+            user.tier = UserTier.FREE
+            user.is_subscription_active = False
+            user.subscription_expired_at = datetime.now()
+            
+            db.commit()
+            logger.info(f"Google subscription expired for user {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling Google expiration: {str(e)}")
+            db.rollback()
 
 
 # 创建服务实例

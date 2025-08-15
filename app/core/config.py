@@ -50,14 +50,42 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     STRIPE_PUBLISHABLE_KEY: Optional[str] = None
     
-    # Apple In-App Purchase
+    # ==================== APPLE IN-APP PURCHASE ====================
+    # Apple IAP Basic Configuration
     APPLE_SHARED_SECRET: Optional[str] = None
     APPLE_SANDBOX: bool = True  # Use sandbox for development
+    APPLE_BUNDLE_ID: Optional[str] = None  # com.fintellic.app
+    APPLE_USE_SANDBOX: bool = True  # Use sandbox environment
     
-    # Google Play Billing
+    # Apple IAP URLs
+    APPLE_VERIFY_RECEIPT_URL: str = "https://buy.itunes.apple.com/verifyReceipt"
+    APPLE_SANDBOX_VERIFY_URL: str = "https://sandbox.itunes.apple.com/verifyReceipt"
+    
+    # Apple Product IDs
+    APPLE_MONTHLY_PRODUCT_ID: Optional[str] = None  # com.fintellic.app.monthly
+    APPLE_YEARLY_PRODUCT_ID: Optional[str] = None  # com.fintellic.app.yearly
+    
+    # ==================== GOOGLE PLAY BILLING ====================
+    # Google Play Basic Configuration
     GOOGLE_PLAY_SERVICE_ACCOUNT_KEY: Optional[str] = None
     GOOGLE_PLAY_PACKAGE_NAME: Optional[str] = None
+    GOOGLE_PACKAGE_NAME: Optional[str] = None  # Alias for GOOGLE_PLAY_PACKAGE_NAME
     
+    # Google Service Account
+    GOOGLE_SERVICE_ACCOUNT_KEY_PATH: Optional[str] = None
+    GOOGLE_SERVICE_ACCOUNT_KEY_BASE64: Optional[str] = None  # Alternative: base64 encoded
+    
+    # Google Product IDs
+    GOOGLE_MONTHLY_PRODUCT_ID: Optional[str] = None  # monthly_subscription
+    GOOGLE_YEARLY_PRODUCT_ID: Optional[str] = None  # yearly_subscription
+    
+    # ==================== WEBHOOK CONFIGURATION ====================
+    # Webhook URLs
+    WEBHOOK_BASE_URL: Optional[str] = None  # https://api.fintellic.com
+    APPLE_WEBHOOK_PATH: str = "/api/webhooks/apple"
+    GOOGLE_WEBHOOK_PATH: str = "/api/webhooks/google"
+    
+    # ==================== SUBSCRIPTION FEATURES ====================
     # Subscription Features
     ENABLE_SUBSCRIPTION: bool = True
     ENABLE_TRIAL_PERIOD: bool = False  # 暂不启用试用期
@@ -71,6 +99,14 @@ class Settings(BaseSettings):
     # Early Bird Marketing
     SHOW_EARLY_BIRD_COUNTDOWN: bool = True  # 显示早鸟名额倒计时
     EARLY_BIRD_MARKETING_MESSAGE: str = "🔥 Limited Early Bird Offer: Only {slots} spots left!"
+    
+    # ==================== EMAIL NOTIFICATIONS (OPTIONAL) ====================
+    # SMTP Configuration (for future use)
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: Optional[int] = None
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    NOTIFICATION_EMAIL: Optional[str] = None
     # ================================================================
     
     # Scheduler settings

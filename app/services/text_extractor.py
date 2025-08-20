@@ -1,6 +1,6 @@
 # app/services/text_extractor.py
 """
-Text Extractor Service - Enhanced Version with Intelligent S-1 Chapter Extraction
+Text Extractor Service - Enhanced Version with Intelligent S-1 Chapter Extraction and Markdown Table Support
 Extracts structured text from SEC filing HTML documents
 Enhanced for different filing types (10-K, 10-Q, 8-K, S-1)
 FIXED: Better document type identification with multiple patterns
@@ -10,6 +10,7 @@ ENHANCED: Added Exhibit 99 extraction for 8-K filings
 ENHANCED: Added S-1 specific chapter extraction with multiple detection methods
 ENHANCED: Intelligent section detection using TOC, font styles, and patterns
 FIXED: Handle cases where filing directory might not exist or be empty
+REVOLUTIONARY: HTML → Markdown table conversion to preserve financial data structure
 """
 import re
 from pathlib import Path
@@ -24,6 +25,7 @@ class TextExtractor:
     """
     Extract structured text from SEC filing HTML documents
     Enhanced with intelligent S-1 extraction using multiple detection methods
+    REVOLUTIONARY: Added Markdown table conversion for accurate financial data preservation
     """
     
     def __init__(self):
@@ -148,7 +150,7 @@ class TextExtractor:
             filing_dir: Path to the filing directory
             
         Returns:
-            Dictionary with extracted text sections
+            Dictionary with extracted text sections and enhanced_text (Markdown format)
         """
         # Check if directory exists
         if not filing_dir.exists():
@@ -157,6 +159,7 @@ class TextExtractor:
                 'error': 'Filing directory not found',
                 'full_text': '',
                 'primary_content': '',
+                'enhanced_text': '',
                 'filing_type': 'UNKNOWN'
             }
         
@@ -193,6 +196,7 @@ class TextExtractor:
                 'error': 'No filing documents found',
                 'full_text': '',
                 'primary_content': '',
+                'enhanced_text': '',
                 'filing_type': 'UNKNOWN'
             }
         
@@ -216,6 +220,9 @@ class TextExtractor:
                 
                 if 'full_text' in sections:
                     sections['full_text'] += f"\n\n{exhibit_99_content}"
+                
+                if 'enhanced_text' in sections:
+                    sections['enhanced_text'] += f"\n\n## EXHIBIT 99 CONTENT\n\n{exhibit_99_content}"
                 
                 sections['exhibit_99_content'] = exhibit_99_content
         
@@ -285,21 +292,14 @@ class TextExtractor:
                 # Parse with BeautifulSoup
                 soup = BeautifulSoup(html_content, 'html.parser')
                 
-                # Remove script and style elements
-                for element in soup(['script', 'style', 'link', 'meta']):
-                    element.decompose()
-                
-                # Extract text
-                text = soup.get_text()
-                
-                # Clean up text
-                text = self._clean_text(text)
+                # Extract and enhance content
+                enhanced_content = self._extract_enhanced_content_from_soup(soup)
                 
                 # Add header for this exhibit
-                if text and len(text) > 100:
+                if enhanced_content and len(enhanced_content) > 100:
                     header = f"\n{'='*40}\nExhibit 99: {exhibit_file.name}\n{'='*40}\n"
-                    exhibit_99_content.append(header + text)
-                    logger.info(f"Extracted {len(text)} chars from {exhibit_file.name}")
+                    exhibit_99_content.append(header + enhanced_content)
+                    logger.info(f"Extracted {len(enhanced_content)} chars from {exhibit_file.name}")
                 
             except Exception as e:
                 logger.error(f"Error extracting from {exhibit_file.name}: {e}")
@@ -333,6 +333,7 @@ class TextExtractor:
                 return {
                     'full_text': '',
                     'primary_content': '',
+                    'enhanced_text': '',
                     'filing_type': 'UNKNOWN'
                 }
             
@@ -363,8 +364,12 @@ class TextExtractor:
             # Extract sections based on filing type
             sections = self._extract_sections_by_type(main_content, filing_type)
             
+            # Generate enhanced text (Markdown format)
+            enhanced_text = self._generate_enhanced_markdown_from_text(main_content, filing_type)
+            
             # Always include full text and primary content
             sections['full_text'] = main_content
+            sections['enhanced_text'] = enhanced_text
             sections['filing_type'] = filing_type
             
             # Ensure we have quality primary content
@@ -379,12 +384,13 @@ class TextExtractor:
                 'error': str(e),
                 'full_text': '',
                 'primary_content': '',
+                'enhanced_text': '',
                 'filing_type': 'UNKNOWN'
             }
     
     def extract_from_html(self, html_path: Path) -> Dict[str, str]:
         """
-        Extract structured text sections from an HTML filing
+        Extract structured text sections from an HTML filing with Markdown enhancement
         """
         try:
             with open(html_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -396,6 +402,7 @@ class TextExtractor:
                 return {
                     'full_text': '',
                     'primary_content': '',
+                    'enhanced_text': '',
                     'filing_type': 'UNKNOWN'
                 }
             
@@ -419,6 +426,9 @@ class TextExtractor:
                 return self._extract_from_ixbrl(html_content, filing_type)
             
             soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # REVOLUTIONARY: Extract enhanced content with Markdown table conversion
+            enhanced_text = self._extract_enhanced_content_from_soup(soup)
             
             # Remove script and style elements
             for element in soup(['script', 'style', 'link', 'meta']):
@@ -446,6 +456,7 @@ class TextExtractor:
             
             # Always ensure we have these keys
             sections['full_text'] = text
+            sections['enhanced_text'] = enhanced_text  # NEW: Markdown enhanced text
             sections['filing_type'] = filing_type
             
             # Ensure quality primary content
@@ -460,8 +471,242 @@ class TextExtractor:
                 'error': str(e),
                 'full_text': '',
                 'primary_content': '',
+                'enhanced_text': '',
                 'filing_type': 'UNKNOWN'
             }
+    
+    def _extract_enhanced_content_from_soup(self, soup: BeautifulSoup) -> str:
+        """
+        REVOLUTIONARY: Extract content with Markdown table conversion for accurate financial data
+        
+        This method addresses the core problem identified in the solution document:
+        - Converts HTML tables to clean Markdown format
+        - Preserves table structure instead of creating chaotic separators
+        - Enhances key financial data with proper markup
+        """
+        logger.info("Starting enhanced content extraction with Markdown table conversion")
+        
+        # Build Markdown document
+        markdown_doc = []
+        
+        # 1. Process tables - convert to clean Markdown tables
+        tables_processed = 0
+        for table in soup.find_all('table'):
+            if self._is_financial_table(table):
+                markdown_table = self._table_to_markdown_clean(table)
+                if markdown_table:
+                    markdown_doc.append(markdown_table)
+                    tables_processed += 1
+                    
+        logger.info(f"Processed {tables_processed} financial tables into Markdown format")
+        
+        # 2. Process text sections - enhance with markup
+        for section in self._find_sections(soup):
+            enhanced_section = self._enhance_text_section(section)
+            if enhanced_section:
+                markdown_doc.append(enhanced_section)
+        
+        # 3. Combine all content
+        enhanced_text = '\n\n'.join(markdown_doc)
+        
+        # 4. Final cleanup and validation
+        enhanced_text = self._clean_text(enhanced_text)
+        
+        logger.info(f"Generated enhanced Markdown document: {len(enhanced_text)} chars")
+        return enhanced_text
+    
+    def _is_financial_table(self, table_soup) -> bool:
+        """
+        Determine if a table contains financial data
+        """
+        table_text = table_soup.get_text().lower()
+        
+        # Financial keywords that indicate important tables
+        financial_keywords = [
+            'revenue', 'income', 'assets', 'liabilities', 'cash', 'earnings',
+            'net sales', 'gross profit', 'operating', 'total', 'shares',
+            'million', 'billion', 'thousand', '$', 'consolidated',
+            'balance sheet', 'statement', 'fiscal', 'quarter', 'year'
+        ]
+        
+        # Count keyword matches
+        keyword_matches = sum(1 for keyword in financial_keywords if keyword in table_text)
+        
+        # Check for financial numbers
+        has_financial_numbers = bool(re.search(r'\$[\d,]+|\d+[,.]?\d*\s*(?:million|billion)', table_text))
+        
+        # Table must have multiple rows and columns
+        rows = len(table_soup.find_all('tr'))
+        
+        return keyword_matches >= 2 and has_financial_numbers and rows >= 2
+    
+    def _table_to_markdown_clean(self, table_soup) -> str:
+        """
+        CORE FIX: Convert HTML table to clean Markdown format
+        
+        This addresses the main problem: BeautifulSoup's get_text() creates chaotic
+        separators that confuse AI. Instead, we preserve table structure in Markdown.
+        
+        Before: | | | | | | | | 13,640 | | | 15,009 | |
+        After:  | Net sales | 3,535 | 5,082 | 13,640 | 15,009 |
+        """
+        try:
+            markdown_lines = []
+            
+            rows = table_soup.find_all('tr')
+            if not rows:
+                return ""
+            
+            # Process each row
+            for row_idx, row in enumerate(rows):
+                cells = row.find_all(['td', 'th'])
+                
+                # Extract cell contents and filter empty cells
+                clean_cells = []
+                for cell in cells:
+                    cell_text = cell.get_text().strip()
+                    # Only include cells with meaningful content
+                    if cell_text and len(cell_text) > 0:
+                        # Clean up the text
+                        cell_text = re.sub(r'\s+', ' ', cell_text)
+                        clean_cells.append(cell_text)
+                
+                # Only include rows with substantial content
+                if clean_cells and len(clean_cells) >= 2:
+                    # Create Markdown table row
+                    markdown_row = "| " + " | ".join(clean_cells) + " |"
+                    markdown_lines.append(markdown_row)
+                    
+                    # Add header separator after first row (if it looks like a header)
+                    if row_idx == 0 and len(markdown_lines) == 1:
+                        # Create separator row
+                        separator_cells = ["---"] * len(clean_cells)
+                        separator_row = "| " + " | ".join(separator_cells) + " |"
+                        markdown_lines.append(separator_row)
+            
+            # Return the Markdown table
+            if len(markdown_lines) >= 3:  # Header + separator + at least one data row
+                result = '\n'.join(markdown_lines)
+                logger.debug(f"Created Markdown table with {len(markdown_lines)} rows")
+                return result
+            else:
+                return ""
+                
+        except Exception as e:
+            logger.error(f"Error converting table to Markdown: {e}")
+            return ""
+    
+    def _find_sections(self, soup: BeautifulSoup) -> List:
+        """
+        Find meaningful text sections for enhancement
+        """
+        sections = []
+        
+        # Find paragraphs and div elements with substantial text
+        for element in soup.find_all(['p', 'div']):
+            text = element.get_text().strip()
+            if len(text) > 200:  # Only include substantial content
+                sections.append(element)
+        
+        return sections
+    
+    def _enhance_text_section(self, section) -> str:
+        """
+        Enhance text section with Markdown formatting for key financial data
+        """
+        text = section.get_text().strip()
+        
+        if len(text) < 100:
+            return ""
+        
+        # Add bold formatting for financial amounts
+        text = re.sub(
+            r'\$([0-9,]+(?:\.[0-9]+)?)\s*(million|billion|M|B)?',
+            r'**$\1\2**',
+            text
+        )
+        
+        # Add bold formatting for percentages
+        text = re.sub(
+            r'([0-9]+(?:\.[0-9]+)?%)',
+            r'**\1**',
+            text
+        )
+        
+        # Add bold formatting for key dates
+        text = re.sub(
+            r'(fiscal\s+year\s+\d{4}|quarter\s+ended\s+\w+\s+\d+,\s+\d{4})',
+            r'**\1**',
+            text,
+            flags=re.IGNORECASE
+        )
+        
+        # Extract section title if present
+        section_title = self._extract_section_title(section)
+        if section_title:
+            text = f"## {section_title}\n\n{text}"
+        
+        return text
+    
+    def _extract_section_title(self, section) -> Optional[str]:
+        """
+        Extract section title from HTML element
+        """
+        # Look for preceding header elements
+        prev_sibling = section.find_previous_sibling()
+        while prev_sibling:
+            if prev_sibling.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                title = prev_sibling.get_text().strip()
+                if len(title) < 100:  # Reasonable title length
+                    return title
+            prev_sibling = prev_sibling.find_previous_sibling()
+        
+        # Look for bold text at the beginning of the section
+        first_bold = section.find(['b', 'strong'])
+        if first_bold:
+            title = first_bold.get_text().strip()
+            if len(title) < 100:
+                return title
+        
+        return None
+    
+    def _generate_enhanced_markdown_from_text(self, text: str, filing_type: str) -> str:
+        """
+        Generate enhanced Markdown from plain text (for TXT files)
+        """
+        # Split into paragraphs
+        paragraphs = text.split('\n\n')
+        enhanced_paragraphs = []
+        
+        for para in paragraphs:
+            if len(para.strip()) < 50:
+                continue
+                
+            # Enhance with financial data markup
+            enhanced_para = self._enhance_text_with_markdown(para)
+            enhanced_paragraphs.append(enhanced_para)
+        
+        return '\n\n'.join(enhanced_paragraphs)
+    
+    def _enhance_text_with_markdown(self, text: str) -> str:
+        """
+        Enhance text with Markdown formatting for financial data
+        """
+        # Add bold formatting for financial amounts
+        text = re.sub(
+            r'\$([0-9,]+(?:\.[0-9]+)?)\s*(million|billion|M|B)?',
+            r'**$\1\2**',
+            text
+        )
+        
+        # Add bold formatting for percentages
+        text = re.sub(
+            r'([0-9]+(?:\.[0-9]+)?%)',
+            r'**\1**',
+            text
+        )
+        
+        return text
     
     def _identify_filing_type_enhanced(self, text: str) -> str:
         """
@@ -1119,7 +1364,7 @@ class TextExtractor:
     
     def _extract_from_ixbrl(self, html_content: str, pre_identified_type: str = None) -> Dict[str, str]:
         """
-        Enhanced iXBRL extraction with better content preservation
+        Enhanced iXBRL extraction with better content preservation and Markdown enhancement
         """
         soup = BeautifulSoup(html_content, 'html.parser')
         
@@ -1130,6 +1375,9 @@ class TextExtractor:
         # Remove script and style
         for element in soup(['script', 'style', 'link', 'meta', 'noscript']):
             element.decompose()
+        
+        # Extract enhanced content with Markdown
+        enhanced_text = self._extract_enhanced_content_from_soup(soup)
         
         # Extract text with structure preservation
         text_parts = []
@@ -1164,6 +1412,7 @@ class TextExtractor:
         
         # Always include full text and filing type
         sections['full_text'] = text
+        sections['enhanced_text'] = enhanced_text  # NEW: Markdown enhanced text
         sections['filing_type'] = filing_type
         
         # Ensure primary content
@@ -1205,7 +1454,7 @@ class TextExtractor:
     
     def extract_financial_tables(self, soup: BeautifulSoup) -> List[Dict]:
         """
-        Extract financial tables from HTML
+        Extract financial tables from HTML - ENHANCED with Markdown conversion
         """
         tables = []
         
@@ -1215,17 +1464,14 @@ class TextExtractor:
         for table in soup.find_all('table'):
             table_text = table.get_text().lower()
             if any(keyword in table_text for keyword in financial_keywords):
-                # Extract table data
-                rows = []
-                for tr in table.find_all('tr'):
-                    cols = [td.get_text().strip() for td in tr.find_all(['td', 'th'])]
-                    if cols:
-                        rows.append(cols)
+                # Extract table data with Markdown conversion
+                markdown_table = self._table_to_markdown_clean(table)
                 
-                if rows:
+                if markdown_table:
                     tables.append({
-                        'rows': rows,
-                        'text': table.get_text()
+                        'markdown': markdown_table,
+                        'text': table.get_text(),
+                        'type': 'financial'
                     })
         
         return tables

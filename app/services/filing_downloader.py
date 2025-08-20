@@ -10,6 +10,8 @@ from urllib.parse import urlparse, parse_qs, unquote
 from sqlalchemy.orm import Session
 
 from app.models.filing import Filing, ProcessingStatus, FilingType
+# Phase 4: 导入通知服务
+from app.services.notification_service import notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,10 @@ class FilingDownloader:
     Enhanced filing downloader with improved S-1 document detection
     Based on actual database patterns analysis
     
+    Phase 4 Update: 添加通知功能
+    - 在下载完成后触发推送通知
+    - 通知所有订阅该类型财报的用户
+    
     Key improvements:
     - FIXED: S-1 main document detection (avoids fee calculation tables)
     - Prioritizes correct S-1 document patterns based on real data
@@ -27,6 +33,7 @@ class FilingDownloader:
     - Multiple URL format attempts
     - Content validation
     - Downloads Exhibit 99 files for 8-K filings
+    - Phase 4: Push notifications after successful download
     """
     
     def __init__(self):
@@ -586,6 +593,7 @@ class FilingDownloader:
     async def download_filing(self, db: Session, filing: Filing) -> bool:
         """
         Main download method with improved S-1 handling
+        Phase 4: 添加通知功能
         """
         try:
             # Update status
@@ -751,6 +759,28 @@ class FilingDownloader:
                 # Update status to PARSING
                 filing.status = ProcessingStatus.PARSING
                 db.commit()
+                
+                # ========================= Phase 4: 发送推送通知 =========================
+                try:
+                    logger.info(f"Phase 4: Triggering push notification for filing {filing.id}")
+                    
+                    # 调用通知服务发送通知
+                    notification_count = notification_service.send_filing_notification(
+                        db=db,
+                        filing=filing,
+                        notification_type="filing_release"
+                    )
+                    
+                    if notification_count > 0:
+                        logger.info(f"✅ Successfully sent {notification_count} push notifications")
+                    else:
+                        logger.info("No users subscribed to notifications for this filing")
+                        
+                except Exception as notification_error:
+                    # 通知失败不应该影响下载流程
+                    logger.error(f"Failed to send push notifications: {notification_error}")
+                    # 继续执行，不中断下载流程
+                # =========================================================================
                 
                 logger.info(f"Successfully completed download for {filing.accession_number}")
                 return True

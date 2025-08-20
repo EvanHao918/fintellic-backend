@@ -1,15 +1,15 @@
 # app/services/ai_processor.py
 """
-AI Processor Service - Streamlined Version
+AI Processor Service - Enhanced with Data Accuracy Constraints
 STREAMLINED: Focused on core functionality only
 - Unified Analysis generation (main content)
-- Feed Summary extraction (list view)
+- Feed Summary extraction (list view)  
 - Smart Markup Data (frontend rendering)
 - Enhanced Tags (intelligent categorization)
 
 REMOVED: Question generation, tone analysis, separate financial highlights
 ENHANCED: Management analysis, S-1 processing, tag quality
-FIXED: Data source marking to prevent hallucination
+REVOLUTIONARY: Enhanced data source marking and Markdown table processing to prevent hallucination
 """
 import json
 import re
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # Initialize OpenAI client
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-# Data source marking patterns
+# ENHANCED Data source marking patterns - CRITICAL for accuracy
 DATA_SOURCE_PATTERNS = {
     'document': r'\[DOC:\s*([^\]]+)\]',
     'api': r'\[API:\s*([^\]]+)\]',
@@ -46,6 +46,7 @@ DATA_SOURCE_PATTERNS = {
 class AIProcessor:
     """
     Process filings using OpenAI with enhanced management analysis and tag extraction
+    REVOLUTIONARY: Enhanced with Markdown table processing and strict data accuracy constraints
     """
     
     def __init__(self):
@@ -86,47 +87,66 @@ class AIProcessor:
             return len(text) // 4
     
     def _validate_data_marking(self, text: str) -> Tuple[bool, List[str]]:
-        """Validate that AI output contains proper data source markings"""
+        """
+        CRITICAL: Validate that AI output contains proper data source markings
+        This prevents the hallucination issues identified in the solution document
+        """
         issues = []
         
         # Extract all numbers and claims
         numbers = re.findall(r'\$[\d,]+[BMK]?|[\d,]+%|\d+\.?\d*\s*(?:million|billion)', text)
         
-        # Check if numbers have nearby citations
-        for number in numbers[:10]:
+        # Check if numbers have nearby citations - ENHANCED logic
+        unmarked_numbers = 0
+        for number in numbers[:15]:  # Check more numbers
             pos = text.find(number)
             if pos == -1:
                 continue
                 
-            nearby_text = text[max(0, pos-50):pos+50]
+            # Expand search window for citations
+            nearby_text = text[max(0, pos-100):pos+100]
             has_citation = any(
                 re.search(pattern, nearby_text) 
                 for pattern in DATA_SOURCE_PATTERNS.values()
             )
             
             if not has_citation:
-                issues.append(f"Unmarked number: {number}")
+                unmarked_numbers += 1
+                if unmarked_numbers <= 3:  # Only log first few
+                    issues.append(f"Unmarked number: {number}")
         
         # Check for forbidden phrases when NO_DATA should be used
         if '[NO_DATA]' not in text:
             forbidden_without_data = [
-                'analyst consensus', 'analyst expectations',
-                'beat expectations', 'missed estimates',
-                'exceeded analyst', 'below analyst'
+                'analyst consensus', 'analyst expectations', 'analyst estimate',
+                'beat expectations', 'missed estimates', 'exceeded analyst',
+                'below analyst', 'vs consensus', 'consensus view'
             ]
             for phrase in forbidden_without_data:
                 if phrase.lower() in text.lower():
                     if not re.search(r'\[API:\s*FMP\]', text):
                         issues.append(f"Used '{phrase}' without analyst data or [NO_DATA] marker")
         
-        # Check minimum marking density
+        # Check minimum marking density - ENHANCED
         total_markings = sum(
             len(re.findall(pattern, text)) 
             for pattern in DATA_SOURCE_PATTERNS.values()
         )
         
-        if len(text) > 1000 and total_markings < 5:
-            issues.append("Insufficient data source markings for content length")
+        text_length = len(text)
+        if text_length > 1000:
+            expected_markings = max(5, text_length // 500)  # At least 1 marking per 500 chars
+            if total_markings < expected_markings:
+                issues.append(f"Insufficient data source markings: {total_markings}/{expected_markings} expected")
+        
+        # Check for template/placeholder content
+        suspicious_patterns = [
+            r'\$X\.XB', r'\$\d+\.XB', r'TBD', r'INSERT.*HERE', 
+            r'PLACEHOLDER', r'\[AMOUNT\]', r'\[NUMBER\]'
+        ]
+        for pattern in suspicious_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                issues.append(f"Suspicious placeholder content detected: {pattern}")
         
         is_valid = len(issues) == 0
         return is_valid, issues
@@ -164,6 +184,10 @@ class AIProcessor:
                 if keyword in section_lower:
                     score += 10
             
+            # ENHANCED: Prioritize Markdown tables (from enhanced text_extractor)
+            if '|' in section and '---' in section:
+                score += 20  # High priority for structured tables
+            
             # Score based on financial data
             score += len(re.findall(r'\$[\d,]+', section)) * 2
             score += len(re.findall(r'\d+\.?\d*%', section)) * 2
@@ -171,6 +195,9 @@ class AIProcessor:
             # Bonus for management-related content
             if any(term in section_lower for term in ['management', 'executive', 'ceo', 'cfo', 'board']):
                 score += 15
+            
+            # Bonus for enhanced markdown formatting
+            score += len(re.findall(r'\*\*[^*]+\*\*', section)) * 1  # Bold text
             
             scored_sections.append((score, section))
         
@@ -213,7 +240,7 @@ class AIProcessor:
             # Get filing directory
             filing_dir = Path(f"data/filings/{filing.company.cik}/{filing.accession_number.replace('-', '')}")
             
-            # Extract text
+            # Extract text with ENHANCED Markdown support
             sections = text_extractor.extract_from_filing(filing_dir)
             
             if 'error' in sections:
@@ -222,8 +249,15 @@ class AIProcessor:
             extracted_filing_type = sections.get('filing_type', 'UNKNOWN')
             logger.info(f"Extracted filing type: {extracted_filing_type}")
             
-            primary_content = sections.get('primary_content', '')
+            # REVOLUTIONARY: Use enhanced_text (Markdown) if available, fallback to primary_content
+            primary_content = sections.get('enhanced_text', '') or sections.get('primary_content', '')
             full_text = sections.get('full_text', '')
+            
+            # Log the content type being used
+            if sections.get('enhanced_text'):
+                logger.info(f"Using enhanced Markdown content: {len(primary_content)} chars")
+            else:
+                logger.info(f"Using standard primary content: {len(primary_content)} chars")
             
             if filing.filing_type == FilingType.FORM_8K and 'exhibit_99_content' in sections:
                 logger.info(f"8-K includes Exhibit 99 content: {len(sections['exhibit_99_content'])} chars")
@@ -266,7 +300,7 @@ class AIProcessor:
             filing.unified_analysis = unified_result['unified_analysis']
             filing.unified_feed_summary = unified_result['feed_summary']
             filing.smart_markup_data = unified_result['markup_data']
-            filing.analysis_version = "v7"  # Streamlined version
+            filing.analysis_version = "v7_enhanced"  # Enhanced version marker
             
             if analyst_data:
                 filing.analyst_expectations = analyst_data
@@ -297,10 +331,12 @@ class AIProcessor:
         full_text: str,
         analyst_data: Optional[Dict] = None
     ) -> Dict:
-        """Generate unified analysis with intelligent retry logic"""
+        """Generate unified analysis with intelligent retry logic and enhanced validation"""
         max_retries = 3
         
         for attempt in range(max_retries):
+            logger.info(f"Analysis attempt {attempt + 1}/{max_retries}")
+            
             # Preprocess content
             processed_content = self._preprocess_content_for_ai(
                 primary_content, full_text, filing.filing_type, attempt
@@ -311,7 +347,7 @@ class AIProcessor:
                 filing, processed_content, processed_content, analyst_data
             )
             
-            # Validate data marking
+            # CRITICAL: Validate data marking
             is_valid, validation_issues = self._validate_data_marking(unified_result['unified_analysis'])
             
             if not is_valid:
@@ -443,6 +479,8 @@ class AIProcessor:
             r'placeholder',
             r'INSERT.*HERE',
             r'TBD',
+            r'\$X\.X+B',  # Placeholder formats
+            r'\d+\.X+%',  # Placeholder percentages
         ]
         
         for pattern in template_patterns:
@@ -502,20 +540,25 @@ class AIProcessor:
         }
     
     def _build_data_marking_instructions(self) -> str:
-        """Build critical instructions for mandatory data source marking"""
+        """Build critical instructions for mandatory data source marking - ENHANCED"""
         return """
 CRITICAL REQUIREMENT: Data Source Marking System
 ================================================
+You are reviewing this filing with the rigor of a financial journalist.
+The document's tables and explicitly stated numbers are your primary sources.
+Let the document tell its story through actual data, not approximations.
+
 EVERY factual claim, number, or data point MUST be marked with its source using these tags:
 
 1. [DOC: location] - For information directly from THIS filing
    Examples: [DOC: Financial Statements], [DOC: MD&A p.3], [DOC: Risk Factors section]
+   Examples: [DOC: Consolidated Income Statement], [DOC: Management Discussion]
 
 2. [API: source] - For external data we provided (like analyst estimates)
    Example: [API: FMP analyst consensus]
 
 3. [CALC: formula] - For calculations you perform
-   Example: [CALC: Q3/Q2-1 = 12% growth]
+   Example: [CALC: Q3/Q2-1 = 12% growth], [CALC: $15,009M/$13,640M-1 = 10% growth]
 
 4. [NO_DATA] - When specific data is not available
    Example: "Analyst consensus data [NO_DATA], so we cannot compare to expectations"
@@ -523,15 +566,24 @@ EVERY factual claim, number, or data point MUST be marked with its source using 
 5. [CAUTION] - For uncertain inferences or estimates
    Example: "This suggests [CAUTION] potential margin pressure"
 
+ENHANCED RULE - Table Priority:
+When citing financial figures, prioritize data from Markdown tables.
+Tables are formatted as:
+| Metric | Value |
+|--------|-------|
+| Revenue | $15,009M |
+If you see this structure, use these exact values with [DOC: Table] citations.
+
 RULES:
 - Numbers without source tags will be REJECTED
 - If you mention analyst expectations, you MUST have [API: FMP] or use [NO_DATA]
 - Never invent or estimate consensus figures
-- Mark at least one source per paragraph
+- Mark at least one source per major paragraph
+- Markdown tables are your most reliable data source
 """
     
     def _build_10k_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
-        """Enhanced 10-K prompt with management analysis focus"""
+        """Enhanced 10-K prompt with management analysis focus and data accuracy constraints"""
         marking_instructions = self._build_data_marking_instructions()
         ticker = self._get_safe_ticker(filing)
         company_name = filing.company.name if filing.company else "the company"
@@ -587,6 +639,7 @@ KEY PRINCIPLES:
 - Use +[positive developments] sparingly for major wins
 - Use -[challenges] sparingly for significant concerns
 - Include management's perspective where available
+- NEVER invent numbers - cite every financial figure with [DOC: location]
 
 CONTEXT:
 Fiscal Year: {context.get('fiscal_year', 'FY2024')}
@@ -596,10 +649,10 @@ Current Date: {datetime.now().strftime('%B %d, %Y')}
 FILING CONTENT:
 {content}
 
-Now, provide a comprehensive analysis of {ticker}'s annual report with proper source citations."""
+Now, provide a comprehensive analysis of {ticker}'s annual report with complete source attribution."""
     
     def _build_10q_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict, analyst_data: Optional[Dict] = None) -> str:
-        """Enhanced 10-Q prompt with management outlook focus"""
+        """Enhanced 10-Q prompt with management outlook focus and data accuracy constraints"""
         marking_instructions = self._build_data_marking_instructions()
         ticker = self._get_safe_ticker(filing)
         company_name = filing.company.name if filing.company else "the company"
@@ -622,7 +675,7 @@ Now, provide a comprehensive analysis of {ticker}'s annual report with proper so
                     if eps_est.get('analysts'):
                         analyst_context += f" ({eps_est.get('analysts')} analysts)"
                 
-                analyst_context += "\nCompare these expectations with actual results and mark all comparisons properly\n"
+                analyst_context += "\nCompare these expectations with actual results and mark all comparisons with [API: FMP]\n"
         else:
             analyst_context = "\nNOTE: No analyst consensus data available. Use [NO_DATA] if you need to mention expectations.\n"
         
@@ -675,6 +728,7 @@ ANALYSIS APPROACH:
 - Include management's perspective throughout
 - Connect the numbers to business realities
 - Close with concrete takeaways for investors
+- NEVER fabricate analyst comparisons - use [NO_DATA] if needed
 
 CONTEXT:
 Quarter: {context.get('fiscal_quarter', 'Q3 2024')}
@@ -687,7 +741,7 @@ FILING CONTENT:
 Analyze this quarter's performance with complete source attribution and management perspective."""
     
     def _build_s1_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
-        """Enhanced S-1 prompt with better investment thesis focus"""
+        """Enhanced S-1 prompt with better investment thesis focus and data accuracy"""
         marking_instructions = self._build_data_marking_instructions()
         company_name = filing.company.name if filing.company else "the company"
         ticker = self._get_safe_ticker(filing)
@@ -750,7 +804,7 @@ For SPACs/Early-Stage:
 - Target acquisition criteria
 - Trust structure and investor protections
 
-REMEMBER: Quality analysis over speculation!
+REMEMBER: Quality analysis over speculation! NEVER invent financial metrics.
 
 CONTEXT:
 Filing Date: {context.get('filing_date', '')}
@@ -762,7 +816,7 @@ FILING CONTENT:
 Evaluate this IPO opportunity with complete source citations and balanced perspective."""
     
     def _build_8k_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
-        """8-K prompt (unchanged from original)"""
+        """8-K prompt with enhanced data accuracy constraints"""
         marking_instructions = self._build_data_marking_instructions()
         ticker = self._get_safe_ticker(filing)
         company_name = filing.company.name if filing.company else "the company"
@@ -778,19 +832,22 @@ Evaluate this IPO opportunity with complete source citations and balanced perspe
 EARNINGS-SPECIFIC FOCUS:
 - Extract and highlight: Revenue, EPS, key segment performance
 - Identify the primary drivers of performance
-- Note any guidance updates or management outlook changes"""
+- Note any guidance updates or management outlook changes
+- Cite all numbers with [DOC: Item 2.02] or [DOC: Exhibit 99]"""
         elif item_type and item_type.startswith('1.01'):
             type_specific_guidance = """
 AGREEMENT-SPECIFIC FOCUS:
 - Summarize the key terms: parties, duration, financial terms
 - Explain the strategic rationale and expected benefits
-- Assess the potential financial and operational impact"""
+- Assess the potential financial and operational impact
+- Cite all details with [DOC: Item 1.01]"""
         elif item_type and item_type.startswith('5.02'):
             type_specific_guidance = """
 LEADERSHIP-SPECIFIC FOCUS:
 - Clearly state who is leaving/joining and their roles
 - Note effective dates and transition arrangements
-- Assess potential impact on strategy or operations"""
+- Assess potential impact on strategy or operations
+- Cite all information with [DOC: Item 5.02]"""
         
         return f"""You are a financial journalist analyzing a material event for {company_name} ({ticker}).
 
@@ -814,6 +871,7 @@ ANALYSIS FRAMEWORK:
 - Mark every factual claim with its source
 - Explain the business/financial impact
 - Close with what to watch for next
+- NEVER speculate on numbers - cite everything
 
 CONTEXT:
 Event Date: {context.get('filing_date', '')}
@@ -825,7 +883,7 @@ FILING CONTENT:
 Analyze this event with complete source attribution."""
     
     def _build_generic_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
-        """Generic prompt for other filing types"""
+        """Generic prompt for other filing types with data accuracy constraints"""
         marking_instructions = self._build_data_marking_instructions()
         ticker = self._get_safe_ticker(filing)
         company_name = filing.company.name if filing.company else "the company"
@@ -842,6 +900,7 @@ Write an analysis that:
 2. Explains the implications for investors
 3. Uses specific data from the filing with [DOC: location] citations
 4. Maintains professional clarity throughout
+5. NEVER invents or approximates numbers
 
 Focus on what's material and actionable for investors.
 
@@ -1199,10 +1258,6 @@ Write the compelling summary:"""
         
         return tags
     
-    # REMOVED: _analyze_tone() method - no longer needed
-    # REMOVED: _generate_questions_from_unified() method - no longer needed
-    # REMOVED: _extract_financial_highlights() method - no longer needed
-    
     def _format_expectations_comparison(self, analyst_data: Dict) -> str:
         """Format expectations comparison for storage"""
         revenue_est = analyst_data.get('revenue_estimate', {})
@@ -1255,7 +1310,7 @@ Write the compelling summary:"""
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a professional financial analyst with expertise in SEC filings analysis. Write in clear, professional English suitable for sophisticated retail investors. Always cite your sources."},
+                    {"role": "system", "content": "You are a professional financial analyst with expertise in SEC filings analysis. Write in clear, professional English suitable for sophisticated retail investors. Always cite your sources with proper data marking tags."},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=max_tokens,

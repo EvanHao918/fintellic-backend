@@ -85,6 +85,42 @@ class Settings(BaseSettings):
     APPLE_WEBHOOK_PATH: str = "/api/webhooks/apple"
     GOOGLE_WEBHOOK_PATH: str = "/api/webhooks/google"
     
+    # ==================== FIREBASE PUSH NOTIFICATIONS (PHASE 4) ====================
+    # Firebase Configuration
+    FIREBASE_ENABLED: bool = True  # 启用推送通知
+    FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = None  # Firebase服务账号JSON字符串
+    FIREBASE_SERVICE_ACCOUNT_PATH: Optional[str] = None  # 或者使用文件路径
+    
+    # FCM Settings
+    FCM_SERVER_KEY: Optional[str] = None  # FCM服务器密钥（旧版，可选）
+    FCM_SENDER_ID: Optional[str] = None  # FCM发送者ID
+    
+    # Notification Settings
+    NOTIFICATION_BATCH_SIZE: int = 500  # 批量发送通知的大小
+    NOTIFICATION_RATE_LIMIT: int = 100  # 每秒发送通知数量限制
+    NOTIFICATION_RETRY_ATTEMPTS: int = 3  # 失败重试次数
+    NOTIFICATION_RETRY_DELAY: int = 5  # 重试延迟（秒）
+    
+    # Notification Content Defaults
+    NOTIFICATION_DEFAULT_ICON: str = "ic_notification"  # Android通知图标
+    NOTIFICATION_DEFAULT_COLOR: str = "#E88B00"  # 品牌色（橙色）
+    NOTIFICATION_DEFAULT_SOUND: str = "default"  # 通知声音
+    
+    # Notification Features
+    ENABLE_FILING_NOTIFICATIONS: bool = True  # 财报发布通知
+    ENABLE_DAILY_RESET_NOTIFICATIONS: bool = True  # 每日重置通知
+    ENABLE_SUBSCRIPTION_NOTIFICATIONS: bool = True  # 订阅相关通知
+    ENABLE_MARKET_SUMMARY_NOTIFICATIONS: bool = False  # 市场汇总通知（暂未实现）
+    
+    # Daily Reset Time (EST)
+    DAILY_RESET_HOUR: int = 0  # EST时区的重置时间（0点）
+    DAILY_RESET_MINUTE: int = 0
+    
+    # Test Mode
+    ENABLE_TEST_NOTIFICATIONS: bool = True  # 允许发送测试通知
+    TEST_NOTIFICATION_USER_IDS: List[int] = []  # 允许接收测试通知的用户ID列表
+    # ================================================================
+    
     # ==================== SUBSCRIPTION FEATURES ====================
     # Subscription Features
     ENABLE_SUBSCRIPTION: bool = True
@@ -97,7 +133,7 @@ class Settings(BaseSettings):
     ENABLE_SUBSCRIPTION_EMAILS: bool = True
     
     # Early Bird Marketing
-    SHOW_EARLY_BIRD_COUNTDOWN: bool = True  # 显示早鸟名额倒计时
+    SHOW_EARLY_BIRD_COUNTDOWN: bool = True  # 显示早鸟倒计时
     EARLY_BIRD_MARKETING_MESSAGE: str = "🔥 Limited Early Bird Offer: Only {slots} spots left!"
     
     # ==================== EMAIL NOTIFICATIONS (OPTIONAL) ====================
@@ -134,6 +170,12 @@ class Settings(BaseSettings):
     ENABLE_SMART_MARKUP: bool = True
     MAX_MARKUP_DENSITY: float = 0.15  # 最多15%的文本被标记
     MARKUP_TYPES: List[str] = ["number", "concept", "positive", "negative", "insight"]
+    
+    # ==================== ENHANCED ACCURACY SETTINGS ====================
+    # Enhanced text extraction and AI processing for better financial data accuracy
+    ENHANCED_EXTRACTION_ENABLED: bool = True    # 启用增强文本提取（Markdown表格）
+    ENHANCED_DATA_MARKING: bool = True          # 启用严格数据标记验证
+    # ================================================================
     
     # ==================== FMP API CONFIGURATION ====================
     # Financial Modeling Prep API

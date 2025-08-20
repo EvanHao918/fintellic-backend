@@ -5,7 +5,8 @@ amqp==5.3.1
 annotated-types==0.7.0
 anyio==3.7.1
 attrs==25.3.0
-bcrypt==4.3.0
+# 🔥 修复：使用兼容版本的bcrypt
+bcrypt==4.1.3
 beautifulsoup4==4.12.2
 billiard==4.2.1
 celery==5.3.4
@@ -35,7 +36,8 @@ MarkupSafe==3.0.2
 multidict==6.5.0
 openai==1.3.7
 packaging==25.0
-passlib==1.7.4
+# 🔥 修复：使用兼容版本的passlib
+passlib[bcrypt]==1.7.4
 prompt_toolkit==3.0.51
 propcache==0.3.2
 psycopg2-binary==2.9.9
@@ -71,9 +73,22 @@ yarl==1.20.1
 yfinance==0.2.36
 tiktoken==0.5.2
 
-# 新增支付相关依赖
+# 支付相关依赖
 google-auth==2.23.4
 google-auth-httplib2==0.1.1
 google-api-python-client==2.108.0
 PyJWT==2.8.0
 requests==2.31.0
+
+# ==================== 新增Phase 4通知系统依赖 ====================
+# Firebase Admin SDK for push notifications
+firebase-admin==6.1.0
+
+# Firebase依赖项（会自动安装，列出供参考）
+# google-cloud-firestore==2.11.1
+# google-cloud-storage==2.10.0
+# grpcio==1.59.0
+# grpcio-status==1.59.0
+# proto-plus==1.22.3
+# protobuf==4.24.4
+# ================================================================

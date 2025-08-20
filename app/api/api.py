@@ -15,7 +15,8 @@ from app.api.endpoints import (
     comments, 
     watchlist, 
     view_limits,
-    subscriptions  # 新增订阅端点
+    subscriptions,  # Phase 2: 订阅端点
+    notifications   # Phase 4: 通知端点 (新增)
 )
 
 api_router = APIRouter()
@@ -52,3 +53,6 @@ api_router.include_router(view_limits.router, prefix="", tags=["view_limits"])
 
 # Subscription endpoints (Phase 2)
 api_router.include_router(subscriptions.router, prefix="/subscriptions", tags=["subscriptions"])
+
+# Notification endpoints (Phase 4) - 新增
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])

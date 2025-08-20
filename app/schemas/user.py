@@ -152,7 +152,7 @@ class UserResponse(UserBase):
     subscription_auto_renew: bool = True
     
     class Config:
-        orm_mode = True
+        from_attributes = True
         from_attributes = True
 
 
@@ -176,7 +176,7 @@ class UserDetailResponse(UserResponse):
     google_subscription_id: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
         from_attributes = True
 
 
@@ -188,7 +188,7 @@ class UserPublic(BaseModel):
     is_early_bird: bool = False  # 显示早鸟标识
     
     class Config:
-        orm_mode = True
+        from_attributes = True
         from_attributes = True
 
 
@@ -209,5 +209,5 @@ class UserInDB(UserBase):
     subscription_expires_at: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
         from_attributes = True

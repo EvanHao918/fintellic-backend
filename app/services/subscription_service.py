@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
@@ -30,18 +30,41 @@ class SubscriptionService:
     """订阅服务类"""
     
     @staticmethod
+    def _get_utc_now() -> datetime:
+        """获取UTC时间，确保时区一致性"""
+        return datetime.now(timezone.utc)
+    
+    @staticmethod
+    def _ensure_utc_datetime(dt: Optional[datetime]) -> Optional[datetime]:
+        """确保datetime是UTC时区感知的"""
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            # 如果是naive datetime，假设为UTC
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+    
+    @staticmethod
+    def _is_early_bird_by_sequence(user: User) -> bool:
+        """基于序号判定是否为早鸟用户"""
+        return user.user_sequence_number is not None and user.user_sequence_number <= settings.EARLY_BIRD_LIMIT
+    
+    @staticmethod
     def get_user_pricing(db: Session, user: User) -> PricingInfo:
         """获取用户的价格信息"""
         try:
             # 获取早鸟统计
             early_bird_count = db.query(func.count(User.id)).filter(
-                User.is_early_bird == True
+                User.user_sequence_number <= settings.EARLY_BIRD_LIMIT
             ).scalar() or 0
             
             slots_remaining = max(0, settings.EARLY_BIRD_LIMIT - early_bird_count)
             
+            # 🔥 修复：基于序号判定早鸟状态，而非数据库字段
+            is_early_bird = SubscriptionService._is_early_bird_by_sequence(user)
+            
             # 确定用户的价格
-            if user.is_early_bird or user.pricing_tier == PricingTier.EARLY_BIRD:
+            if is_early_bird:
                 monthly_price = settings.EARLY_BIRD_MONTHLY_PRICE
                 yearly_price = settings.EARLY_BIRD_YEARLY_PRICE
                 pricing_tier = PricingTier.EARLY_BIRD
@@ -52,15 +75,22 @@ class SubscriptionService:
             
             yearly_savings = (monthly_price * 12) - yearly_price
             
+            # 🔥 修复：同时更新数据库中的早鸟状态，确保一致性
+            if user.is_early_bird != is_early_bird:
+                user.is_early_bird = is_early_bird
+                user.pricing_tier = pricing_tier
+                db.commit()
+                logger.info(f"Updated early bird status for user {user.id}: sequence={user.user_sequence_number}, is_early_bird={is_early_bird}")
+            
             return PricingInfo(
-                is_early_bird=user.is_early_bird,
+                is_early_bird=is_early_bird,
                 user_sequence_number=user.user_sequence_number,
                 pricing_tier=pricing_tier,
                 monthly_price=monthly_price,
                 yearly_price=yearly_price,
                 yearly_savings=yearly_savings,
                 yearly_savings_percentage=40,
-                early_bird_slots_remaining=slots_remaining if not user.is_early_bird else None,
+                early_bird_slots_remaining=slots_remaining if not is_early_bird else None,
                 features={
                     "unlimited_reports": True,
                     "ai_analysis": True,
@@ -88,32 +118,47 @@ class SubscriptionService:
                     total_payments=float(user.total_payment_amount or 0)
                 )
             
+            # 🔥 修复：统一时区处理
+            current_time = SubscriptionService._get_utc_now()
+            expires_at = SubscriptionService._ensure_utc_datetime(user.subscription_expires_at)
+            next_billing_date = SubscriptionService._ensure_utc_datetime(user.next_billing_date)
+            
             # 如果用户有活跃订阅，从用户表读取信息
             days_remaining = None
-            if user.subscription_expires_at:
-                days_remaining = max(0, (user.subscription_expires_at - datetime.now()).days)
+            if expires_at:
+                time_diff = expires_at - current_time
+                days_remaining = max(0, time_diff.days)
+            
+            # 🔥 修复：确保所有字段都有值，避免null
+            subscription_type = user.subscription_type or SubscriptionType.MONTHLY
+            pricing_tier = user.pricing_tier or (PricingTier.EARLY_BIRD if SubscriptionService._is_early_bird_by_sequence(user) else PricingTier.STANDARD)
+            
+            # 如果价格层级不正确，重新计算
+            if not user.pricing_tier or user.pricing_tier != pricing_tier:
+                user.pricing_tier = pricing_tier
+                db.commit()
             
             return SubscriptionInfo(
                 is_active=True,
-                subscription_type=user.subscription_type or SubscriptionType.MONTHLY,
-                pricing_tier=user.pricing_tier or PricingTier.STANDARD,
+                subscription_type=subscription_type,
+                pricing_tier=pricing_tier,
                 status="active",
-                monthly_price=user.monthly_price or settings.STANDARD_MONTHLY_PRICE,
+                monthly_price=user.monthly_price or settings.EARLY_BIRD_MONTHLY_PRICE if SubscriptionService._is_early_bird_by_sequence(user) else settings.STANDARD_MONTHLY_PRICE,
                 current_price=float(user.subscription_price or user.monthly_price or settings.STANDARD_MONTHLY_PRICE),
-                expires_at=user.subscription_expires_at,
-                next_billing_date=user.next_billing_date,
-                auto_renew=user.subscription_auto_renew if hasattr(user, 'subscription_auto_renew') else True,
-                payment_method=user.payment_method if hasattr(user, 'payment_method') else None,
-                cancelled_at=user.subscription_cancelled_at,
+                expires_at=expires_at,
+                next_billing_date=next_billing_date,
+                auto_renew=getattr(user, 'subscription_auto_renew', True),
+                payment_method=getattr(user, 'payment_method', None),
+                cancelled_at=SubscriptionService._ensure_utc_datetime(user.subscription_cancelled_at),
                 days_remaining=days_remaining,
-                started_at=user.subscription_started_at,
+                started_at=SubscriptionService._ensure_utc_datetime(user.subscription_started_at),
                 total_payments=float(user.total_payment_amount or 0),
-                last_payment_date=user.last_payment_date,
+                last_payment_date=SubscriptionService._ensure_utc_datetime(user.last_payment_date),
                 last_payment_amount=float(user.last_payment_amount) if user.last_payment_amount else None
             )
             
         except Exception as e:
-            logger.error(f"Error in get_current_subscription: {str(e)}")
+            logger.error(f"Error in get_current_subscription for user {user.id}: {str(e)}")
             # 如果查询失败，返回基本信息
             return SubscriptionInfo(
                 is_active=user.tier == UserTier.PRO,
@@ -142,28 +187,38 @@ class SubscriptionService:
             # 确定价格
             pricing_info = SubscriptionService.get_user_pricing(db, user)
             
+            # 🔥 修复：统一时区处理
+            current_time = SubscriptionService._get_utc_now()
+            
             if subscription_data.subscription_type == SubscriptionType.MONTHLY:
                 price = pricing_info.monthly_price
-                expires_at = datetime.now() + timedelta(days=30)
+                expires_at = current_time + timedelta(days=30)
             else:  # YEARLY
                 price = pricing_info.yearly_price
-                expires_at = datetime.now() + timedelta(days=365)
+                expires_at = current_time + timedelta(days=365)
             
             # 在 Phase 2，我们直接更新用户表
             user.tier = UserTier.PRO
             user.is_subscription_active = True
             user.subscription_type = subscription_data.subscription_type
-            user.subscription_started_at = datetime.now()
+            user.subscription_started_at = current_time
             user.subscription_expires_at = expires_at
             user.next_billing_date = expires_at
             user.subscription_price = price
             user.subscription_auto_renew = subscription_data.auto_renew
             user.payment_method = subscription_data.payment_method.value if subscription_data.payment_method else None
-            user.last_payment_date = datetime.now()
+            user.last_payment_date = current_time
             user.last_payment_amount = price
             user.total_payment_amount = (user.total_payment_amount or 0) + price
             
+            # 🔥 修复：确保早鸟状态和价格层级正确
+            user.is_early_bird = SubscriptionService._is_early_bird_by_sequence(user)
+            user.pricing_tier = pricing_info.pricing_tier
+            user.monthly_price = pricing_info.monthly_price
+            
             db.commit()
+            
+            logger.info(f"Subscription created for user {user.id}: type={subscription_data.subscription_type}, price=${price}, early_bird={user.is_early_bird}")
             
             return SubscriptionResponse(
                 success=True,
@@ -204,13 +259,14 @@ class SubscriptionService:
             
             # 计算新价格和到期时间
             pricing_info = SubscriptionService.get_user_pricing(db, user)
+            current_time = SubscriptionService._get_utc_now()
             
             if update_data.subscription_type == SubscriptionType.MONTHLY:
                 new_price = pricing_info.monthly_price
-                new_expires_at = datetime.now() + timedelta(days=30)
+                new_expires_at = current_time + timedelta(days=30)
             else:  # YEARLY
                 new_price = pricing_info.yearly_price
-                new_expires_at = datetime.now() + timedelta(days=365)
+                new_expires_at = current_time + timedelta(days=365)
             
             # 更新用户
             user.subscription_type = update_data.subscription_type
@@ -247,18 +303,32 @@ class SubscriptionService:
                     subscription_info=None
                 )
             
-            user.subscription_cancelled_at = datetime.now()
+            current_time = SubscriptionService._get_utc_now()
+            user.subscription_cancelled_at = current_time
             user.subscription_auto_renew = False
             
+            # 🔥 修复：增强取消订阅逻辑
             if cancel_data.cancel_immediately:
-                # 立即取消
+                # 立即取消 - 降级为FREE用户
                 user.tier = UserTier.FREE
                 user.is_subscription_active = False
-                user.subscription_expires_at = datetime.now()
+                user.subscription_expires_at = current_time
                 message = "Subscription cancelled immediately"
+                logger.info(f"User {user.id} subscription cancelled immediately")
             else:
-                # 到期后取消
-                message = f"Subscription will be cancelled on {user.subscription_expires_at.date()}"
+                # 到期后取消 - 保持Pro状态直到到期
+                expires_at = SubscriptionService._ensure_utc_datetime(user.subscription_expires_at)
+                if expires_at:
+                    expire_date = expires_at.date()
+                    message = f"Subscription will be cancelled on {expire_date}"
+                    logger.info(f"User {user.id} subscription scheduled for cancellation on {expire_date}")
+                else:
+                    # 如果没有到期时间，立即取消
+                    user.tier = UserTier.FREE
+                    user.is_subscription_active = False
+                    user.subscription_expires_at = current_time
+                    message = "Subscription cancelled immediately"
+                    logger.info(f"User {user.id} subscription cancelled immediately (no expiry date)")
             
             db.commit()
             
@@ -269,9 +339,12 @@ class SubscriptionService:
             )
             
         except Exception as e:
-            logger.error(f"Error in cancel_subscription: {str(e)}")
+            logger.error(f"Error in cancel_subscription for user {user.id}: {str(e)}")
             db.rollback()
-            raise
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to cancel subscription: {str(e)}"
+            )
     
     @staticmethod
     def get_payment_history(
@@ -324,8 +397,9 @@ class SubscriptionService:
     def get_early_bird_status(db: Session) -> EarlyBirdStatus:
         """获取早鸟状态"""
         try:
+            # 🔥 修复：基于序号统计早鸟用户
             early_bird_count = db.query(func.count(User.id)).filter(
-                User.is_early_bird == True
+                User.user_sequence_number <= settings.EARLY_BIRD_LIMIT
             ).scalar() or 0
             
             slots_remaining = max(0, settings.EARLY_BIRD_LIMIT - early_bird_count)
@@ -387,7 +461,7 @@ class SubscriptionService:
                 User.tier == UserTier.PRO
             ).scalar() or 0
             early_bird_users = db.query(func.count(User.id)).filter(
-                User.is_early_bird == True
+                User.user_sequence_number <= settings.EARLY_BIRD_LIMIT
             ).scalar() or 0
             
             return {
@@ -406,7 +480,7 @@ class SubscriptionService:
                 "early_bird_users": 0,
                 "conversion_rate": 0
             }
-    
+
     # ==================== Apple IAP 处理方法 ====================
     
     @staticmethod
@@ -436,7 +510,16 @@ class SubscriptionService:
             
             # 获取订阅信息
             subscription_type = "YEARLY" if "yearly" in product_id.lower() else "MONTHLY"
-            expires_date = datetime.fromisoformat(receipt_info["expires_date"]) if receipt_info.get("expires_date") else None
+            expires_date_str = receipt_info.get("expires_date")
+            expires_date = None
+            if expires_date_str:
+                # 🔥 修复：确保时区处理正确
+                try:
+                    expires_date = datetime.fromisoformat(expires_date_str.replace('Z', '+00:00'))
+                    if expires_date.tzinfo is None:
+                        expires_date = expires_date.replace(tzinfo=timezone.utc)
+                except:
+                    expires_date = SubscriptionService._get_utc_now() + timedelta(days=30 if subscription_type == "MONTHLY" else 365)
             
             # 确定价格
             pricing_info = SubscriptionService.get_user_pricing(db, user)
@@ -445,18 +528,20 @@ class SubscriptionService:
             else:
                 price = pricing_info.monthly_price
             
+            current_time = SubscriptionService._get_utc_now()
+            
             # 更新用户订阅状态
             user.tier = UserTier.PRO
             user.is_subscription_active = True
             user.subscription_type = subscription_type
-            user.subscription_started_at = user.subscription_started_at or datetime.now()
+            user.subscription_started_at = user.subscription_started_at or current_time
             user.subscription_expires_at = expires_date
             user.next_billing_date = expires_date
             user.subscription_price = price
             user.subscription_auto_renew = receipt_info.get("auto_renew", True)
             user.payment_method = "apple"
             user.apple_subscription_id = receipt_info.get("original_transaction_id")
-            user.last_payment_date = datetime.now()
+            user.last_payment_date = current_time
             user.last_payment_amount = price
             user.total_payment_amount = (user.total_payment_amount or 0) + price
             
@@ -543,12 +628,19 @@ class SubscriptionService:
                 return
             
             # 更新订阅信息
-            expires_date = info.get("expires_date")
-            if expires_date:
-                user.subscription_expires_at = datetime.fromisoformat(expires_date)
-                user.next_billing_date = user.subscription_expires_at
+            expires_date_str = info.get("expires_date")
+            if expires_date_str:
+                try:
+                    expires_date = datetime.fromisoformat(expires_date_str.replace('Z', '+00:00'))
+                    if expires_date.tzinfo is None:
+                        expires_date = expires_date.replace(tzinfo=timezone.utc)
+                    user.subscription_expires_at = expires_date
+                    user.next_billing_date = expires_date
+                except:
+                    logger.warning(f"Failed to parse expires_date: {expires_date_str}")
             
-            user.last_payment_date = datetime.now()
+            current_time = SubscriptionService._get_utc_now()
+            user.last_payment_date = current_time
             user.last_payment_amount = user.subscription_price
             user.total_payment_amount = (user.total_payment_amount or 0) + user.subscription_price
             
@@ -580,7 +672,7 @@ class SubscriptionService:
             
             # 标记续订失败
             user.subscription_auto_renew = False
-            user.subscription_renewal_failed_at = datetime.now()
+            user.subscription_renewal_failed_at = SubscriptionService._get_utc_now()
             
             db.commit()
             logger.info(f"Apple subscription renewal failed for user {user.id}")
@@ -609,7 +701,7 @@ class SubscriptionService:
                 return
             
             # 标记订阅已取消
-            user.subscription_cancelled_at = datetime.now()
+            user.subscription_cancelled_at = SubscriptionService._get_utc_now()
             user.subscription_auto_renew = False
             
             db.commit()
@@ -641,7 +733,7 @@ class SubscriptionService:
             # 处理退款：降级为免费用户
             user.tier = UserTier.FREE
             user.is_subscription_active = False
-            user.subscription_refunded_at = datetime.now()
+            user.subscription_refunded_at = SubscriptionService._get_utc_now()
             
             db.commit()
             logger.info(f"Apple subscription refunded for user {user.id}")
@@ -670,10 +762,11 @@ class SubscriptionService:
                 return
             
             # 撤销订阅：立即失效
+            current_time = SubscriptionService._get_utc_now()
             user.tier = UserTier.FREE
             user.is_subscription_active = False
-            user.subscription_expires_at = datetime.now()
-            user.subscription_revoked_at = datetime.now()
+            user.subscription_expires_at = current_time
+            user.subscription_revoked_at = current_time
             
             db.commit()
             logger.info(f"Apple subscription revoked for user {user.id}")
@@ -711,7 +804,16 @@ class SubscriptionService:
             
             # 获取订阅信息
             subscription_type = purchase_info.get("subscription_type", "MONTHLY")
-            expiry_time = datetime.fromisoformat(purchase_info["expiry_time"]) if purchase_info.get("expiry_time") else None
+            expiry_time_str = purchase_info.get("expiry_time")
+            expiry_time = None
+            if expiry_time_str:
+                try:
+                    expiry_time = datetime.fromisoformat(expiry_time_str.replace('Z', '+00:00'))
+                    if expiry_time.tzinfo is None:
+                        expiry_time = expiry_time.replace(tzinfo=timezone.utc)
+                except:
+                    current_time = SubscriptionService._get_utc_now()
+                    expiry_time = current_time + timedelta(days=30 if subscription_type == "MONTHLY" else 365)
             
             # 确定价格
             price = purchase_info.get("price")
@@ -722,11 +824,13 @@ class SubscriptionService:
                 else:
                     price = pricing_info.monthly_price
             
+            current_time = SubscriptionService._get_utc_now()
+            
             # 更新用户订阅状态
             user.tier = UserTier.PRO
             user.is_subscription_active = True
             user.subscription_type = subscription_type
-            user.subscription_started_at = user.subscription_started_at or datetime.now()
+            user.subscription_started_at = user.subscription_started_at or current_time
             user.subscription_expires_at = expiry_time
             user.next_billing_date = expiry_time
             user.subscription_price = price
@@ -734,7 +838,7 @@ class SubscriptionService:
             user.payment_method = "google"
             user.google_subscription_id = purchase_info.get("purchase_token")
             user.google_order_id = order_id or purchase_info.get("order_id")
-            user.last_payment_date = datetime.now()
+            user.last_payment_date = current_time
             user.last_payment_amount = price
             user.total_payment_amount = (user.total_payment_amount or 0) + price
             
@@ -780,7 +884,7 @@ class SubscriptionService:
             # 恢复订阅
             user.tier = UserTier.PRO
             user.is_subscription_active = True
-            user.subscription_recovered_at = datetime.now()
+            user.subscription_recovered_at = SubscriptionService._get_utc_now()
             
             db.commit()
             logger.info(f"Google subscription recovered for user {user.id}")
@@ -814,11 +918,19 @@ class SubscriptionService:
             
             if verification.get("is_valid") and verification.get("is_active"):
                 # 更新订阅信息
-                if verification.get("expiry_time"):
-                    user.subscription_expires_at = datetime.fromisoformat(verification["expiry_time"])
-                    user.next_billing_date = user.subscription_expires_at
+                expiry_time_str = verification.get("expiry_time")
+                if expiry_time_str:
+                    try:
+                        expiry_time = datetime.fromisoformat(expiry_time_str.replace('Z', '+00:00'))
+                        if expiry_time.tzinfo is None:
+                            expiry_time = expiry_time.replace(tzinfo=timezone.utc)
+                        user.subscription_expires_at = expiry_time
+                        user.next_billing_date = expiry_time
+                    except:
+                        logger.warning(f"Failed to parse Google expiry_time: {expiry_time_str}")
                 
-                user.last_payment_date = datetime.now()
+                current_time = SubscriptionService._get_utc_now()
+                user.last_payment_date = current_time
                 user.last_payment_amount = user.subscription_price
                 user.total_payment_amount = (user.total_payment_amount or 0) + user.subscription_price
                 
@@ -849,7 +961,7 @@ class SubscriptionService:
                 return
             
             # 标记订阅已取消
-            user.subscription_cancelled_at = datetime.now()
+            user.subscription_cancelled_at = SubscriptionService._get_utc_now()
             user.subscription_auto_renew = False
             
             db.commit()
@@ -904,7 +1016,7 @@ class SubscriptionService:
             
             # 暂停订阅（账号保留）
             user.subscription_on_hold = True
-            user.subscription_hold_at = datetime.now()
+            user.subscription_hold_at = SubscriptionService._get_utc_now()
             
             db.commit()
             logger.info(f"Google subscription on hold for user {user.id}")
@@ -934,7 +1046,7 @@ class SubscriptionService:
             
             # 标记进入宽限期
             user.subscription_in_grace_period = True
-            user.grace_period_started_at = datetime.now()
+            user.grace_period_started_at = SubscriptionService._get_utc_now()
             
             db.commit()
             logger.info(f"Google subscription in grace period for user {user.id}")
@@ -966,7 +1078,7 @@ class SubscriptionService:
             user.tier = UserTier.PRO
             user.is_subscription_active = True
             user.subscription_auto_renew = True
-            user.subscription_restarted_at = datetime.now()
+            user.subscription_restarted_at = SubscriptionService._get_utc_now()
             
             # 清除保留和宽限期标记
             user.subscription_on_hold = False
@@ -999,10 +1111,11 @@ class SubscriptionService:
                 return
             
             # 撤销订阅：立即失效
+            current_time = SubscriptionService._get_utc_now()
             user.tier = UserTier.FREE
             user.is_subscription_active = False
-            user.subscription_expires_at = datetime.now()
-            user.subscription_revoked_at = datetime.now()
+            user.subscription_expires_at = current_time
+            user.subscription_revoked_at = current_time
             
             db.commit()
             logger.info(f"Google subscription revoked for user {user.id}")
@@ -1033,7 +1146,7 @@ class SubscriptionService:
             # 订阅过期
             user.tier = UserTier.FREE
             user.is_subscription_active = False
-            user.subscription_expired_at = datetime.now()
+            user.subscription_expired_at = SubscriptionService._get_utc_now()
             
             db.commit()
             logger.info(f"Google subscription expired for user {user.id}")

@@ -46,7 +46,7 @@ class User(Base):
     tier = Column(Enum(UserTier), default=UserTier.FREE, nullable=False)
     subscription_expires_at = Column(DateTime(timezone=True), nullable=True)
     
-    # ============ 新增订阅管理字段 ============
+    # ============ 订阅管理字段 ============
     # 订阅相关
     subscription_type = Column(Enum(SubscriptionType), nullable=True)  # monthly/yearly
     pricing_tier = Column(Enum(PricingTier), nullable=True)  # early_bird/standard
@@ -81,7 +81,7 @@ class User(Base):
     
     # 订阅元数据（JSON格式，存储额外信息）
     subscription_metadata = Column(JSON, nullable=True)  # 可存储支付方式、账单地址等
-    # ============ 结束新增字段 ============
+    # ============ 结束订阅字段 ============
     
     # Account status
     is_active = Column(Boolean, default=True, nullable=False)
@@ -100,7 +100,7 @@ class User(Base):
     # Biometric settings (stored as JSON)
     biometric_settings = Column(String(512))  # {"face_id": true, "devices": [...]}
     
-    # Device tokens for push notifications
+    # Device tokens for push notifications (Phase 4)
     device_tokens = Column(String(2048))  # JSON array of device tokens
     
     # Daily limits for free users
@@ -118,9 +118,17 @@ class User(Base):
     filing_views = relationship("UserFilingView", back_populates="user", cascade="all, delete-orphan")
     comment_votes = relationship("CommentVote", back_populates="user", cascade="all, delete-orphan")
     
-    # 新增关系 - 使用字符串引用避免循环依赖
+    # Phase 2关系 - 订阅
     subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan", foreign_keys="[Subscription.user_id]")
     payment_records = relationship("PaymentRecord", back_populates="user", cascade="all, delete-orphan", foreign_keys="[PaymentRecord.user_id]")
+    
+    # Phase 4关系 - 通知设置（新增）
+    notification_settings = relationship(
+        "UserNotificationSettings", 
+        back_populates="user", 
+        uselist=False,  # 一对一关系
+        cascade="all, delete-orphan"
+    )
     
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', tier={self.tier}, pricing_tier={self.pricing_tier})>"
@@ -157,3 +165,26 @@ class User(Base):
     def yearly_price(self):
         """Get user's yearly price (60% of monthly * 12)"""
         return self.monthly_price * 12 * 0.6
+    
+    @property
+    def has_device_tokens(self):
+        """Check if user has registered device tokens for notifications"""
+        if not self.device_tokens:
+            return False
+        try:
+            import json
+            tokens = json.loads(self.device_tokens)
+            return len(tokens) > 0
+        except:
+            return False
+    
+    def get_device_tokens(self):
+        """Get list of device tokens"""
+        if not self.device_tokens:
+            return []
+        try:
+            import json
+            tokens = json.loads(self.device_tokens)
+            return [t.get('token') for t in tokens if t.get('token')]
+        except:
+            return []

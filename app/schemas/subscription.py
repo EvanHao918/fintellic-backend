@@ -74,7 +74,7 @@ class PricingInfo(BaseModel):
     }
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SubscriptionInfo(BaseModel):
@@ -99,7 +99,7 @@ class SubscriptionInfo(BaseModel):
     last_payment_amount: Optional[float] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SubscriptionResponse(BaseModel):
@@ -112,7 +112,7 @@ class SubscriptionResponse(BaseModel):
     client_secret: Optional[str] = None  # Stripe payment intent secret
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PaymentHistory(BaseModel):
@@ -127,7 +127,7 @@ class PaymentHistory(BaseModel):
     description: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SubscriptionHistory(BaseModel):
@@ -142,7 +142,7 @@ class SubscriptionHistory(BaseModel):
     cancelled_at: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CreateCheckoutSession(BaseModel):
@@ -174,7 +174,7 @@ class SubscriptionStatistics(BaseModel):
     average_lifetime_value: float
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class EarlyBirdStatus(BaseModel):
@@ -196,7 +196,7 @@ class EarlyBirdStatus(BaseModel):
     urgency_level: Optional[str] = None  # low, medium, high, critical
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PromoCode(BaseModel):
@@ -211,4 +211,4 @@ class PromoCode(BaseModel):
     applicable_plans: List[str] = []  # plan_names that this code applies to
     
     class Config:
-        orm_mode = True
+        from_attributes = True

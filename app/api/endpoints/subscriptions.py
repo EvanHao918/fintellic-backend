@@ -106,15 +106,34 @@ def cancel_subscription(
     cancel_data: SubscriptionCancel
 ) -> Any:
     """
-    Cancel subscription
+    Cancel subscription - 🔥 修复：增强响应处理
     """
-    if not current_user.is_subscription_active:
+    try:
+        logger.info(f"Cancel subscription request for user {current_user.id} with data: {cancel_data}")
+        
+        if not current_user.is_subscription_active:
+            logger.warning(f"User {current_user.id} tried to cancel but has no active subscription")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No active subscription found"
+            )
+        
+        # 调用服务层处理取消逻辑
+        result = subscription_service.cancel_subscription(db, current_user, cancel_data)
+        
+        logger.info(f"Cancel subscription result for user {current_user.id}: success={result.success}")
+        
+        return result
+        
+    except HTTPException:
+        # 重新抛出已知的HTTP异常
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in cancel_subscription for user {current_user.id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No active subscription found"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to cancel subscription: {str(e)}"
         )
-    
-    return subscription_service.cancel_subscription(db, current_user, cancel_data)
 
 
 @router.get("/history", response_model=List[SubscriptionHistory])

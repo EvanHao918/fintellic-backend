@@ -1,6 +1,7 @@
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
 
 from app.api.deps import get_db, get_current_active_user
 from app.crud.user import crud_user
@@ -16,10 +17,14 @@ from app.schemas.user import (
 from app.core.security import verify_password, get_password_hash
 from app.core.config import settings
 from app.services.subscription_service import subscription_service
-from datetime import datetime, timedelta
 from fastapi import Body
 
 router = APIRouter()
+
+
+def _get_utc_now() -> datetime:
+    """获取UTC时间，确保时区一致性"""
+    return datetime.now(timezone.utc)
 
 
 @router.get("/me", response_model=UserDetailResponse)
@@ -238,31 +243,76 @@ def mock_upgrade_to_pro(
             detail="User is already Pro"
         )
     
-    # Mock upgrade - set Pro status
-    current_user.tier = "PRO"
-    current_user.is_subscription_active = True
-    current_user.subscription_type = "MONTHLY" if plan == "monthly" else "YEARLY"
-    current_user.subscription_started_at = datetime.utcnow()
-    current_user.subscription_expires_at = datetime.utcnow() + timedelta(days=30 if plan == "monthly" else 365)
-    current_user.next_billing_date = current_user.subscription_expires_at
-    current_user.subscription_price = 39.00 if current_user.is_early_bird else 49.00
-    
-    db.add(current_user)
-    db.commit()
-    db.refresh(current_user)
-    
-    return {
-        "message": f"Successfully upgraded to Pro ({plan}) - Mock",
-        "user": {
-            "id": current_user.id,
-            "email": current_user.email,
-            "username": current_user.username,
-            "full_name": current_user.full_name,
-            "is_pro": True,
-            "tier": "PRO",
-            "subscription_type": current_user.subscription_type,
-            "subscription_expires_at": current_user.subscription_expires_at.isoformat(),
-            "is_early_bird": current_user.is_early_bird,
-            "subscription_price": float(current_user.subscription_price)
+    try:
+        # 🔥 修复：统一时区处理
+        current_time = _get_utc_now()
+        
+        # 🔥 修复：基于序号判定早鸟状态和价格
+        is_early_bird = current_user.user_sequence_number is not None and current_user.user_sequence_number <= settings.EARLY_BIRD_LIMIT
+        
+        if plan == "yearly":
+            subscription_price = settings.EARLY_BIRD_YEARLY_PRICE if is_early_bird else settings.STANDARD_YEARLY_PRICE
+            expires_at = current_time + timedelta(days=365)
+            subscription_type = "YEARLY"
+        else:
+            subscription_price = settings.EARLY_BIRD_MONTHLY_PRICE if is_early_bird else settings.STANDARD_MONTHLY_PRICE
+            expires_at = current_time + timedelta(days=30)
+            subscription_type = "MONTHLY"
+        
+        # Mock upgrade - set Pro status
+        current_user.tier = "PRO"
+        current_user.is_subscription_active = True
+        current_user.subscription_type = subscription_type
+        current_user.subscription_started_at = current_time
+        current_user.subscription_expires_at = expires_at
+        current_user.next_billing_date = expires_at
+        current_user.subscription_price = subscription_price
+        current_user.subscription_auto_renew = True
+        
+        # 🔥 修复：确保早鸟状态和价格层级正确设置
+        current_user.is_early_bird = is_early_bird
+        current_user.pricing_tier = "EARLY_BIRD" if is_early_bird else "STANDARD"
+        
+        # 更新支付信息
+        current_user.last_payment_date = current_time
+        current_user.last_payment_amount = subscription_price
+        current_user.total_payment_amount = (current_user.total_payment_amount or 0) + subscription_price
+        current_user.payment_method = "mock"
+        
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+        
+        # 🔥 修复：返回完整的用户信息，包括正确的monthly_price
+        return {
+            "message": f"Successfully upgraded to Pro ({plan}) - Mock",
+            "user": {
+                "id": current_user.id,
+                "email": current_user.email,
+                "username": current_user.username,
+                "full_name": current_user.full_name,
+                "is_pro": True,
+                "tier": "PRO",
+                "subscription_type": current_user.subscription_type,
+                "subscription_expires_at": current_user.subscription_expires_at.isoformat() if current_user.subscription_expires_at else None,
+                "is_early_bird": current_user.is_early_bird,
+                "pricing_tier": current_user.pricing_tier,
+                "subscription_price": float(current_user.subscription_price),
+                "monthly_price": current_user.monthly_price,  # 这是@property，会动态计算
+                "user_sequence_number": current_user.user_sequence_number,
+                "is_subscription_active": current_user.is_subscription_active,
+                "subscription_auto_renew": current_user.subscription_auto_renew,
+                "payment_method": current_user.payment_method,
+                "last_payment_date": current_user.last_payment_date.isoformat() if current_user.last_payment_date else None,
+                "last_payment_amount": float(current_user.last_payment_amount) if current_user.last_payment_amount else None,
+                "total_payment_amount": float(current_user.total_payment_amount) if current_user.total_payment_amount else 0,
+            }
         }
-    }
+        
+    except Exception as e:
+        logger.error(f"Error in mock upgrade for user {current_user.id}: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upgrade user: {str(e)}"
+        )

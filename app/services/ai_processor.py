@@ -10,10 +10,11 @@ STREAMLINED: Focused on core functionality only
 REMOVED: Question generation, tone analysis, separate financial highlights
 ENHANCED: Management analysis, S-1 processing, tag quality
 REVOLUTIONARY: Enhanced data source marking and Markdown table processing to prevent hallucination
+FIXED: Added defensive type checking for FilingType to prevent 'str' object has no attribute 'value' errors
 """
 import json
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from datetime import datetime
 import logging
 from pathlib import Path
@@ -47,6 +48,7 @@ class AIProcessor:
     """
     Process filings using OpenAI with enhanced management analysis and tag extraction
     REVOLUTIONARY: Enhanced with Markdown table processing and strict data accuracy constraints
+    FIXED: Added defensive FilingType handling to prevent attribute errors
     """
     
     def __init__(self):
@@ -63,6 +65,21 @@ class AIProcessor:
         # Token limits
         self.max_input_tokens = 100000
         self.target_output_tokens = 3000
+    
+    def _get_safe_filing_type_value(self, filing_type: Union[FilingType, str]) -> str:
+        """
+        FIXED: Safely get filing type value, handling both enum and string types
+        This prevents the 'str' object has no attribute 'value' error
+        """
+        if isinstance(filing_type, str):
+            return filing_type
+        elif hasattr(filing_type, 'value'):
+            return filing_type.value
+        elif isinstance(filing_type, FilingType):
+            return filing_type.value
+        else:
+            logger.warning(f"Unexpected filing_type type: {type(filing_type)}, value: {filing_type}")
+            return str(filing_type)
     
     def _get_safe_ticker(self, filing: Filing) -> str:
         """Get ticker safely, returning a default value if None"""
@@ -151,8 +168,11 @@ class AIProcessor:
         is_valid = len(issues) == 0
         return is_valid, issues
     
-    def _smart_truncate_content(self, content: str, max_tokens: int, filing_type: str) -> str:
-        """Intelligently truncate content while preserving key sections"""
+    def _smart_truncate_content(self, content: str, max_tokens: int, filing_type: Union[FilingType, str]) -> str:
+        """
+        Intelligently truncate content while preserving key sections
+        FIXED: Added safe filing type handling
+        """
         current_tokens = self._count_tokens(content)
         
         if current_tokens <= max_tokens:
@@ -162,6 +182,9 @@ class AIProcessor:
         
         # Split content into sections
         sections = content.split('\n\n')
+        
+        # FIXED: Get filing type value safely
+        filing_type_value = self._get_safe_filing_type_value(filing_type)
         
         # Priority keywords for different filing types
         priority_keywords = {
@@ -173,7 +196,7 @@ class AIProcessor:
         
         # Score each section
         scored_sections = []
-        filing_keywords = priority_keywords.get(filing_type.value, [])
+        filing_keywords = priority_keywords.get(filing_type_value, [])
         
         for section in sections:
             score = 0
@@ -235,7 +258,9 @@ class AIProcessor:
             ticker = self._get_safe_ticker(filing)
             company_name = filing.company.name if filing.company else "Unknown Company"
             
-            logger.info(f"Starting enhanced AI processing for {ticker} {filing.filing_type.value}")
+            # FIXED: Use safe filing type access
+            filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
+            logger.info(f"Starting enhanced AI processing for {ticker} {filing_type_value}")
             
             # Get filing directory
             filing_dir = Path(f"data/filings/{filing.company.cik}/{filing.accession_number.replace('-', '')}")
@@ -396,8 +421,11 @@ class AIProcessor:
         
         return unified_result
     
-    def _preprocess_content_for_ai(self, primary_content: str, full_text: str, filing_type: FilingType, attempt: int) -> str:
-        """Preprocess content to ensure AI gets high-quality input"""
+    def _preprocess_content_for_ai(self, primary_content: str, full_text: str, filing_type: Union[FilingType, str], attempt: int) -> str:
+        """
+        Preprocess content to ensure AI gets high-quality input
+        FIXED: Safe filing type handling
+        """
         if attempt == 0:
             content = primary_content
         else:
@@ -408,7 +436,7 @@ class AIProcessor:
         available_tokens = self.max_input_tokens - prompt_tokens - self.target_output_tokens
         
         # Smart truncate if needed
-        content = self._smart_truncate_content(content, available_tokens, filing_type.value)
+        content = self._smart_truncate_content(content, available_tokens, filing_type)
         
         # Clean up content
         content = self._clean_content_for_ai(content)
@@ -435,18 +463,32 @@ class AIProcessor:
         
         return content.strip()
     
-    def _validate_content_quality(self, analysis: str, filing_type: FilingType) -> bool:
-        """Validate that the generated analysis has sufficient quality"""
+    def _validate_content_quality(self, analysis: str, filing_type: Union[FilingType, str]) -> bool:
+        """
+        Validate that the generated analysis has sufficient quality
+        FIXED: Safe filing type handling
+        """
+        # Handle both FilingType enum and string
+        if isinstance(filing_type, str):
+            filing_type_value = filing_type
+        else:
+            filing_type_value = self._get_safe_filing_type_value(filing_type)
+        
         # Check for minimum financial data mentions
         financial_mentions = len(re.findall(r'\$[\d,]+[BMK]?|[\d,]+%|\d+\.?\d*\s*(?:million|billion)', analysis))
         
-        if filing_type in [FilingType.FORM_10K, FilingType.FORM_10Q]:
+        # Convert string values to FilingType for comparison if needed
+        if filing_type_value in ['FORM_10K', '10-K']:
+            if financial_mentions < 5:
+                logger.warning(f"Insufficient financial data in analysis: {financial_mentions} mentions")
+                return False
+        elif filing_type_value in ['FORM_10Q', '10-Q']:
             if financial_mentions < 5:
                 logger.warning(f"Insufficient financial data in analysis: {financial_mentions} mentions")
                 return False
         
         # Check for key sections
-        if filing_type == FilingType.FORM_10K:
+        if filing_type_value in ['FORM_10K', '10-K']:
             required_topics = ['revenue', 'income', 'business', 'management']
             found_topics = sum(1 for topic in required_topics if topic.lower() in analysis.lower())
             if found_topics < 2:
@@ -501,14 +543,17 @@ class AIProcessor:
         # Build filing-specific context
         filing_context = self._build_filing_context(filing, analyst_data)
         
+        # FIXED: Safe filing type value access
+        filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
+        
         # Generate unified analysis with enhanced prompts
-        if filing.filing_type == FilingType.FORM_10K:
+        if filing_type_value in ['FORM_10K', '10-K']:
             prompt = self._build_10k_unified_prompt_enhanced(filing, content, filing_context)
-        elif filing.filing_type == FilingType.FORM_10Q:
+        elif filing_type_value in ['FORM_10Q', '10-Q']:
             prompt = self._build_10q_unified_prompt_enhanced(filing, content, filing_context, analyst_data)
-        elif filing.filing_type == FilingType.FORM_8K:
+        elif filing_type_value in ['FORM_8K', '8-K']:
             prompt = self._build_8k_unified_prompt(filing, content, filing_context)
-        elif filing.filing_type == FilingType.FORM_S1:
+        elif filing_type_value in ['FORM_S1', 'S-1']:
             prompt = self._build_s1_unified_prompt_enhanced(filing, content, filing_context)
         else:
             prompt = self._build_generic_unified_prompt(filing, content, filing_context)
@@ -526,7 +571,7 @@ class AIProcessor:
         # Generate compelling feed summary
         feed_summary = await self._generate_feed_summary_from_unified(
             unified_analysis, 
-            filing.filing_type.value,
+            filing_type_value,
             filing
         )
         
@@ -587,6 +632,9 @@ RULES:
         marking_instructions = self._build_data_marking_instructions()
         ticker = self._get_safe_ticker(filing)
         company_name = filing.company.name if filing.company else "the company"
+        
+        # FIXED: Safe filing type access
+        filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
         
         return f"""You are a seasoned equity analyst writing for retail investors who want professional insights in accessible language.
 
@@ -849,6 +897,9 @@ LEADERSHIP-SPECIFIC FOCUS:
 - Assess potential impact on strategy or operations
 - Cite all information with [DOC: Item 5.02]"""
         
+        # FIXED: Safe filing type access
+        filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
+        
         return f"""You are a financial journalist analyzing a material event for {company_name} ({ticker}).
 
 {marking_instructions}
@@ -888,7 +939,10 @@ Analyze this event with complete source attribution."""
         ticker = self._get_safe_ticker(filing)
         company_name = filing.company.name if filing.company else "the company"
         
-        return f"""You are a financial analyst examining this {filing.filing_type.value} filing for {company_name} ({ticker}).
+        # FIXED: Safe filing type access
+        filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
+        
+        return f"""You are a financial analyst examining this {filing_type_value} filing for {company_name} ({ticker}).
 
 {marking_instructions}
 
@@ -944,13 +998,13 @@ FILING CONTENT:
         }
         
         # Build filing type specific prompts
-        if filing_type == "FORM_10K":
+        if filing_type in ["FORM_10K", "10-K"]:
             prompt = self._build_10k_summary_prompt(filing, narrative_elements, unified_analysis)
-        elif filing_type == "FORM_10Q":
+        elif filing_type in ["FORM_10Q", "10-Q"]:
             prompt = self._build_10q_summary_prompt(filing, narrative_elements, unified_analysis)
-        elif filing_type == "FORM_8K":
+        elif filing_type in ["FORM_8K", "8-K"]:
             prompt = self._build_8k_summary_prompt(filing, narrative_elements, unified_analysis)
-        elif filing_type == "FORM_S1":
+        elif filing_type in ["FORM_S1", "S-1"]:
             prompt = self._build_s1_summary_prompt(filing, narrative_elements, unified_analysis)
         else:
             prompt = self._build_generic_summary_prompt(filing, narrative_elements, unified_analysis)
@@ -1080,7 +1134,10 @@ Write the compelling summary:"""
         """Build generic compelling summary prompt"""
         ticker = self._get_safe_ticker(filing)
         
-        return f"""Create a compelling 2-3 sentence summary (200-300 chars) for {ticker}'s {filing.filing_type.value} filing.
+        # FIXED: Safe filing type access
+        filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
+        
+        return f"""Create a compelling 2-3 sentence summary (200-300 chars) for {ticker}'s {filing_type_value} filing.
 
 Requirements:
 1. Start with ticker: "{ticker}:"
@@ -1179,9 +1236,10 @@ Write the compelling summary:"""
         if filing.filing_type == FilingType.FORM_10Q and unified_result.get('analyst_data'):
             filing.expectations_comparison = self._format_expectations_comparison(unified_result['analyst_data'])
     
-    def _generate_enhanced_tags(self, markup_data: Dict, unified_text: str, filing_type: FilingType, ticker: str) -> List[str]:
+    def _generate_enhanced_tags(self, markup_data: Dict, unified_text: str, filing_type: Union[FilingType, str], ticker: str) -> List[str]:
         """
         Generate enhanced tags with better industry and financial relevance
+        FIXED: Safe filing type handling
         """
         tags = []
         text_lower = unified_text.lower()
@@ -1238,15 +1296,26 @@ Write the compelling summary:"""
         if 'restructuring' in text_lower:
             tags.append('Restructuring')
         
-        # Filing type tag
+        # Filing type tag - FIXED: Safe filing type handling
         filing_type_tags = {
-            FilingType.FORM_10K: 'Annual Report',
-            FilingType.FORM_10Q: 'Quarterly Results',
-            FilingType.FORM_8K: 'Material Event',
-            FilingType.FORM_S1: 'IPO Filing'
+            'FORM_10K': 'Annual Report',
+            '10-K': 'Annual Report',
+            'FORM_10Q': 'Quarterly Results',
+            '10-Q': 'Quarterly Results',
+            'FORM_8K': 'Material Event',
+            '8-K': 'Material Event',
+            'FORM_S1': 'IPO Filing',
+            'S-1': 'IPO Filing'
         }
-        if filing_type in filing_type_tags:
-            tags.append(filing_type_tags[filing_type])
+        
+        # Handle both enum and string types
+        if isinstance(filing_type, str):
+            filing_type_key = filing_type
+        else:
+            filing_type_key = self._get_safe_filing_type_value(filing_type)
+        
+        if filing_type_key in filing_type_tags:
+            tags.append(filing_type_tags[filing_type_key])
         
         # Ticker-specific tag if it's a well-known company
         if ticker and len(ticker) <= 5 and not ticker.startswith('CIK'):

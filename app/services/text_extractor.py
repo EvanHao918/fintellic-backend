@@ -1,16 +1,19 @@
 # app/services/text_extractor.py
 """
-Text Extractor Service - Enhanced Version with Intelligent S-1 Chapter Extraction and Markdown Table Support
-Extracts structured text from SEC filing HTML documents
-Enhanced for different filing types (10-K, 10-Q, 8-K, S-1)
-FIXED: Better document type identification with multiple patterns
-FIXED: Smart content extraction based on filing type
-FIXED: Improved iXBRL handling with content validation
-ENHANCED: Added Exhibit 99 extraction for 8-K filings
-ENHANCED: Added S-1 specific chapter extraction with multiple detection methods
-ENHANCED: Intelligent section detection using TOC, font styles, and patterns
-FIXED: Handle cases where filing directory might not exist or be empty
-REVOLUTIONARY: HTML → Markdown table conversion to preserve financial data structure
+Text Extractor Service - Enhanced Version with Complete Exhibit Processing
+
+ENHANCED: 支持 Exhibit 99 + 10.x 系列的完整附件提取
+- 扩展现有 _extract_exhibit_99 方法为 _extract_important_exhibits
+- 保持向后兼容，所有现有功能和调用方式不变
+- 智能优先级处理：99系列 > 10.1-10.9 > 10.10+
+- 性能优化：Token预算分配、内容整合优化
+
+核心改进：
+1. 统一附件提取架构
+2. 智能内容整合和优先级排序
+3. 附件类型标识和来源追踪
+4. 向后兼容性保证
+5. 保持表格结构完整的革命性方法
 """
 import re
 from pathlib import Path
@@ -24,13 +27,49 @@ logger = logging.getLogger(__name__)
 class TextExtractor:
     """
     Extract structured text from SEC filing HTML documents
-    Enhanced with intelligent S-1 extraction using multiple detection methods
-    REVOLUTIONARY: Added Markdown table conversion for accurate financial data preservation
+    Enhanced with comprehensive exhibit processing for investment-grade analysis
     """
     
     def __init__(self):
         self.min_section_length = 100  # Minimum characters for a valid section
         self.max_section_length = 50000  # Maximum characters to avoid memory issues
+        
+        # ENHANCED: 附件处理配置
+        self.exhibit_config = {
+            'EX-99': {
+                'priority': 100,
+                'max_chars': 100000,
+                'patterns': [
+                    "*ex99*.htm", "*ex99*.html",
+                    "*kex99*.htm", "*kex99*.html", 
+                    "*dex99*.htm", "*dex99*.html",
+                    "ex-99*.htm", "ex-99*.html",
+                    "exhibit99*.htm", "exhibit99*.html"
+                ],
+                'description': 'Press Release/Financial Data'
+            },
+            'EX-10_CONTRACTS': {
+                'priority': 90,
+                'max_chars': 80000,
+                'patterns': [
+                    "*ex10[._-][1-9].htm", "*ex10[._-][1-9].html",
+                    "*kex10[._-][1-9].htm", "*dex10[._-][1-9].htm",
+                    "ex-10.[1-9]*.htm", "ex-10.[1-9]*.html"
+                ],
+                'description': 'Material Contracts'
+            },
+            'EX-10_COMPENSATION': {
+                'priority': 80,
+                'max_chars': 60000,
+                'patterns': [
+                    "*ex10[._-]1[0-9].htm", "*ex10[._-]1[0-9].html",
+                    "*ex10[._-][2-9][0-9].htm", "*ex10[._-][2-9][0-9].html",
+                    "*kex10[._-]1[0-9].htm", "*dex10[._-]1[0-9].htm",
+                    "ex-10.1[0-9]*.htm", "ex-10.2[0-9]*.htm"
+                ],
+                'description': 'Executive Compensation'
+            }
+        }
         
         # Define filing type patterns with priority
         self.filing_patterns = {
@@ -146,11 +185,7 @@ class TextExtractor:
         """
         Extract text from all documents in a filing directory
         
-        Args:
-            filing_dir: Path to the filing directory
-            
-        Returns:
-            Dictionary with extracted text sections and enhanced_text (Markdown format)
+        ENHANCED: 现在支持完整的附件处理（99 + 10.x系列）
         """
         # Check if directory exists
         if not filing_dir.exists():
@@ -207,24 +242,41 @@ class TextExtractor:
         # Extract from main document
         sections = self.extract_from_html(main_doc)
         
-        # Enhanced: Extract Exhibit 99 for 8-K filings
+        # ENHANCED: 提取重要附件内容（99 + 10.x系列）
         if sections.get('filing_type') == '8-K':
-            exhibit_99_content = self._extract_exhibit_99(filing_dir)
-            if exhibit_99_content:
-                logger.info(f"Successfully extracted Exhibit 99 content: {len(exhibit_99_content)} chars")
+            important_exhibits_content = self._extract_important_exhibits(filing_dir)
+            if important_exhibits_content:
+                # 获取附件统计信息
+                exhibit_stats = important_exhibits_content.get('stats', {})
+                total_exhibits = exhibit_stats.get('total_found', 0)
+                successful_extracts = exhibit_stats.get('successful_extracts', 0)
                 
-                if 'primary_content' in sections:
-                    sections['primary_content'] += f"\n\n{'='*50}\nEXHIBIT 99 CONTENT\n{'='*50}\n\n{exhibit_99_content}"
-                else:
-                    sections['primary_content'] = exhibit_99_content
+                logger.info(f"🎯 Enhanced 8-K processing: {successful_extracts}/{total_exhibits} exhibits extracted")
                 
-                if 'full_text' in sections:
-                    sections['full_text'] += f"\n\n{exhibit_99_content}"
-                
-                if 'enhanced_text' in sections:
-                    sections['enhanced_text'] += f"\n\n## EXHIBIT 99 CONTENT\n\n{exhibit_99_content}"
-                
-                sections['exhibit_99_content'] = exhibit_99_content
+                # 整合附件内容到主要部分
+                exhibit_content = important_exhibits_content.get('content', '')
+                if exhibit_content:
+                    # 添加到 primary_content
+                    if 'primary_content' in sections:
+                        sections['primary_content'] += f"\n\n{'='*60}\nIMPORTANT EXHIBITS CONTENT\n{'='*60}\n\n{exhibit_content}"
+                    else:
+                        sections['primary_content'] = exhibit_content
+                    
+                    # 添加到其他部分以保持兼容性
+                    if 'full_text' in sections:
+                        sections['full_text'] += f"\n\n{exhibit_content}"
+                    
+                    if 'enhanced_text' in sections:
+                        sections['enhanced_text'] += f"\n\n## IMPORTANT EXHIBITS CONTENT\n\n{exhibit_content}"
+                    
+                    # 保持向后兼容：仍然提供单独的exhibit_99_content
+                    exhibit_99_only = important_exhibits_content.get('exhibit_99_content', '')
+                    if exhibit_99_only:
+                        sections['exhibit_99_content'] = exhibit_99_only
+                    
+                    # 新增：提供完整的附件内容分类
+                    sections['important_exhibits_content'] = exhibit_content
+                    sections['exhibit_processing_stats'] = exhibit_stats
         
         return sections
     
@@ -250,72 +302,145 @@ class TextExtractor:
         
         return False
     
+    def _extract_important_exhibits(self, filing_dir: Path) -> Optional[Dict]:
+        """
+        ENHANCED: 提取重要附件内容 - 支持 99 + 10.x 系列
+        
+        基于现有 _extract_exhibit_99 方法扩展，保持架构一致性
+        
+        Returns:
+            Dict containing:
+            - content: 整合的附件内容
+            - exhibit_99_content: 仅99系列内容（向后兼容）
+            - stats: 处理统计信息
+        """
+        exhibit_contents = []
+        exhibit_99_only = []  # 向后兼容
+        processing_stats = {
+            'total_found': 0,
+            'successful_extracts': 0,
+            'by_category': {}
+        }
+        
+        # 按优先级处理各类附件
+        for category, config in self.exhibit_config.items():
+            category_files = []
+            category_content = []
+            
+            # 查找该类别的附件文件
+            for pattern in config['patterns']:
+                found_files = list(filing_dir.glob(pattern))
+                category_files.extend(found_files)
+            
+            # 去重并排序
+            category_files = sorted(set(category_files), key=lambda x: x.name)
+            
+            if not category_files:
+                logger.debug(f"No {category} files found")
+                processing_stats['by_category'][category] = {'found': 0, 'extracted': 0}
+                continue
+            
+            logger.info(f"Found {len(category_files)} {category} file(s): {[f.name for f in category_files]}")
+            processing_stats['by_category'][category] = {'found': len(category_files), 'extracted': 0}
+            processing_stats['total_found'] += len(category_files)
+            
+            # 提取每个文件的内容
+            for exhibit_file in category_files:
+                try:
+                    # 检查文件大小
+                    file_size_mb = exhibit_file.stat().st_size / (1024 * 1024)
+                    max_size_mb = config.get('max_size_mb', 50)
+                    
+                    if file_size_mb > max_size_mb:
+                        logger.warning(f"Skipping {exhibit_file.name} - file too large ({file_size_mb:.1f}MB > {max_size_mb}MB)")
+                        continue
+                    
+                    # 读取并提取内容
+                    with open(exhibit_file, 'r', encoding='utf-8', errors='ignore') as f:
+                        html_content = f.read()
+                    
+                    # 使用BeautifulSoup解析
+                    soup = BeautifulSoup(html_content, 'html.parser')
+                    
+                    # 提取增强内容 - 使用表格结构保持方法
+                    enhanced_content = self._extract_enhanced_content_from_soup(soup)
+                    
+                    if enhanced_content and len(enhanced_content) > 100:
+                        # 为该附件添加标题头
+                        exhibit_header = f"\n{'='*50}\n{config['description']}: {exhibit_file.name}\n{'-'*30}\nCategory: {category}\nPriority: {config['priority']}\n{'='*50}\n"
+                        
+                        # 限制内容长度
+                        max_chars = config.get('max_chars', 60000)
+                        if len(enhanced_content) > max_chars:
+                            logger.warning(f"Truncating {exhibit_file.name} content from {len(enhanced_content)} to {max_chars} chars")
+                            enhanced_content = enhanced_content[:max_chars] + "\n\n[Content truncated due to length...]"
+                        
+                        # 添加到相应的内容集合
+                        full_exhibit_content = exhibit_header + enhanced_content
+                        category_content.append(full_exhibit_content)
+                        
+                        # 向后兼容：如果是EX-99，也添加到exhibit_99_only
+                        if category == 'EX-99':
+                            ex99_header = f"\n{'='*40}\nExhibit 99: {exhibit_file.name}\n{'='*40}\n"
+                            exhibit_99_only.append(ex99_header + enhanced_content)
+                        
+                        processing_stats['by_category'][category]['extracted'] += 1
+                        processing_stats['successful_extracts'] += 1
+                        
+                        logger.info(f"✅ Extracted {category} content from {exhibit_file.name}: {len(enhanced_content)} chars")
+                
+                except Exception as e:
+                    logger.error(f"❌ Error extracting from {exhibit_file.name}: {e}")
+                    continue
+            
+            # 将该类别的内容添加到总体内容中
+            if category_content:
+                # 添加类别分隔符
+                category_separator = f"\n\n{'🔸'*20} {config['description'].upper()} {'🔸'*20}\n"
+                exhibit_contents.append(category_separator + '\n\n'.join(category_content))
+        
+        # 整合所有内容
+        result = {}
+        
+        if exhibit_contents:
+            # 主要内容：所有重要附件
+            combined_content = '\n\n'.join(exhibit_contents)
+            
+            # 应用总体大小限制
+            max_total_chars = 300000  # 总体限制
+            if len(combined_content) > max_total_chars:
+                logger.warning(f"Total exhibit content truncated from {len(combined_content)} to {max_total_chars} chars")
+                combined_content = combined_content[:max_total_chars] + "\n\n[Total exhibit content truncated...]"
+            
+            result['content'] = combined_content
+            result['stats'] = processing_stats
+            
+            # 向后兼容：单独的exhibit_99内容
+            if exhibit_99_only:
+                exhibit_99_combined = '\n\n'.join(exhibit_99_only)
+                if len(exhibit_99_combined) > 100000:
+                    exhibit_99_combined = exhibit_99_combined[:100000] + "\n\n[Exhibit 99 content truncated...]"
+                result['exhibit_99_content'] = exhibit_99_combined
+            
+            logger.info(f"🎉 Successfully processed important exhibits: "
+                       f"{processing_stats['successful_extracts']}/{processing_stats['total_found']} files")
+            
+            return result
+        
+        logger.info("No important exhibits found")
+        return None
+    
     def _extract_exhibit_99(self, filing_dir: Path) -> Optional[str]:
         """
-        Extract content from Exhibit 99 files in the filing directory
+        向后兼容：保持原有 _extract_exhibit_99 方法签名和行为
+        
+        现在内部调用增强的 _extract_important_exhibits 方法，
+        但只返回 Exhibit 99 内容以保持向后兼容
         """
-        exhibit_99_content = []
+        important_exhibits = self._extract_important_exhibits(filing_dir)
         
-        # Look for Exhibit 99 files with various naming patterns
-        exhibit_patterns = [
-            "*ex99*.htm", "*ex99*.html",
-            "*kex99*.htm", "*kex99*.html",
-            "*dex99*.htm", "*dex99*.html",
-            "ex-99*.htm", "ex-99*.html",
-            "exhibit99*.htm", "exhibit99*.html"
-        ]
-        
-        exhibit_files = []
-        for pattern in exhibit_patterns:
-            exhibit_files.extend(filing_dir.glob(pattern))
-        
-        # Remove duplicates and sort
-        exhibit_files = sorted(set(exhibit_files), key=lambda x: x.name)
-        
-        if not exhibit_files:
-            logger.info("No Exhibit 99 files found")
-            return None
-        
-        logger.info(f"Found {len(exhibit_files)} Exhibit 99 file(s): {[f.name for f in exhibit_files]}")
-        
-        for exhibit_file in exhibit_files:
-            try:
-                # Check file size
-                if exhibit_file.stat().st_size > 50 * 1024 * 1024:
-                    logger.warning(f"Skipping {exhibit_file.name} - file too large (>50MB)")
-                    continue
-                
-                # Read and extract content
-                with open(exhibit_file, 'r', encoding='utf-8', errors='ignore') as f:
-                    html_content = f.read()
-                
-                # Parse with BeautifulSoup
-                soup = BeautifulSoup(html_content, 'html.parser')
-                
-                # Extract and enhance content
-                enhanced_content = self._extract_enhanced_content_from_soup(soup)
-                
-                # Add header for this exhibit
-                if enhanced_content and len(enhanced_content) > 100:
-                    header = f"\n{'='*40}\nExhibit 99: {exhibit_file.name}\n{'='*40}\n"
-                    exhibit_99_content.append(header + enhanced_content)
-                    logger.info(f"Extracted {len(enhanced_content)} chars from {exhibit_file.name}")
-                
-            except Exception as e:
-                logger.error(f"Error extracting from {exhibit_file.name}: {e}")
-                continue
-        
-        if exhibit_99_content:
-            # Combine all exhibit content
-            combined_content = '\n\n'.join(exhibit_99_content)
-            
-            # Limit total size
-            max_exhibit_chars = 100000
-            if len(combined_content) > max_exhibit_chars:
-                logger.warning(f"Exhibit 99 content truncated from {len(combined_content)} to {max_exhibit_chars} chars")
-                combined_content = combined_content[:max_exhibit_chars] + "\n\n[Exhibit content truncated...]"
-            
-            return combined_content
+        if important_exhibits and 'exhibit_99_content' in important_exhibits:
+            return important_exhibits['exhibit_99_content']
         
         return None
     
@@ -474,6 +599,25 @@ class TextExtractor:
                 'enhanced_text': '',
                 'filing_type': 'UNKNOWN'
             }
+    
+    def _categorize_exhibit_file(self, filename: str) -> Optional[str]:
+        """
+        根据文件名判断附件类别
+        
+        Returns:
+            附件类别标识符或None
+        """
+        filename_lower = filename.lower()
+        
+        # 检查各类附件模式
+        for category, config in self.exhibit_config.items():
+            for pattern in config['patterns']:
+                # 将glob模式转换为正则表达式
+                regex_pattern = pattern.replace('*', '.*').replace('.', r'\.')
+                if re.match(regex_pattern, filename_lower):
+                    return category
+        
+        return None
     
     def _extract_enhanced_content_from_soup(self, soup: BeautifulSoup) -> str:
         """

@@ -6,6 +6,8 @@ FIXED:
 2. Use lowercase status values consistently
 3. Better validation before creating filing records
 4. Auto-populate ticker from company relationship
+ENHANCED: Record precise detection timestamps (detected_at field)
+ENHANCED: Consistent timezone handling and validation
 """
 from typing import List, Dict
 from datetime import datetime, timedelta, timezone
@@ -28,7 +30,7 @@ logger = logging.getLogger(__name__)
 class EDGARScanner:
     """
     Scans SEC EDGAR for new filings using RSS feeds
-    ENHANCED: Better ticker management and validation
+    ENHANCED: Better ticker management and validation, precise detection timestamps
     """
     
     def __init__(self):
@@ -156,13 +158,17 @@ class EDGARScanner:
     async def scan_for_new_filings(self) -> List[Dict]:
         """
         Main scanning method - uses RSS for efficiency
-        ENHANCED: Better ticker management
+        ENHANCED: Records precise detection timestamps with timezone handling
         
         Returns:
             List of new filings discovered
         """
         logger.info("Starting EDGAR RSS scan...")
         logger.info(f"DEBUG: Monitoring {len(self.monitored_ciks)} companies (S&P 500 + NASDAQ 100)")
+        
+        # ENHANCED: Record the precise scan time in UTC - this will be our detection timestamp
+        scan_start_time = datetime.now(timezone.utc)
+        logger.debug(f"Scan started at: {scan_start_time.isoformat()}")
         
         # Get recent filings from RSS (last 60 minutes to ensure overlap)
         all_rss_filings = await sec_client.get_rss_filings(
@@ -228,6 +234,11 @@ class EDGARScanner:
                     if existing and not existing.ticker and existing.company:
                         existing.ticker = existing.company.ticker
                         db.commit()
+                    # ENHANCED: Update detected_at if missing (for old records)
+                    if existing and not existing.detected_at:
+                        existing.detected_at = scan_start_time
+                        logger.debug(f"Updated detected_at for existing filing {existing.id}")
+                        db.commit()
                     continue
                 
                 # Get or create company
@@ -244,8 +255,8 @@ class EDGARScanner:
                     logger.warning(f"Skipping filing creation for {company.ticker} - failed pre-creation validation")
                     continue
                 
-                # ENHANCED: Create new filing record with ticker
-                filing = self._create_filing_record(company, rss_filing)
+                # ENHANCED: Create new filing record with precise detection time
+                filing = self._create_filing_record(company, rss_filing, scan_start_time)
                 db.add(filing)
                 
                 # Commit immediately to make filing available to other processes
@@ -260,6 +271,7 @@ class EDGARScanner:
                     "ticker": filing.ticker or company.ticker,  # Use filing ticker or company ticker
                     "form_type": rss_filing["form"],
                     "filing_date": rss_filing["filing_date"],
+                    "detected_at": scan_start_time.isoformat(),  # ENHANCED: Include detection time
                     "accession_number": rss_filing["accession_number"],
                     "discovery_method": "RSS",
                     "indices": company.indices
@@ -267,7 +279,7 @@ class EDGARScanner:
                 
                 logger.info(
                     f"New filing discovered: {filing.ticker or company.ticker} ({company.indices}) - {rss_filing['form']} "
-                    f"({rss_filing['filing_date']}) via RSS - Filing ID: {filing_id}"
+                    f"({rss_filing['filing_date']}) detected at {scan_start_time.strftime('%H:%M:%S')} UTC - Filing ID: {filing_id}"
                 )
                 
                 # Automatically trigger Celery task to process this filing
@@ -293,21 +305,22 @@ class EDGARScanner:
         
         logger.info(f"Successfully processed {len(new_filings)} new filings")
         
-        # ENHANCED: Update any filings with missing tickers
-        self._update_missing_tickers()
+        # ENHANCED: Update any filings with missing tickers or timestamps
+        self._update_missing_data()
         
         return new_filings
     
     def _validate_before_creation(self, rss_filing: Dict, company: Company) -> bool:
         """
         Additional validation before creating filing record
+        ENHANCED: Timezone-aware validation
         """
         # Don't create filings for inactive companies
         if not company.is_active:
             logger.warning(f"Company {company.ticker} is marked inactive")
             return False
         
-        # Verify the filing date is reasonable (not too far in the future)
+        # ENHANCED: Verify the filing date is reasonable (not too far in the future)
         filing_date = datetime.strptime(rss_filing['filing_date'], '%Y-%m-%d')
         filing_date_utc = filing_date.replace(tzinfo=timezone.utc)
         current_time_utc = datetime.now(timezone.utc)
@@ -394,10 +407,16 @@ class EDGARScanner:
         
         return company
     
-    def _create_filing_record(self, company: Company, rss_filing: Dict) -> Filing:
+    def _create_filing_record(self, company: Company, rss_filing: Dict, detection_time: datetime) -> Filing:
         """
         Create a new filing record from RSS data
-        ENHANCED: Ensure ticker is populated from company
+        ENHANCED: Records precise detection timestamp and ensures ticker is populated
+        ENHANCED: Consistent timezone handling
+        
+        Args:
+            company: Company object
+            rss_filing: RSS filing data
+            detection_time: Precise UTC timestamp when filing was detected
         """
         # Map form type
         form_mapping = {
@@ -407,60 +426,83 @@ class EDGARScanner:
             "S-1": FilingType.FORM_S1
         }
         
-        # Parse filing date and make it timezone-aware
+        # ENHANCED: Parse filing date and make it timezone-aware (UTC)
         filing_date = datetime.strptime(
             rss_filing["filing_date"], "%Y-%m-%d"
         )
         # Store as UTC timezone-aware datetime
         filing_date_utc = filing_date.replace(tzinfo=timezone.utc)
         
-        # ENHANCED: Create Filing with ticker from company
+        # ENHANCED: Ensure detection_time is timezone-aware UTC
+        if detection_time.tzinfo is None:
+            detection_time = detection_time.replace(tzinfo=timezone.utc)
+        elif detection_time.tzinfo != timezone.utc:
+            detection_time = detection_time.astimezone(timezone.utc)
+        
+        # ENHANCED: Create Filing with ticker from company and precise detection time
         filing = Filing(
             company_id=company.id,
             ticker=company.ticker,  # Set ticker from company
             accession_number=rss_filing["accession_number"],
             filing_type=form_mapping.get(rss_filing["form"], FilingType.FORM_10K),
-            filing_date=filing_date_utc,
-            status=ProcessingStatus.PENDING  # Using lowercase enum value
+            form_type=rss_filing["form"],  # Store raw form type too
+            filing_date=filing_date_utc,  # Official SEC filing date (UTC)
+            detected_at=detection_time,  # ENHANCED: When we detected this filing (precise UTC timestamp)
+            status=ProcessingStatus.PENDING  # Using enum value
         )
         
         # Set URL fields as attributes after creation
         if rss_filing.get('rss_link'):
             filing.filing_url = rss_filing['rss_link']
             filing.full_text_url = rss_filing['rss_link']
+            filing.primary_document_url = rss_filing['rss_link']
         
         # Ensure ticker is populated
         if not filing.ticker and company.ticker:
             filing.ticker = company.ticker
         
+        # Log the creation with timing info
+        logger.debug(f"Created filing record: {filing.ticker} {filing.filing_type.value} "
+                    f"filed={filing_date_utc.isoformat()} detected={detection_time.isoformat()}")
+        
         return filing
     
-    def _update_missing_tickers(self):
+    def _update_missing_data(self):
         """
-        ENHANCED: Update all filings with missing tickers
-        Run periodically to fix any filings that don't have tickers
+        ENHANCED: Update all filings with missing tickers or timestamps
+        Run periodically to fix any filings that don't have complete data
         """
         db = SessionLocal()
         try:
-            # Find filings with missing tickers
-            filings_without_ticker = db.query(Filing).filter(
-                (Filing.ticker == None) | (Filing.ticker == '')
+            # ENHANCED: Find filings with missing tickers OR missing detected_at
+            filings_needing_update = db.query(Filing).filter(
+                (Filing.ticker == None) | (Filing.ticker == '') | (Filing.detected_at == None)
             ).all()
             
-            if filings_without_ticker:
-                logger.info(f"Found {len(filings_without_ticker)} filings without ticker")
+            if filings_needing_update:
+                logger.info(f"Found {len(filings_needing_update)} filings needing data updates")
                 
-                updated_count = 0
-                for filing in filings_without_ticker:
-                    if filing.company and filing.company.ticker:
+                updated_ticker_count = 0
+                updated_timestamp_count = 0
+                
+                for filing in filings_needing_update:
+                    # Update missing ticker
+                    if (not filing.ticker or filing.ticker == '') and filing.company and filing.company.ticker:
                         filing.ticker = filing.company.ticker
-                        updated_count += 1
+                        updated_ticker_count += 1
+                    
+                    # Update missing detected_at (use created_at as fallback)
+                    if not filing.detected_at and filing.created_at:
+                        filing.detected_at = filing.created_at
+                        updated_timestamp_count += 1
+                        logger.debug(f"Set detected_at={filing.created_at.isoformat()} for filing {filing.id}")
                 
-                if updated_count > 0:
+                if updated_ticker_count > 0 or updated_timestamp_count > 0:
                     db.commit()
-                    logger.info(f"Updated {updated_count} filings with ticker information")
+                    logger.info(f"Updated {updated_ticker_count} tickers and {updated_timestamp_count} timestamps")
+                    
         except Exception as e:
-            logger.error(f"Error updating missing tickers: {e}")
+            logger.error(f"Error updating missing data: {e}")
             db.rollback()
         finally:
             db.close()
@@ -503,6 +545,7 @@ class EDGARScanner:
         """
         Get statistics for S&P 500 and NASDAQ 100 companies
         Used for health checks and monitoring
+        ENHANCED: Include detected_at timing information
         """
         db = SessionLocal()
         try:
@@ -514,12 +557,15 @@ class EDGARScanner:
                 Company.is_nasdaq100 == True
             ).count()
             
-            # Get today's filings
+            # ENHANCED: Get today's filings using detected_at when available
             today_start_utc = datetime.now(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
+            
+            # Count filings detected today (prioritize detected_at over filing_date)
             today_filings = db.query(Filing).filter(
-                Filing.filing_date >= today_start_utc
+                (Filing.detected_at >= today_start_utc) | 
+                ((Filing.detected_at == None) & (Filing.filing_date >= today_start_utc))
             ).count()
             
             # Get pending filings count
@@ -527,9 +573,10 @@ class EDGARScanner:
                 Filing.status == ProcessingStatus.PENDING
             ).count()
             
-            # Get latest filing
+            # ENHANCED: Get latest filing using detected_at first, then created_at
             latest_filing = db.query(Filing).order_by(
-                Filing.created_at.desc()
+                Filing.detected_at.desc().nulls_last(),  # detected_at first (nulls last)
+                Filing.created_at.desc()  # created_at as fallback
             ).first()
             
             latest_filing_info = None
@@ -538,7 +585,16 @@ class EDGARScanner:
                     Company.id == latest_filing.company_id
                 ).first()
                 if company:
-                    latest_filing_info = f"{company.ticker or latest_filing.ticker} - {latest_filing.filing_type.value}"
+                    # Use detected_at if available, otherwise created_at
+                    time_ref = latest_filing.detected_at or latest_filing.created_at
+                    detection_time = time_ref.strftime('%H:%M UTC') if time_ref else 'Unknown'
+                    time_type = 'detected' if latest_filing.detected_at else 'created'
+                    latest_filing_info = f"{company.ticker or latest_filing.ticker} - {latest_filing.filing_type.value} ({time_type} {detection_time})"
+            
+            # ENHANCED: Get filings without detected_at (for health monitoring)
+            filings_without_detected_at = db.query(Filing).filter(
+                Filing.detected_at == None
+            ).count()
             
             return {
                 'total_monitored': len(self.monitored_ciks),
@@ -550,6 +606,7 @@ class EDGARScanner:
                 'today_filings': today_filings,
                 'pending_filings': pending_filings,
                 'latest_filing': latest_filing_info,
+                'filings_without_detected_at': filings_without_detected_at,
                 'status': 'active',
                 'last_check': datetime.now(timezone.utc).isoformat()
             }
@@ -565,6 +622,7 @@ class EDGARScanner:
                 'today_filings': 0,
                 'pending_filings': 0,
                 'latest_filing': None,
+                'filings_without_detected_at': 0,
                 'status': 'initializing',
                 'error': str(e)
             }

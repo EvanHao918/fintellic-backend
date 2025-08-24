@@ -18,22 +18,18 @@ logger = logging.getLogger(__name__)
 
 class FilingDownloader:
     """
-    Enhanced filing downloader with improved S-1 document detection
-    Based on actual database patterns analysis
+    Enhanced filing downloader with comprehensive exhibit processing
     
-    Phase 4 Update: 添加通知功能
-    - 在下载完成后触发推送通知
-    - 通知所有订阅该类型财报的用户
+    ENHANCED: 支持 Exhibit 99 + 10.x 系列的完整附件处理
+    - Exhibit 99: 新闻稿、财务数据、投资者材料 (已有，保持不变)
+    - Exhibit 10.1-10.9: 重大合同、供应商协议、客户合同
+    - Exhibit 10.10+: 高管补偿、RSU协议、股票期权
     
-    Key improvements:
-    - FIXED: S-1 main document detection (avoids fee calculation tables)
-    - Prioritizes correct S-1 document patterns based on real data
-    - Handles iXBRL viewer links (/ix?doc=...)
-    - Smart document type detection with priority system
-    - Multiple URL format attempts
-    - Content validation
-    - Downloads Exhibit 99 files for 8-K filings
-    - Phase 4: Push notifications after successful download
+    优化原则：
+    1. 基于现有 _parse_exhibit_99_files 架构进行扩展
+    2. 保持向后兼容，所有现有功能不变
+    3. 统一处理逻辑，智能优先级分配
+    4. 性能优化：文件大小限制、容错机制
     """
     
     def __init__(self):
@@ -49,6 +45,10 @@ class FilingDownloader:
         self.last_request_time = datetime.now()
         self.data_dir = Path("data/filings")
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 附件处理配置
+        self.max_exhibit_file_size = 50 * 1024 * 1024  # 50MB limit per exhibit
+        self.max_exhibits_per_filing = 20  # Maximum exhibits to download per filing
     
     async def _rate_limit(self):
         """Respect SEC rate limits"""
@@ -412,17 +412,45 @@ class FilingDownloader:
         
         return None
     
-    def _parse_exhibit_99_files(self, html_content: str) -> List[Dict]:
+    def _parse_important_exhibits(self, html_content: str) -> List[Dict]:
         """
-        Parse index.htm to find all Exhibit 99 files
+        ENHANCED: 解析重要附件 - 支持 Exhibit 99 + 10.x 系列
+        
+        基于现有 _parse_exhibit_99_files 方法扩展，保持架构一致性
+        优先级：Exhibit 99 > 10.1-10.9 > 10.10+
         
         Returns:
-            List of exhibit file info dictionaries
+            List of exhibit file info dictionaries with priority scoring
         """
         exhibits = []
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        # Find all table rows
+        # 定义附件优先级和分类
+        exhibit_patterns = {
+            # 最高优先级：Exhibit 99（财务数据、新闻稿）
+            'EX-99': {
+                'priority': 100,
+                'max_size_mb': 50,
+                'patterns': [r'EX-99\.?\d*'],
+                'description': 'Press Release/Financial Data'
+            },
+            # 高优先级：Exhibit 10.1-10.9（重大合同）
+            'EX-10_CONTRACTS': {
+                'priority': 90,
+                'max_size_mb': 30,
+                'patterns': [r'EX-10\.[1-9](?![0-9])'],  # 10.1 to 10.9 only
+                'description': 'Material Contracts'
+            },
+            # 中等优先级：Exhibit 10.10+（高管补偿）
+            'EX-10_COMPENSATION': {
+                'priority': 80,
+                'max_size_mb': 20,
+                'patterns': [r'EX-10\.(?:[1-9]\d+|\d{2,})'],  # 10.10, 10.11, etc.
+                'description': 'Executive Compensation'
+            }
+        }
+        
+        # 查找所有表格行
         tables = soup.find_all('table')
         
         for table in tables:
@@ -433,36 +461,71 @@ class FilingDownloader:
                 if len(cells) < 3:
                     continue
                 
-                # Look for EX-99 in any cell
+                # 获取行文本用于模式匹配
                 row_text = ' '.join(cell.get_text(strip=True) for cell in cells)
                 
-                # Check if this row contains EX-99
-                if re.search(r'EX-99\.?\d*', row_text, re.IGNORECASE):
-                    # Find the link in this row
-                    for cell in cells:
-                        link = cell.find('a')
-                        if link and link.get('href'):
-                            href = link.get('href', '')
-                            # Skip if it's the viewer link
-                            if '/ix?doc=' in href:
-                                continue
-                                
-                            filename = link.get_text(strip=True) or href.split('/')[-1]
-                            
-                            # Extract exhibit number
-                            exhibit_match = re.search(r'EX-99\.?(\d*)', row_text, re.IGNORECASE)
-                            exhibit_num = exhibit_match.group(1) if exhibit_match else ''
-                            exhibit_type = f"EX-99{f'.{exhibit_num}' if exhibit_num else ''}"
-                            
-                            exhibits.append({
-                                'filename': filename,
-                                'url': href,
-                                'type': exhibit_type,
-                                'description': f'Exhibit 99{f".{exhibit_num}" if exhibit_num else ""}'
-                            })
-                            break
+                # 检查是否匹配任何重要附件模式
+                for exhibit_type, config in exhibit_patterns.items():
+                    for pattern in config['patterns']:
+                        if re.search(pattern, row_text, re.IGNORECASE):
+                            # 在该行中查找链接
+                            for cell in cells:
+                                link = cell.find('a')
+                                if link and link.get('href'):
+                                    href = link.get('href', '')
+                                    
+                                    # 跳过 iXBRL 查看器链接
+                                    if '/ix?doc=' in href:
+                                        continue
+                                    
+                                    filename = link.get_text(strip=True) or href.split('/')[-1]
+                                    
+                                    # 提取具体的附件编号
+                                    exhibit_match = re.search(pattern, row_text, re.IGNORECASE)
+                                    if exhibit_match:
+                                        exhibit_num = exhibit_match.group(0)
+                                        
+                                        # 避免重复添加相同文件
+                                        if not any(ex['filename'] == filename for ex in exhibits):
+                                            exhibits.append({
+                                                'filename': filename,
+                                                'url': href,
+                                                'type': exhibit_num,
+                                                'category': exhibit_type,
+                                                'description': f'{exhibit_num} - {config["description"]}',
+                                                'priority': config['priority'],
+                                                'max_size_mb': config['max_size_mb']
+                                            })
+                                            logger.debug(f"Found important exhibit: {exhibit_num} ({filename})")
+                                    break
+                            break  # 找到匹配的模式后，跳出模式循环
         
+        # 按优先级排序，确保重要附件优先下载
+        exhibits.sort(key=lambda x: x['priority'], reverse=True)
+        
+        # 限制附件数量避免过载
+        if len(exhibits) > self.max_exhibits_per_filing:
+            logger.warning(f"Found {len(exhibits)} exhibits, limiting to {self.max_exhibits_per_filing} highest priority")
+            exhibits = exhibits[:self.max_exhibits_per_filing]
+        
+        logger.info(f"Identified {len(exhibits)} important exhibits for download")
         return exhibits
+    
+    def _parse_exhibit_99_files(self, html_content: str) -> List[Dict]:
+        """
+        保持向后兼容：原始 Exhibit 99 解析方法
+        现在内部调用 _parse_important_exhibits 并过滤结果
+        """
+        all_exhibits = self._parse_important_exhibits(html_content)
+        
+        # 只返回 EX-99 系列，保持向后兼容
+        exhibit_99_files = [
+            exhibit for exhibit in all_exhibits 
+            if exhibit['category'] == 'EX-99'
+        ]
+        
+        logger.info(f"Found {len(exhibit_99_files)} Exhibit 99 file(s) (backward compatibility)")
+        return exhibit_99_files
     
     def _validate_document_content(self, content: bytes, filing_type: str) -> bool:
         """
@@ -523,6 +586,30 @@ class FilingDownloader:
         except Exception as e:
             logger.error(f"Error validating content: {e}")
             return size_kb > 20
+    
+    def _validate_exhibit_size(self, exhibit: Dict, content: bytes) -> bool:
+        """
+        验证附件文件大小是否在合理范围内
+        
+        Args:
+            exhibit: 附件信息字典
+            content: 文件内容
+            
+        Returns:
+            bool: 是否通过大小验证
+        """
+        size_mb = len(content) / (1024 * 1024)
+        max_size_mb = exhibit.get('max_size_mb', 50)
+        
+        if size_mb > max_size_mb:
+            logger.warning(f"Exhibit {exhibit['filename']} too large: {size_mb:.1f}MB > {max_size_mb}MB limit")
+            return False
+        
+        if size_mb < 0.01:  # 10KB minimum
+            logger.warning(f"Exhibit {exhibit['filename']} too small: {size_mb:.1f}MB")
+            return False
+        
+        return True
     
     async def _try_alternative_patterns(self, client: httpx.AsyncClient, filing: Filing) -> Optional[Dict]:
         """
@@ -592,8 +679,13 @@ class FilingDownloader:
     
     async def download_filing(self, db: Session, filing: Filing) -> bool:
         """
-        Main download method with improved S-1 handling
-        Phase 4: 添加通知功能
+        ENHANCED: 主下载方法，支持完整附件处理
+        
+        改进内容：
+        1. 保持原有下载流程不变
+        2. 为8-K添加完整附件处理（99 + 10.x系列）
+        3. 智能优先级和容错机制
+        4. 性能优化和大小限制
         """
         try:
             # Update status
@@ -601,7 +693,7 @@ class FilingDownloader:
             filing.processing_started_at = datetime.utcnow()
             db.commit()
             
-            logger.info(f"Starting download for {filing.company.ticker} {filing.filing_type.value} "
+            logger.info(f"Starting enhanced download for {filing.company.ticker} {filing.filing_type.value} "
                        f"({filing.accession_number})")
             
             # Create directory
@@ -609,7 +701,7 @@ class FilingDownloader:
             filing_dir.mkdir(parents=True, exist_ok=True)
             
             async with httpx.AsyncClient(headers=self.headers, timeout=30.0) as client:
-                # Step 1: Download index page
+                # ========================= Phase 1: 下载索引页面 =========================
                 urls_to_try = []
                 
                 # Most common format
@@ -650,7 +742,7 @@ class FilingDownloader:
                 with open(index_path, 'wb') as f:
                     f.write(index_content)
                 
-                # Step 2: Parse index to find main document
+                # ========================= Phase 2: 下载主文档 =========================
                 index_text = index_content.decode('utf-8', errors='ignore')
                 main_doc = self._parse_index_enhanced(index_text, filing.filing_type.value)
                 
@@ -659,7 +751,7 @@ class FilingDownloader:
                     main_doc = await self._try_alternative_patterns(client, filing)
                 
                 if main_doc:
-                    # Step 3: Download the main document
+                    # Download the main document
                     doc_url = main_doc['url']
                     
                     # Handle relative URLs
@@ -716,16 +808,25 @@ class FilingDownloader:
                     logger.warning("Could not find main document in any format")
                     # Don't fail completely - we still have the index
                 
-                # Step 4: Download Exhibit 99 files for 8-K filings
+                # ========================= Phase 3: 下载重要附件 =========================
                 if filing.filing_type == FilingType.FORM_8K:
-                    logger.info("This is an 8-K filing, checking for Exhibit 99 files...")
+                    logger.info("This is an 8-K filing, checking for important exhibits...")
                     
-                    exhibit_files = self._parse_exhibit_99_files(index_text)
+                    # 使用增强的附件解析方法
+                    important_exhibits = self._parse_important_exhibits(index_text)
                     
-                    if exhibit_files:
-                        logger.info(f"Found {len(exhibit_files)} Exhibit 99 file(s) to download")
+                    if important_exhibits:
+                        logger.info(f"Found {len(important_exhibits)} important exhibit(s) to download:")
                         
-                        for exhibit in exhibit_files:
+                        # 显示发现的附件信息
+                        for exhibit in important_exhibits:
+                            logger.info(f"  - {exhibit['type']}: {exhibit['filename']} "
+                                       f"(Priority: {exhibit['priority']}, Max: {exhibit['max_size_mb']}MB)")
+                        
+                        successful_downloads = 0
+                        failed_downloads = 0
+                        
+                        for exhibit in important_exhibits:
                             try:
                                 exhibit_url = exhibit['url']
                                 if not exhibit_url.startswith('http'):
@@ -735,7 +836,7 @@ class FilingDownloader:
                                         base_url_parts = successful_url.rsplit('/', 1)[0]
                                         exhibit_url = f"{base_url_parts}/{exhibit_url}"
                                 
-                                logger.info(f"Downloading {exhibit['type']}: {exhibit['filename']}")
+                                logger.info(f"Downloading {exhibit['type']} ({exhibit['category']}): {exhibit['filename']}")
                                 
                                 await self._rate_limit()
                                 exhibit_response = await client.get(exhibit_url, timeout=60.0)
@@ -743,18 +844,36 @@ class FilingDownloader:
                                 if exhibit_response.status_code == 200:
                                     exhibit_content = exhibit_response.content
                                     
-                                    exhibit_path = filing_dir / exhibit['filename']
-                                    with open(exhibit_path, 'wb') as f:
-                                        f.write(exhibit_content)
-                                    
-                                    logger.info(f"✅ Successfully downloaded {exhibit['filename']} "
-                                               f"({len(exhibit_content)/1024:.1f}KB)")
+                                    # 验证文件大小
+                                    if self._validate_exhibit_size(exhibit, exhibit_content):
+                                        exhibit_path = filing_dir / exhibit['filename']
+                                        with open(exhibit_path, 'wb') as f:
+                                            f.write(exhibit_content)
+                                        
+                                        size_mb = len(exhibit_content) / (1024 * 1024)
+                                        logger.info(f"✅ Successfully downloaded {exhibit['filename']} "
+                                                   f"({size_mb:.1f}MB)")
+                                        successful_downloads += 1
+                                    else:
+                                        logger.warning(f"❌ Skipped {exhibit['filename']} - size validation failed")
+                                        failed_downloads += 1
                                 else:
-                                    logger.warning(f"Failed to download {exhibit['filename']}: "
+                                    logger.warning(f"❌ Failed to download {exhibit['filename']}: "
                                                   f"HTTP {exhibit_response.status_code}")
+                                    failed_downloads += 1
                                     
                             except Exception as e:
-                                logger.error(f"Error downloading exhibit {exhibit['filename']}: {e}")
+                                logger.error(f"❌ Error downloading exhibit {exhibit['filename']}: {e}")
+                                failed_downloads += 1
+                                # 单个附件失败不影响整体处理，继续下载其他附件
+                                continue
+                        
+                        logger.info(f"📊 Exhibit download summary: "
+                                   f"{successful_downloads} successful, {failed_downloads} failed")
+                        
+                        # 如果有附件成功下载，记录到日志
+                        if successful_downloads > 0:
+                            logger.info(f"🎉 Enhanced 8-K processing completed with {successful_downloads} exhibits")
                 
                 # Update status to PARSING
                 filing.status = ProcessingStatus.PARSING
@@ -782,7 +901,7 @@ class FilingDownloader:
                     # 继续执行，不中断下载流程
                 # =========================================================================
                 
-                logger.info(f"Successfully completed download for {filing.accession_number}")
+                logger.info(f"🎯 Successfully completed enhanced download for {filing.accession_number}")
                 return True
                     
         except Exception as e:

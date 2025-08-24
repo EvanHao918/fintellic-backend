@@ -5,9 +5,10 @@ ENHANCED: Added validation throughout the pipeline
 FIXED: Timezone-aware datetime comparisons
 FIXED: Added retry logic for "Filing not found" errors
 FIXED: Better error handling for AI processing failures
+FIXED: Safe FilingType handling to prevent 'str' object has no attribute 'value' errors
 """
 import logging
-from typing import Optional, Dict
+from typing import Optional, Dict, Union
 from celery import Task
 import asyncio
 from datetime import datetime, timezone
@@ -16,7 +17,7 @@ import traceback
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal, ThreadSafeSession, get_task_db
-from app.models.filing import Filing, ProcessingStatus
+from app.models.filing import Filing, ProcessingStatus, FilingType
 from app.services.filing_downloader import filing_downloader
 from app.services.ai_processor import ai_processor
 
@@ -35,6 +36,21 @@ class FilingTask(Task):
         if db:
             db.close()
             ThreadSafeSession.remove()
+    
+    def _get_safe_filing_type_value(self, filing_type: Union[FilingType, str]) -> str:
+        """
+        FIXED: Safely get filing type value, handling both enum and string types
+        This prevents the 'str' object has no attribute 'value' error
+        """
+        if isinstance(filing_type, str):
+            return filing_type
+        elif hasattr(filing_type, 'value'):
+            return filing_type.value
+        elif isinstance(filing_type, FilingType):
+            return filing_type.value
+        else:
+            logger.warning(f"Unexpected filing_type type: {type(filing_type)}, value: {filing_type}")
+            return str(filing_type)
     
     def validate_filing(self, filing: Filing) -> tuple[bool, str]:
         """
@@ -79,6 +95,7 @@ def process_filing_task(self, filing_id: int):
     ENHANCED: Added validation at each step
     FIXED: Added retry logic for "Filing not found" errors
     FIXED: Better error handling for AI processing
+    FIXED: Safe FilingType handling to prevent attribute errors
     """
     db = None
     filing = None
@@ -117,7 +134,9 @@ def process_filing_task(self, filing_id: int):
             db.commit()
             return {"status": "error", "message": error_msg}
         
-        logger.info(f"Processing filing: {filing.company.ticker} - {filing.filing_type.value} ({filing.accession_number})")
+        # FIXED: Safe filing type access
+        filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
+        logger.info(f"Processing filing: {filing.company.ticker} - {filing_type_value} ({filing.accession_number})")
         
         # Check if filing has already been successfully processed
         if filing.status == ProcessingStatus.COMPLETED and filing.unified_analysis:
@@ -126,7 +145,7 @@ def process_filing_task(self, filing_id: int):
                 "status": "success",
                 "filing_id": filing_id,
                 "company": filing.company.ticker if filing.company else "Unknown",
-                "type": filing.filing_type.value,
+                "type": filing_type_value,
                 "analysis_version": filing.analysis_version,
                 "message": "Already processed"
             }
@@ -256,7 +275,7 @@ def process_filing_task(self, filing_id: int):
             "status": "success",
             "filing_id": filing_id,
             "company": filing.company.ticker if filing.company else "Unknown",
-            "type": filing.filing_type.value,
+            "type": filing_type_value,
             "analysis_version": filing.analysis_version
         }
         
@@ -324,6 +343,7 @@ def process_filing_task(self, filing_id: int):
 def validate_completed_filing(filing: Filing) -> Dict:
     """
     Validate a completed filing for quality and completeness
+    FIXED: Safe FilingType handling
     """
     issues = []
     
@@ -339,16 +359,19 @@ def validate_completed_filing(filing: Filing) -> Dict:
     elif len(filing.unified_feed_summary) > 300:
         issues.append("Feed summary too long")
     
+    # FIXED: Safe filing type value access
+    filing_type_value = filing.filing_type.value if hasattr(filing.filing_type, 'value') else str(filing.filing_type)
+    
     # Check filing-specific requirements
-    if filing.filing_type.value == "10-Q":
+    if filing_type_value in ["10-Q", "FORM_10Q"]:
         if not filing.financial_highlights and not filing.core_metrics:
             issues.append("Missing financial highlights for 10-Q")
     
-    elif filing.filing_type.value == "8-K":
+    elif filing_type_value in ["8-K", "FORM_8K"]:
         if not filing.event_type:
             issues.append("Missing event type for 8-K")
     
-    elif filing.filing_type.value == "S-1":
+    elif filing_type_value in ["S-1", "FORM_S1"]:
         if not filing.financial_summary and not filing.financial_highlights:
             issues.append("Missing financial summary for S-1")
     

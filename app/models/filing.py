@@ -1,8 +1,11 @@
 """
 Filing model - Core model for SEC filings
 FIXED: Changed financial_metrics and other JSON fields to Text to avoid type conflicts
+ENHANCED: Added detected_at field for precise filing detection timestamps
+ENHANCED: Added proper indexing and methods for detected_at field
+FIXED: Changed FilingType to inherit from str, enum.Enum for consistency
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Enum as SQLEnum, JSON, Float
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Enum as SQLEnum, JSON, Float, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -11,8 +14,8 @@ import json
 from app.models.base import Base
 
 
-class FilingType(enum.Enum):
-    """Types of SEC filings we process"""
+class FilingType(str, enum.Enum):
+    """Types of SEC filings we process - FIXED: Now inherits from str, enum.Enum"""
     FORM_10K = "10-K"      # Annual report
     FORM_10Q = "10-Q"      # Quarterly report
     FORM_8K = "8-K"        # Current report
@@ -24,8 +27,8 @@ class FilingType(enum.Enum):
     OTHER = "OTHER"
 
 
-class ProcessingStatus(enum.Enum):
-    """Filing processing status"""
+class ProcessingStatus(str, enum.Enum):
+    """Filing processing status - FIXED: Also changed to str, enum.Enum"""
     PENDING = "PENDING"
     DOWNLOADING = "DOWNLOADING"
     PARSING = "PARSING"
@@ -35,12 +38,12 @@ class ProcessingStatus(enum.Enum):
     SKIPPED = "SKIPPED"
 
 
-class ManagementTone(enum.Enum):
-    """Management tone assessment"""
+class ManagementTone(str, enum.Enum):
+    """Management tone assessment - FIXED: Also changed to str, enum.Enum"""
     VERY_OPTIMISTIC = "very_optimistic"
     OPTIMISTIC = "optimistic"
     CONFIDENT = "confident"
-    CONCERNED = "concerned"  # 添加这个缺失的值
+    CONCERNED = "concerned"  # æ·»åŠ è¿™ä¸ªç¼ºå¤±çš„å€¼
     NEUTRAL = "neutral"
     CAUTIOUS = "cautious"
     PESSIMISTIC = "pessimistic"
@@ -61,8 +64,9 @@ class Filing(Base):
     filing_type = Column(SQLEnum(FilingType), nullable=False, index=True)
     form_type = Column(String(20))  # Raw form type from SEC
     
-    # Filing dates
-    filing_date = Column(DateTime(timezone=True), nullable=False, index=True)
+    # Filing dates - ENHANCED with precise detection time
+    filing_date = Column(DateTime(timezone=True), nullable=False, index=True)  # SEC official filing date
+    detected_at = Column(DateTime(timezone=True), index=True)  # When we detected this filing (precise to minute)
     period_end_date = Column(DateTime(timezone=True))
     accepted_date = Column(DateTime(timezone=True))
     
@@ -234,6 +238,14 @@ class Filing(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
+    # ENHANCED: Explicit indexes for better query performance
+    __table_args__ = (
+        Index('idx_filings_detected_at_desc', detected_at.desc()),  # For ordering by detected_at DESC
+        Index('idx_filings_company_filing_date', company_id, filing_date.desc()),  # Compound index
+        Index('idx_filings_ticker_type_date', ticker, filing_type, filing_date.desc()),  # For ticker queries
+        Index('idx_filings_status_detected', status, detected_at.desc()),  # For status + time queries
+    )
+    
     # Relationships
     company = relationship("Company", back_populates="filings")
     comments = relationship("Comment", back_populates="filing", cascade="all, delete-orphan")
@@ -257,10 +269,35 @@ class Filing(Base):
     
     @property
     def filing_age_days(self):
-        """Get age of filing in days"""
+        """Get age of filing in days since SEC filing date"""
         if self.filing_date:
-            return (datetime.utcnow() - self.filing_date).days
+            return (datetime.utcnow() - self.filing_date.replace(tzinfo=None)).days
         return None
+    
+    @property
+    def detection_age_minutes(self):
+        """Get age of detection in minutes - ENHANCED PROPERTY"""
+        if self.detected_at:
+            # Handle timezone-aware datetime comparison
+            now_utc = datetime.utcnow().replace(tzinfo=self.detected_at.tzinfo)
+            return int((now_utc - self.detected_at).total_seconds() / 60)
+        return None
+    
+    @property
+    def detection_age_hours(self):
+        """Get age of detection in hours - NEW PROPERTY"""
+        minutes = self.detection_age_minutes
+        return int(minutes / 60) if minutes is not None else None
+    
+    @property
+    def is_recently_detected(self):
+        """Check if filing was detected recently (within 1 hour) - NEW PROPERTY"""
+        return self.detection_age_minutes is not None and self.detection_age_minutes < 60
+    
+    @property
+    def display_time(self):
+        """Get the best time to display (detected_at preferred, filing_date as fallback) - NEW PROPERTY"""
+        return self.detected_at or self.filing_date
     
     @property
     def has_expectations(self):
@@ -374,7 +411,7 @@ class Filing(Base):
         return value
     
     def to_dict(self, include_analysis=True):
-        """Convert to dictionary for API responses"""
+        """Convert to dictionary for API responses - ENHANCED with detected_at"""
         data = {
             'id': self.id,
             'company_id': self.company_id,
@@ -382,6 +419,8 @@ class Filing(Base):
             'filing_type': self.filing_type.value,
             'display_type': self.display_filing_type,
             'filing_date': self.filing_date.isoformat() if self.filing_date else None,
+            'detected_at': self.detected_at.isoformat() if self.detected_at else None,  # ENHANCED: Include detected_at
+            'display_time': self.display_time.isoformat() if self.display_time else None,  # ENHANCED: Best display time
             'period_end_date': self.period_end_date.isoformat() if self.period_end_date else None,
             'filing_url': self.filing_url,
             'status': self.status.value,
@@ -390,7 +429,11 @@ class Filing(Base):
             'sentiment_score': self.sentiment_score,
             'management_tone': self.management_tone.value if self.management_tone else None,
             'reading_time_minutes': self.reading_time_minutes,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            # ENHANCED: Add timing metadata
+            'detection_age_minutes': self.detection_age_minutes,
+            'detection_age_hours': self.detection_age_hours,
+            'is_recently_detected': self.is_recently_detected,
         }
         
         # Add financial highlights for 10-K/10-Q
@@ -461,10 +504,17 @@ class Filing(Base):
             
         return False
     
+    # ENHANCED: Static method for query optimization
+    @classmethod
+    def get_recent_filings_query(cls, db_session, hours_back=24):
+        """Get optimized query for recent filings using detected_at"""
+        from datetime import datetime, timedelta
+        cutoff = datetime.utcnow() - timedelta(hours=hours_back)
+        
+        return db_session.query(cls).filter(
+            cls.detected_at >= cutoff,
+            cls.status == ProcessingStatus.COMPLETED
+        ).order_by(cls.detected_at.desc())
+    
     class Meta:
         db_table = 'filings'
-        indexes = [
-            ('company_id', 'filing_date'),
-            ('ticker', 'filing_type', 'filing_date'),
-            ('status', 'created_at'),
-        ]

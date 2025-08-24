@@ -4,6 +4,8 @@ Handles both v1 (legacy) and v2 (unified) analysis formats
 Enhanced to return full company details for mature companies
 FIXED: Changed all file_url to filing_url
 FIXED: Use getattr to safely access key_tags
+ENHANCED: Return detected_at timestamps for accurate timing display
+CRITICAL FIX: Corrected PostgreSQL ORDER BY syntax - NULLS LAST must come after DESC
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
@@ -135,7 +137,8 @@ async def get_filings(
     Get list of filings with optional filters
     Results are cached for 5 minutes
     Authentication is optional - public endpoint
-    Enhanced to return more company information
+    Enhanced to return more company information and detected_at timestamps
+    FIXED: Corrected PostgreSQL ORDER BY syntax
     """
     # Generate cache key
     cache_key = FilingCache.get_filing_list_key(skip, limit, form_type, ticker)
@@ -160,8 +163,14 @@ async def get_filings(
     # Get total count
     total = query.count()
     
+    # FIXED: Corrected PostgreSQL ORDER BY syntax - DESC must come before NULLS LAST
+    query = query.order_by(
+        desc(Filing.detected_at).nulls_last(),  # FIXED: Proper syntax
+        desc(Filing.filing_date)
+    )
+    
     # Get paginated results
-    filings = query.order_by(desc(Filing.filing_date)).offset(skip).limit(limit).all()
+    filings = query.offset(skip).limit(limit).all()
     
     # Convert to response format
     filing_responses = []
@@ -180,16 +189,20 @@ async def get_filings(
         # 获取公司信息（Feed流使用简化版）
         company_info = get_company_info_dict(filing.company, filing.filing_type.value)
         
+        # ENHANCED: Use detected_at for timing if available, fallback to filing_date
+        display_time = filing.detected_at if filing.detected_at else filing.filing_date
+        
         filing_brief = FilingBrief(
             id=filing.id,
             form_type=filing.filing_type.value,
-            filing_date=filing.filing_date,
+            filing_date=display_time,  # ENHANCED: Use detected_at or filing_date
+            detected_at=filing.detected_at,  # NEW: Include detected_at separately
             accession_number=filing.accession_number,
-            filing_url=filing.primary_document_url or filing.filing_url or "",  # FIXED: file_url -> filing_url
+            filing_url=filing.primary_document_url or filing.filing_url or "",
             company=company_info,
             one_liner=one_liner,
             sentiment=filing.management_tone.value if filing.management_tone else None,
-            tags=filing.key_tags if filing.key_tags else [],  # 直接使用，SQLAlchemy已自动解析JSON
+            tags=filing.key_tags if filing.key_tags else [],
             vote_counts=vote_counts,
             comment_count=getattr(filing, 'comment_count', 0) or 0,
             view_count=view_count,
@@ -230,7 +243,7 @@ async def get_filing(
     Returns unified analysis if available (v2), otherwise legacy format
     Results are cached for 1 hour
     Enforces daily view limits for free users
-    Enhanced to return full company details for mature companies
+    Enhanced to return full company details for mature companies and detected_at timestamps
     """
     # Check if user can view this filing
     view_check = ViewTrackingService.can_view_filing(db, current_user, filing_id)
@@ -308,15 +321,20 @@ async def get_filing(
     # 获取增强的公司信息（详情页使用完整版）
     company_info = get_company_info_dict(filing.company, filing.filing_type.value)
     
+    # ENHANCED: Use detected_at for timing if available
+    display_time = filing.detected_at if filing.detected_at else filing.filing_date
+    
     # Prepare base response data
     response_data = {
         "id": filing.id,
         "form_type": filing.filing_type.value,
-        "filing_date": filing.filing_date,
+        "filing_date": filing.filing_date,  # Keep original SEC filing date
+        "detected_at": filing.detected_at,  # NEW: Include precise detection time
+        "display_time": display_time,  # NEW: Time to use for display (detected_at preferred)
         "accession_number": filing.accession_number,
-        "filing_url": filing.primary_document_url or filing.filing_url or "",  # FIXED: file_url -> filing_url
+        "filing_url": filing.primary_document_url or filing.filing_url or "",
         "cik": filing.company.cik,
-        "company": company_info,  # 使用增强的公司信息
+        "company": company_info,
         "status": filing.status.value,
         
         # ==================== UNIFIED ANALYSIS FIELDS ====================
@@ -335,7 +353,7 @@ async def get_filing(
         "risks": extract_risks(filing),
         "opportunities": extract_opportunities(filing),
         "questions_answers": filing.safe_json_get('key_questions', []) or [],
-        "tags": filing.key_tags if filing.key_tags else [],  # 直接使用，SQLAlchemy已自动解析JSON
+        "tags": filing.key_tags if filing.key_tags else [],
         "financial_metrics": safe_json_to_string(filing.financial_metrics),
         
         # Metadata
@@ -473,7 +491,8 @@ async def get_popular_filings(
     Get popular filings based on view count
     Results are cached for 10 minutes
     Authentication is optional - public endpoint
-    Enhanced to return company information
+    Enhanced to return company information and detected_at timestamps
+    FIXED: Corrected PostgreSQL ORDER BY syntax
     """
     # Validate period
     if period not in ["day", "week", "month"]:
@@ -497,11 +516,14 @@ async def get_popular_filings(
     else:  # month
         start_date = now - timedelta(days=30)
     
-    # Get filings from date range
+    # FIXED: Use proper PostgreSQL syntax for ORDER BY with NULLS LAST
     filings = db.query(Filing).options(joinedload(Filing.company)).filter(
-        Filing.created_at >= start_date,
+        Filing.detected_at >= start_date if Filing.detected_at else Filing.created_at >= start_date,
         Filing.status == ProcessingStatus.COMPLETED
-    ).order_by(desc(Filing.created_at)).limit(100).all()
+    ).order_by(
+        desc(Filing.detected_at).nulls_last(),  # FIXED: Proper syntax
+        desc(Filing.created_at)
+    ).limit(100).all()
     
     # Sort by view count
     filing_views = []
@@ -539,11 +561,16 @@ async def get_popular_filings(
             "sector": getattr(filing.company, 'sector', filing.company.sic_description)
         }
         
+        # ENHANCED: Use detected_at for display if available
+        display_time = filing.detected_at if filing.detected_at else filing.filing_date
+        
         result.append({
             "id": filing.id,
             "company": company_info,
             "form_type": filing.filing_type.value,
             "filing_date": filing.filing_date.isoformat(),
+            "detected_at": filing.detected_at.isoformat() if filing.detected_at else None,
+            "display_time": display_time.isoformat(),
             "ai_summary": summary,
             "view_count": item["view_count"],
             "votes": vote_counts,

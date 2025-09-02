@@ -4,6 +4,7 @@ Handles all FMP API interactions with caching and error handling
 FIXED: Changed from async to sync to resolve "Event loop is closed" error
 ENHANCED: Improved date matching logic for analyst estimates
 ENHANCED: Added company profile fetching capability
+UPDATED: Enhanced for FMP API optimization project - better data structure for database storage
 """
 import requests  # Changed from aiohttp to requests for sync operations
 import json
@@ -51,13 +52,14 @@ class FMPService:
     def get_company_profile(self, ticker: str) -> Optional[Dict]:
         """
         获取公司详细信息
-        ENHANCED: New method to fetch comprehensive company profile
+        ENHANCED: Enhanced for database integration - returns structured data for Company model
+        UPDATED: Improved data mapping for FMP API optimization project
         
         Args:
-            ticker: 股票代码
+            ticker: 股票代码 
             
         Returns:
-            Dict with company information or None
+            Dict with company information optimized for database storage or None
         """
         # Generate cache key
         cache_key = f"fmp:company_profile:{ticker}"
@@ -72,32 +74,52 @@ class FMPService:
         if profile_data and len(profile_data) > 0:
             profile = profile_data[0]  # API returns array with single item
             
-            # Transform to our format
+            # UPDATED: Enhanced data mapping for database integration
             result = {
+                # Core identifiers
                 'ticker': profile.get('symbol'),
                 'name': profile.get('companyName'),
                 'legal_name': profile.get('companyName'),
+                
+                # Business classification
                 'sector': profile.get('sector'),
                 'industry': profile.get('industry'),
+                'exchange': profile.get('exchangeShortName'),
+                
+                # Location information
                 'headquarters': f"{profile.get('city', '')}, {profile.get('state', '')}".strip(', ') if profile.get('city') or profile.get('state') else None,
                 'country': profile.get('country'),
-                'employees': profile.get('fullTimeEmployees'),
-                'market_cap': profile.get('mktCap'),
-                'exchange': profile.get('exchangeShortName'),
+                
+                # Key financial metrics - OPTIMIZED FOR DATABASE STORAGE
+                'market_cap': profile.get('mktCap'),  # Raw value in USD
+                'pe_ratio': None,  # Will be filled by key metrics call
                 'website': profile.get('website'),
+                
+                # Additional company data
+                'employees': profile.get('fullTimeEmployees'),
                 'description': profile.get('description'),
                 'ceo': profile.get('ceo'),
                 'founded': profile.get('ipoDate'),  # IPO date as proxy for founding
+                
+                # Market data (for reference, not stored in DB)
                 'currency': profile.get('currency'),
                 'price': profile.get('price'),
                 'beta': profile.get('beta'),
                 'volume_avg': profile.get('volAvg'),
+                
+                # Formatted display values (for immediate use)
                 'market_cap_formatted': self._format_market_cap(profile.get('mktCap')),
+                
+                # Metadata
                 'fetch_timestamp': datetime.utcnow().isoformat(),
                 'data_source': 'fmp_profile'
             }
             
-            # Remove None values
+            # ENHANCED: Try to get PE ratio from this profile call
+            if profile.get('pe'):
+                result['pe_ratio'] = profile.get('pe')
+            
+            # Remove None values to keep the result clean
             result = {k: v for k, v in result.items() if v is not None}
             
             # Cache for 24 hours (company profiles don't change often)
@@ -111,17 +133,18 @@ class FMPService:
     def get_company_key_metrics(self, ticker: str) -> Optional[Dict]:
         """
         获取公司关键指标
-        ENHANCED: New method to fetch key financial metrics
+        ENHANCED: Enhanced for PE ratio fetching in FMP optimization project
         
         Args:
-            ticker: 股票代码
+            ticker: 股票代码 
             
         Returns:
-            Dict with key metrics or None
+            Dict with key metrics including PE ratio or None
         """
         cache_key = f"fmp:key_metrics:{ticker}"
         cached = cache.get(cache_key)
         if cached:
+            logger.info(f"[FMP] Using cached key metrics for {ticker}")
             return json.loads(cached)
         
         # Fetch key metrics (quarterly)
@@ -131,32 +154,44 @@ class FMPService:
             metrics = metrics_data[0]
             
             result = {
+                # Core valuation metrics
+                'pe_ratio': metrics.get('peRatio'),
+                'price_to_sales': metrics.get('priceToSalesRatio'),
+                'price_to_book': metrics.get('pbRatio'),
+                
+                # Per-share metrics
                 'revenue_per_share': metrics.get('revenuePerShare'),
                 'net_income_per_share': metrics.get('netIncomePerShare'),
                 'operating_cash_flow_per_share': metrics.get('operatingCashFlowPerShare'),
                 'free_cash_flow_per_share': metrics.get('freeCashFlowPerShare'),
                 'book_value_per_share': metrics.get('bookValuePerShare'),
-                'pe_ratio': metrics.get('peRatio'),
-                'price_to_sales': metrics.get('priceToSalesRatio'),
-                'price_to_book': metrics.get('pbRatio'),
+                
+                # Financial health metrics
                 'debt_to_equity': metrics.get('debtToEquity'),
                 'current_ratio': metrics.get('currentRatio'),
                 'working_capital': metrics.get('workingCapital'),
+                
+                # Profitability metrics
                 'return_on_equity': metrics.get('roe'),
                 'return_on_assets': metrics.get('roa'),
                 'gross_profit_margin': metrics.get('grossProfitMargin'),
                 'operating_profit_margin': metrics.get('operatingProfitMargin'),
                 'net_profit_margin': metrics.get('netProfitMargin'),
-                'fetch_timestamp': datetime.utcnow().isoformat()
+                
+                # Metadata
+                'fetch_timestamp': datetime.utcnow().isoformat(),
+                'data_source': 'fmp_key_metrics'
             }
             
             # Remove None values
             result = {k: v for k, v in result.items() if v is not None}
             
-            # Cache for 1 hour
+            # Cache for 1 hour (metrics change more frequently)
             cache.set(cache_key, json.dumps(result), ttl=3600)
+            logger.info(f"[FMP] Successfully fetched key metrics for {ticker}")
             return result
         
+        logger.warning(f"[FMP] No key metrics found for {ticker}")
         return None
     
     def _format_market_cap(self, market_cap: float) -> str:
@@ -180,7 +215,7 @@ class FMPService:
         ENHANCED: 改进了日期匹配逻辑，支持期间结束日期到报告日期的映射
         
         Args:
-            ticker: 股票代码
+            ticker: 股票代码 
             target_date: 目标日期（格式：YYYY-MM-DD），用于获取特定财报期的预期
                         如果不提供，则获取下一个即将到来的预期
         """

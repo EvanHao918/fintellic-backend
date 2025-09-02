@@ -11,6 +11,7 @@ REMOVED: Question generation, tone analysis, separate financial highlights
 ENHANCED: Management analysis, S-1 processing, tag quality
 REVOLUTIONARY: Enhanced data source marking and Markdown table processing to prevent hallucination
 FIXED: Added defensive type checking for FilingType to prevent 'str' object has no attribute 'value' errors
+UPDATED: Added FMP company profile data fetching and storage during AI processing
 """
 import json
 import re
@@ -49,6 +50,7 @@ class AIProcessor:
     Process filings using OpenAI with enhanced management analysis and tag extraction
     REVOLUTIONARY: Enhanced with Markdown table processing and strict data accuracy constraints
     FIXED: Added defensive FilingType handling to prevent attribute errors
+    UPDATED: Added FMP company profile data integration
     """
     
     def __init__(self):
@@ -262,6 +264,9 @@ class AIProcessor:
             filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
             logger.info(f"Starting enhanced AI processing for {ticker} {filing_type_value}")
             
+            # NEW: Fetch and store FMP company profile data if applicable
+            await self._fetch_and_store_fmp_data(db, filing, ticker)
+            
             # Get filing directory
             filing_dir = Path(f"data/filings/{filing.company.cik}/{filing.accession_number.replace('-', '')}")
             
@@ -325,7 +330,7 @@ class AIProcessor:
             filing.unified_analysis = unified_result['unified_analysis']
             filing.unified_feed_summary = unified_result['feed_summary']
             filing.smart_markup_data = unified_result['markup_data']
-            filing.analysis_version = "v7_enhanced"  # Enhanced version marker
+            filing.analysis_version = "v7_enhanced_fmp"  # Updated version marker
             
             if analyst_data:
                 filing.analyst_expectations = analyst_data
@@ -348,6 +353,95 @@ class AIProcessor:
             filing.error_message = str(e)
             db.commit()
             return False
+    
+    async def _fetch_and_store_fmp_data(self, db: Session, filing: Filing, ticker: str):
+        """
+        NEW: Fetch FMP company profile data and store in database during AI processing
+        This implements the core optimization from the FMP API optimization report
+        """
+        # Only fetch for companies with valid tickers (exclude IPO and unknown companies)
+        if not ticker or ticker in ["UNKNOWN", "PRE-IPO"] or ticker.startswith("CIK"):
+            logger.info(f"[FMP Integration] Skipping FMP data fetch for {ticker} - invalid ticker")
+            return
+        
+        # Only fetch if we don't have recent FMP data (avoid redundant API calls)
+        company = filing.company
+        if not company:
+            logger.warning(f"[FMP Integration] No company object for filing {filing.accession_number}")
+            return
+        
+        # Check if we need to fetch FMP data (if key fields are missing or stale)
+        needs_fmp_data = (
+            not company.market_cap or 
+            not company.pe_ratio or 
+            not company.website
+        )
+        
+        if not needs_fmp_data:
+            logger.info(f"[FMP Integration] Company {ticker} already has FMP data, skipping fetch")
+            return
+        
+        try:
+            logger.info(f"[FMP Integration] Fetching company profile from FMP for {ticker}")
+            fmp_data = fmp_service.get_company_profile(ticker)
+            
+            if fmp_data:
+                logger.info(f"[FMP Integration] Successfully retrieved FMP data for {ticker}")
+                
+                # Extract the data we need (market_cap, pe_ratio, website)
+                company_updates = {}
+                
+                # Market cap (convert from FMP format to millions)
+                if fmp_data.get('market_cap'):
+                    company_updates['market_cap'] = fmp_data['market_cap'] / 1e6  # Convert to millions
+                    logger.info(f"[FMP Integration] Updated market cap: ${company_updates['market_cap']:.0f}M")
+                
+                # Website
+                if fmp_data.get('website'):
+                    company_updates['website'] = fmp_data['website']
+                    logger.info(f"[FMP Integration] Updated website: {company_updates['website']}")
+                
+                # Get PE ratio from key metrics if not in profile
+                pe_ratio = fmp_data.get('pe_ratio')
+                if not pe_ratio:
+                    # Try to get PE ratio from key metrics
+                    key_metrics = fmp_service.get_company_key_metrics(ticker)
+                    if key_metrics and key_metrics.get('pe_ratio'):
+                        pe_ratio = key_metrics['pe_ratio']
+                
+                if pe_ratio and pe_ratio > 0:
+                    company_updates['pe_ratio'] = pe_ratio
+                    logger.info(f"[FMP Integration] Updated PE ratio: {pe_ratio:.1f}")
+                
+                # Update company fields directly
+                for field, value in company_updates.items():
+                    setattr(company, field, value)
+                
+                # Also update other useful fields if they're empty
+                if fmp_data.get('sector') and not company.sector:
+                    company.sector = fmp_data['sector']
+                
+                if fmp_data.get('industry') and not company.industry:
+                    company.industry = fmp_data['industry']
+                
+                if fmp_data.get('employees') and not company.employees:
+                    company.employees = fmp_data['employees']
+                
+                if fmp_data.get('headquarters') and not company.headquarters:
+                    company.headquarters = fmp_data['headquarters']
+                
+                # Mark that we've updated the company
+                company.updated_at = datetime.utcnow()
+                
+                logger.info(f"[FMP Integration] Successfully updated company {ticker} with FMP data")
+                
+            else:
+                logger.warning(f"[FMP Integration] No FMP data available for {ticker}")
+                
+        except Exception as e:
+            logger.error(f"[FMP Integration] Error fetching FMP data for {ticker}: {e}")
+            # Don't fail the entire processing if FMP fetch fails
+            pass
     
     async def _generate_unified_analysis_with_retry(
         self, 

@@ -3,6 +3,7 @@ Company-related API endpoints - Enhanced with FMP integration
 FIXED: Changed file_url to filing_url for consistency
 FIXED: Updated to handle both primary_document_url and primary_doc_url fields
 ENHANCED: Added FMP company profile fetching for detailed company info
+UPDATED: Optimized to use database-stored FMP data instead of real-time API calls (FMP Optimization Project)
 """
 from typing import List, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -95,6 +96,7 @@ async def get_company_detail(
     Get detailed information about a specific company
     Public endpoint - no authentication required
     ENHANCED: Can fetch additional data from FMP API if requested
+    UPDATED: Prioritizes database-stored FMP data over real-time API calls
     """
     try:
         company = db.query(Company).filter(
@@ -114,7 +116,7 @@ async def get_company_detail(
         def safe_datetime(dt):
             return dt.isoformat() if dt else None
         
-        # Build response with safe attribute access
+        # Build response with safe attribute access - UPDATED: Include FMP fields from database
         response = {
             "ticker": company.ticker,
             "name": company.name,
@@ -135,63 +137,75 @@ async def get_company_detail(
             "last_filing_date": safe_datetime(getattr(company, 'last_filing_date', None)),
             "total_filings": recent_filings_count,
             "created_at": safe_datetime(getattr(company, 'created_at', None)),
-            "updated_at": safe_datetime(getattr(company, 'updated_at', None))
+            "updated_at": safe_datetime(getattr(company, 'updated_at', None)),
+            
+            # UPDATED: Include FMP data from database (optimization key point)
+            "market_cap": getattr(company, 'market_cap', None),
+            "market_cap_formatted": getattr(company, 'market_cap_formatted', None),
+            "pe_ratio": getattr(company, 'pe_ratio', None),
+            "pe_ratio_formatted": getattr(company, 'pe_ratio_formatted', None),
+            "website": getattr(company, 'website', None),
+            "employees": getattr(company, 'employees', None),
+            "headquarters": getattr(company, 'headquarters', None),
+            "country": getattr(company, 'country', None),
+            "industry": getattr(company, 'industry', None)
         }
         
-        # ENHANCED: Fetch additional data from FMP if requested
+        # UPDATED: Only fetch real-time FMP data if explicitly requested AND database data is incomplete
         if include_fmp_data:
-            try:
-                # Cache key for FMP enriched data
-                cache_key = f"company:detail:fmp:{ticker.upper()}"
-                cached_fmp_data = cache.get(cache_key)
-                
-                if cached_fmp_data:
-                    response["fmp_data"] = cached_fmp_data
-                else:
-                    # Fetch from FMP
-                    fmp_profile = fmp_service.get_company_profile(ticker.upper())
+            # Check if we need to fetch from FMP (database data incomplete)
+            needs_fmp_fetch = (
+                not company.market_cap or 
+                not company.pe_ratio or 
+                not company.website
+            )
+            
+            if needs_fmp_fetch:
+                logger.info(f"[API] Database FMP data incomplete for {ticker}, fetching from FMP API")
+                try:
+                    # Cache key for FMP enriched data
+                    cache_key = f"company:detail:fmp:{ticker.upper()}"
+                    cached_fmp_data = cache.get(cache_key)
                     
-                    if fmp_profile:
-                        # Merge FMP data with database data
-                        response["fmp_data"] = {
-                            "sector": fmp_profile.get("sector"),
-                            "industry": fmp_profile.get("industry"),
-                            "headquarters": fmp_profile.get("headquarters"),
-                            "country": fmp_profile.get("country"),
-                            "employees": fmp_profile.get("employees"),
-                            "market_cap": fmp_profile.get("market_cap"),
-                            "market_cap_formatted": fmp_profile.get("market_cap_formatted"),
-                            "website": fmp_profile.get("website"),
-                            "description": fmp_profile.get("description"),
-                            "ceo": fmp_profile.get("ceo"),
-                            "price": fmp_profile.get("price"),
-                            "beta": fmp_profile.get("beta"),
-                            "volume_avg": fmp_profile.get("volume_avg"),
-                        }
-                        
-                        # Update database with FMP data if it's missing
-                        if not company.sector and fmp_profile.get("sector"):
-                            company.sector = fmp_profile.get("sector")
-                        if not company.industry and fmp_profile.get("industry"):
-                            company.industry = fmp_profile.get("industry")
-                        if not company.headquarters and fmp_profile.get("headquarters"):
-                            company.headquarters = fmp_profile.get("headquarters")
-                        if not company.employees and fmp_profile.get("employees"):
-                            company.employees = fmp_profile.get("employees")
-                        if not company.website and fmp_profile.get("website"):
-                            company.website = fmp_profile.get("website")
-                        
-                        db.commit()
-                        
-                        # Cache for 24 hours
-                        cache.set(cache_key, response["fmp_data"], ttl=86400)
+                    if cached_fmp_data:
+                        response["fmp_data"] = cached_fmp_data
                     else:
-                        logger.warning(f"No FMP data available for {ticker}")
+                        # Fetch from FMP as fallback
+                        fmp_profile = fmp_service.get_company_profile(ticker.upper())
                         
-            except Exception as e:
-                logger.error(f"Error fetching FMP data for {ticker}: {str(e)}")
-                # Continue without FMP data
-        
+                        if fmp_profile:
+                            # Merge FMP data with database data
+                            response["fmp_data"] = {
+                                "sector": fmp_profile.get("sector"),
+                                "industry": fmp_profile.get("industry"),
+                                "headquarters": fmp_profile.get("headquarters"),
+                                "country": fmp_profile.get("country"),
+                                "employees": fmp_profile.get("employees"),
+                                "market_cap": fmp_profile.get("market_cap"),
+                                "market_cap_formatted": fmp_profile.get("market_cap_formatted"),
+                                "website": fmp_profile.get("website"),
+                                "description": fmp_profile.get("description"),
+                                "ceo": fmp_profile.get("ceo"),
+                                "price": fmp_profile.get("price"),
+                                "beta": fmp_profile.get("beta"),
+                                "volume_avg": fmp_profile.get("volume_avg"),
+                            }
+                            
+                            # OPTIMIZATION: Update database with missing FMP data for future use
+                            company.update_fmp_data(fmp_profile)
+                            db.commit()
+                            logger.info(f"[API] Updated database with FMP data for {ticker}")
+                            
+                            # Cache for 24 hours
+                            cache.set(cache_key, response["fmp_data"], ttl=86400)
+                        else:
+                            logger.warning(f"No FMP data available for {ticker}")
+                except Exception as fmp_error:
+                    logger.error(f"[API] FMP API fallback failed for {ticker}: {str(fmp_error)}")
+                    # Continue without FMP data
+            else:
+                logger.info(f"[API] Using complete database FMP data for {ticker}, no API call needed")
+                            
         return response
         
     except HTTPException:
@@ -211,7 +225,8 @@ async def get_company_profile(
 ):
     """
     Get enhanced company profile with FMP data
-    This endpoint always tries to fetch FMP data for the most complete profile
+    OPTIMIZED: Now primarily uses database-stored FMP data instead of real-time API calls
+    This is the CORE OPTIMIZATION from the FMP API optimization project
     """
     try:
         # First get basic company data from database
@@ -222,7 +237,7 @@ async def get_company_profile(
         if not company:
             raise HTTPException(status_code=404, detail="Company not found")
         
-        # Build comprehensive profile
+        # CORE OPTIMIZATION: Build profile primarily from database-stored FMP data
         profile = {
             "ticker": company.ticker,
             "name": company.name,
@@ -230,64 +245,84 @@ async def get_company_profile(
             "is_sp500": company.is_sp500,
             "is_nasdaq100": company.is_nasdaq100,
             "is_public": getattr(company, 'is_public', True),
-            "has_s1_filing": getattr(company, 'has_s1_filing', False)
+            "has_s1_filing": getattr(company, 'has_s1_filing', False),
+            
+            # OPTIMIZED: Use database-stored FMP data (major performance improvement)
+            "sector": getattr(company, 'sector', None) or company.sic_description,
+            "industry": getattr(company, 'industry', None),
+            "headquarters": getattr(company, 'headquarters', None),
+            "country": getattr(company, 'country', 'United States'),
+            "employees": getattr(company, 'employees', None),
+            "market_cap": getattr(company, 'market_cap', None),
+            "market_cap_formatted": getattr(company, 'market_cap_formatted', None),
+            "pe_ratio": getattr(company, 'pe_ratio', None),
+            "pe_ratio_formatted": getattr(company, 'pe_ratio_formatted', None),
+            "website": getattr(company, 'website', None),
+            "exchange": company.exchange,
+            "founded_year": getattr(company, 'founded_year', None),
+            "fiscal_year_end": company.fiscal_year_end,
+            "state": company.state,
         }
         
-        # Try to get FMP data
-        try:
-            fmp_profile = fmp_service.get_company_profile(ticker.upper())
-            if fmp_profile:
-                profile.update({
-                    "sector": fmp_profile.get("sector") or company.sic_description,
-                    "industry": fmp_profile.get("industry") or getattr(company, 'industry', None),
-                    "headquarters": fmp_profile.get("headquarters") or getattr(company, 'headquarters', None),
-                    "country": fmp_profile.get("country") or getattr(company, 'country', 'United States'),
-                    "employees": fmp_profile.get("employees") or getattr(company, 'employees', None),
-                    "market_cap": fmp_profile.get("market_cap") or getattr(company, 'market_cap', None),
-                    "market_cap_formatted": fmp_profile.get("market_cap_formatted"),
-                    "exchange": company.exchange,
-                    "website": fmp_profile.get("website") or getattr(company, 'website', None),
-                    "description": fmp_profile.get("description"),
-                    "ceo": fmp_profile.get("ceo"),
-                    "founded_year": getattr(company, 'founded_year', None),
-                    "fiscal_year_end": company.fiscal_year_end,
-                    "state": company.state,
-                    "price": fmp_profile.get("price"),
-                    "beta": fmp_profile.get("beta"),
-                    "volume_avg": fmp_profile.get("volume_avg"),
-                })
-                
-                # Also get key metrics if available
-                key_metrics = fmp_service.get_company_key_metrics(ticker.upper())
-                if key_metrics:
-                    profile["key_metrics"] = key_metrics
+        # FALLBACK: Only call FMP API if critical database data is missing
+        has_critical_data = company.market_cap or company.pe_ratio or company.website
+        
+        if not has_critical_data:
+            logger.info(f"[API] Critical data missing for {ticker}, falling back to FMP API")
+            try:
+                # Fetch from FMP as fallback only
+                fmp_profile = fmp_service.get_company_profile(ticker.upper())
+                if fmp_profile:
+                    # Update profile with FMP data
+                    profile.update({
+                        "sector": fmp_profile.get("sector") or profile["sector"],
+                        "industry": fmp_profile.get("industry") or profile["industry"],
+                        "headquarters": fmp_profile.get("headquarters") or profile["headquarters"],
+                        "country": fmp_profile.get("country") or profile["country"],
+                        "employees": fmp_profile.get("employees") or profile["employees"],
+                        "market_cap": fmp_profile.get("market_cap") or profile["market_cap"],
+                        "market_cap_formatted": fmp_profile.get("market_cap_formatted"),
+                        "website": fmp_profile.get("website") or profile["website"],
+                        "description": fmp_profile.get("description"),
+                        "ceo": fmp_profile.get("ceo"),
+                        "price": fmp_profile.get("price"),
+                        "beta": fmp_profile.get("beta"),
+                        "volume_avg": fmp_profile.get("volume_avg"),
+                    })
                     
-            else:
-                # Fallback to database data only
-                profile.update({
-                    "sector": company.sic_description,
-                    "industry": getattr(company, 'industry', None),
-                    "headquarters": getattr(company, 'headquarters', None),
-                    "country": getattr(company, 'country', 'United States'),
-                    "employees": getattr(company, 'employees', None),
-                    "market_cap": getattr(company, 'market_cap', None),
-                    "exchange": company.exchange,
-                    "website": getattr(company, 'website', None),
-                    "founded_year": getattr(company, 'founded_year', None),
-                    "fiscal_year_end": company.fiscal_year_end,
-                    "state": company.state,
-                })
-                
-        except Exception as e:
-            logger.error(f"Error fetching FMP data for {ticker}: {str(e)}")
-            # Continue with database data only
-            profile.update({
-                "sector": company.sic_description,
-                "industry": getattr(company, 'industry', None),
-                "exchange": company.exchange,
-                "fiscal_year_end": company.fiscal_year_end,
-                "state": company.state,
-            })
+                    # OPTIMIZATION: Update database for future use
+                    company.update_fmp_data(fmp_profile)
+                    db.commit()
+                    logger.info(f"[API] Updated database with fallback FMP data for {ticker}")
+                    
+                    # Also get key metrics if available
+                    try:
+                        key_metrics = fmp_service.get_company_key_metrics(ticker.upper())
+                        if key_metrics:
+                            profile["key_metrics"] = key_metrics
+                            # Update PE ratio if we got it from key metrics
+                            if key_metrics.get('pe_ratio') and not company.pe_ratio:
+                                company.pe_ratio = key_metrics['pe_ratio']
+                                db.commit()
+                    except Exception as metrics_error:
+                        logger.warning(f"[API] Could not fetch key metrics for {ticker}: {str(metrics_error)}")
+                        
+            except Exception as fmp_error:
+                logger.error(f"[API] FMP API fallback failed for {ticker}: {str(fmp_error)}")
+                # Continue without FMP data
+        else:
+            logger.info(f"[API] Using database-stored FMP data for {ticker} (OPTIMIZATION SUCCESS)")
+            
+            # For completeness, try to get key metrics from cache or quick call
+            # This is a lighter call and provides additional context
+            try:
+                cache_key = f"fmp:key_metrics:{ticker.upper()}"
+                cached_metrics = cache.get(cache_key)
+                if cached_metrics:
+                    import json
+                    profile["key_metrics"] = json.loads(cached_metrics)
+            except Exception as cache_error:
+                logger.warning(f"[API] Could not load cached metrics for {ticker}: {str(cache_error)}")
         
         # Remove None values for cleaner response
         profile = {k: v for k, v in profile.items() if v is not None}

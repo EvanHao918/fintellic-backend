@@ -3,6 +3,7 @@
 Company model - Represents companies tracked in the system
 ENHANCED: Added IPO support, better categorization, and more company metadata
 FIXED: Added update_filings_ticker method to fix edgar_scanner error
+UPDATED: Added pe_ratio field for FMP API optimization project
 """
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float
 from sqlalchemy.sql import func
@@ -47,10 +48,11 @@ class Company(Base):
     
     # Financial metrics (可选，用于成熟公司)
     market_cap = Column(Float)  # 市值（百万美元）
+    pe_ratio = Column(Float)  # 新增：PE比率 - FMP API优化项目
     
     # Contact
     business_phone = Column(String(50))
-    website = Column(String(255))  # 新增：公司网站
+    website = Column(String(255))  # 新增：公司网站 - 根据调查报告，数据库中已存在此字段
     
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
@@ -134,6 +136,31 @@ class Company(Base):
         else:
             return "Enterprise (10K+)"
     
+    # 新增：格式化PE比率显示
+    @property
+    def pe_ratio_formatted(self):
+        """Format PE ratio for display"""
+        if self.pe_ratio is None:
+            return "N/A"
+        elif self.pe_ratio < 0:
+            return "N/A"  # 负PE通常不显示
+        else:
+            return f"{self.pe_ratio:.1f}"
+    
+    # 新增：格式化市值显示
+    @property
+    def market_cap_formatted(self):
+        """Format market cap for display"""
+        if not self.market_cap:
+            return "N/A"
+            
+        if self.market_cap >= 1e6:  # 万亿美元
+            return f"${self.market_cap / 1e6:.2f}T"
+        elif self.market_cap >= 1e3:  # 十亿美元
+            return f"${self.market_cap / 1e3:.2f}B"
+        else:  # 百万美元
+            return f"${self.market_cap:.0f}M"
+    
     def update_indices(self):
         """Update indices field based on boolean flags"""
         indices = []
@@ -170,6 +197,46 @@ class Company(Base):
                 filing.ticker = self.ticker
             
             # Note: Don't commit here, let the caller handle transaction
+    
+    # 新增：更新FMP数据的方法
+    def update_fmp_data(self, fmp_data: dict):
+        """
+        Update company with FMP API data
+        新增方法：用于在AI处理时更新FMP数据
+        
+        Args:
+            fmp_data: Dictionary containing FMP API response data
+        """
+        if not fmp_data:
+            return
+        
+        # 更新市值（FMP返回的是总市值，转换为百万美元）
+        if fmp_data.get('market_cap'):
+            self.market_cap = fmp_data['market_cap'] / 1e6  # 转换为百万美元
+        
+        # 更新PE比率
+        if fmp_data.get('pe_ratio') and fmp_data['pe_ratio'] > 0:
+            self.pe_ratio = fmp_data['pe_ratio']
+        
+        # 更新网站
+        if fmp_data.get('website'):
+            self.website = fmp_data['website']
+        
+        # 更新其他可能的字段
+        if fmp_data.get('sector') and not self.sector:
+            self.sector = fmp_data['sector']
+        
+        if fmp_data.get('industry') and not self.industry:
+            self.industry = fmp_data['industry']
+        
+        if fmp_data.get('employees') and not self.employees:
+            self.employees = fmp_data['employees']
+        
+        if fmp_data.get('headquarters') and not self.headquarters:
+            self.headquarters = fmp_data['headquarters']
+        
+        if fmp_data.get('country') and not self.country:
+            self.country = fmp_data['country']
     # ================================================================
     
     def to_dict_basic(self):
@@ -199,6 +266,9 @@ class Company(Base):
             "employees": self.employees,
             "employee_size": self.employee_size_category,
             "market_cap": self.market_cap,
+            "market_cap_formatted": self.market_cap_formatted,  # 新增
+            "pe_ratio": self.pe_ratio,  # 新增
+            "pe_ratio_formatted": self.pe_ratio_formatted,  # 新增
             "exchange": self.exchange,
             "is_sp500": self.is_sp500,
             "is_nasdaq100": self.is_nasdaq100,

@@ -1,16 +1,20 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session, scoped_session
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import QueuePool
 from app.core.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Create engine
+# Create engine with proper connection pooling
 engine = create_engine(
     settings.DATABASE_URL,
-    poolclass=NullPool,  # Disable connection pooling for development
-    echo=False,  # Set to True to see SQL queries in console
+    pool_size=5,              # 基本连接池大小
+    max_overflow=10,          # 最大溢出连接数  
+    pool_recycle=3600,        # 1小时回收连接
+    pool_pre_ping=True,       # 连接前检查有效性
+    poolclass=QueuePool,      # 明确指定连接池类型
+    echo=False,               # 设置为True可查看SQL查询
 )
 
 # Create session factory

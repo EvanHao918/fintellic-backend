@@ -158,6 +158,30 @@ class FilingCache:
     def invalidate_filing_list():
         """Invalidate all filing list caches"""
         return cache.delete_pattern("filings:list:*")
+    
+    @staticmethod
+    def invalidate_filing_caches(filing_id: int, company_id: int = None):
+        """
+        NEW: Invalidate all caches related to a specific filing
+        Call this when a new filing is processed
+        """
+        deleted_count = 0
+        
+        # Clear filing list caches (most important)
+        deleted_count += cache.delete_pattern("filings:list:*")
+        
+        # Clear filing detail cache
+        deleted_count += cache.delete(f"filings:detail:{filing_id}")
+        
+        # Clear company-related caches if company_id provided
+        if company_id:
+            deleted_count += cache.delete_pattern(f"companies:detail:{company_id}")
+        
+        # Clear popular filings caches
+        deleted_count += cache.delete_pattern("stats:popular:*")
+        
+        logger.info(f"Invalidated {deleted_count} cache keys for filing {filing_id}")
+        return deleted_count
 
 
 class CompanyCache:

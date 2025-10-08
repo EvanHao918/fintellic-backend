@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, validator
 
 
 # Token schemas
@@ -8,7 +8,7 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    user_info: Optional[Dict[str, Any]] = None  # 添加用户信息
+    user_info: Optional[Dict[str, Any]] = None
 
 
 class TokenData(BaseModel):
@@ -30,11 +30,22 @@ class RegisterRequest(BaseModel):
     password: str = Field(..., min_length=8, max_length=100)
     full_name: Optional[str] = None
     username: Optional[str] = None
-    promo_code: Optional[str] = None  # 优惠码
-    referral_code: Optional[str] = None  # 推荐码
+    promo_code: Optional[str] = None
+    referral_code: Optional[str] = None
     device_id: Optional[str] = None
     device_type: Optional[str] = None  # ios, android, web
     registration_source: Optional[str] = None  # email, apple, google, linkedin
+    
+    @validator('password')
+    def validate_password_strength(cls, v):
+        """确保密码符合安全要求"""
+        if not any(char.isdigit() for char in v):
+            raise ValueError('Password must contain at least one digit')
+        if not any(char.isupper() for char in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(char.islower() for char in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        return v
 
 
 class RegisterResponse(BaseModel):
@@ -58,60 +69,40 @@ class RegisterResponse(BaseModel):
         from_attributes = True
 
 
-# Social authentication schemas
-class AppleSignInRequest(BaseModel):
-    identity_token: str
-    authorization_code: str
-    user_id: str  # Apple user identifier
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    device_id: Optional[str] = None
+# ==================== PASSWORD RESET SCHEMAS ====================
+class PasswordResetRequest(BaseModel):
+    """请求密码重置"""
+    email: EmailStr
 
 
-class GoogleSignInRequest(BaseModel):
-    id_token: str
-    user_id: str  # Google user ID
-    email: str
-    full_name: Optional[str] = None
-    photo_url: Optional[str] = None
-    device_id: Optional[str] = None
+class PasswordResetConfirm(BaseModel):
+    """确认密码重置"""
+    token: str = Field(..., min_length=1, max_length=255)
+    new_password: str = Field(..., min_length=8, max_length=100)
+    
+    @validator('new_password')
+    def validate_password_strength(cls, v):
+        """确保新密码符合安全要求"""
+        if not any(char.isdigit() for char in v):
+            raise ValueError('Password must contain at least one digit')
+        if not any(char.isupper() for char in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(char.islower() for char in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        return v
 
 
-class LinkedInSignInRequest(BaseModel):
-    access_token: str
-    user_id: str
-    email: str
-    full_name: Optional[str] = None
-    profile_url: Optional[str] = None
-    device_id: Optional[str] = None
-
-
-# Biometric authentication
-class BiometricAuthRequest(BaseModel):
-    refresh_token: str
-    biometric_type: str  # face_id, touch_id, fingerprint
-    device_id: str
-    device_model: Optional[str] = None
+class PasswordResetResponse(BaseModel):
+    """密码重置响应"""
+    message: str
+    success: bool = False
+    can_retry_after: Optional[datetime] = None
+# ================================================================
 
 
 # Refresh token
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
-
-
-# Password reset schemas
-class PasswordResetRequest(BaseModel):
-    email: EmailStr
-
-
-class PasswordResetConfirm(BaseModel):
-    token: str
-    new_password: str = Field(..., min_length=8, max_length=100)
-
-
-# Email verification
-class EmailVerificationRequest(BaseModel):
-    token: str
 
 
 # Device management
@@ -134,3 +125,60 @@ class DeviceRegisterRequest(BaseModel):
 class DeviceListResponse(BaseModel):
     devices: list[DeviceInfo]
     current_device_id: Optional[str] = None
+
+
+# ==================== ENHANCED ERROR RESPONSES ====================
+class AuthErrorResponse(BaseModel):
+    """标准化的认证错误响应"""
+    error: str
+    message: str
+    error_code: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+
+
+class ValidationErrorDetail(BaseModel):
+    """验证错误详情"""
+    field: str
+    message: str
+    error_type: str
+
+
+class ValidationErrorResponse(BaseModel):
+    """验证错误响应"""
+    error: str = "validation_error"
+    message: str = "Validation failed"
+    details: list[ValidationErrorDetail]
+# ================================================================
+
+
+# ==================== ACCOUNT SECURITY SCHEMAS ====================
+class SecurityInfoResponse(BaseModel):
+    """账户安全信息响应"""
+    email_verified: bool
+    has_password: bool
+    social_providers: list[str]  # ["apple", "google", "linkedin"]
+    biometric_enabled: bool
+    two_factor_enabled: bool = False
+    last_login_at: Optional[datetime] = None
+    login_attempts_today: int = 0
+    is_account_locked: bool = False
+
+
+class ChangePasswordRequest(BaseModel):
+    """修改密码请求（已登录用户）"""
+    current_password: str
+    new_password: str = Field(..., min_length=8, max_length=100)
+    
+    @validator('new_password')
+    def validate_new_password(cls, v, values):
+        """验证新密码"""
+        if 'current_password' in values and v == values['current_password']:
+            raise ValueError('New password must be different from current password')
+        if not any(char.isdigit() for char in v):
+            raise ValueError('Password must contain at least one digit')
+        if not any(char.isupper() for char in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(char.islower() for char in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        return v
+# ================================================================

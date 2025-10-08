@@ -32,6 +32,20 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=True)  # Nullable for social auth
     
+    # ==================== EMAIL VERIFICATION FIELDS ====================
+    # 邮箱验证相关字段
+    is_verified = Column(Boolean, default=False, nullable=False)  # 邮箱是否已验证
+    email_verification_token = Column(String(255), nullable=True, index=True)  # 验证令牌
+    email_verification_sent_at = Column(DateTime(timezone=True), nullable=True)  # 验证邮件发送时间
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)  # 邮箱验证完成时间
+    
+    # 密码重置相关字段
+    password_reset_token = Column(String(255), nullable=True, index=True)  # 密码重置令牌
+    password_reset_sent_at = Column(DateTime(timezone=True), nullable=True)  # 重置邮件发送时间
+    password_reset_attempts = Column(Integer, default=0)  # 密码重置尝试次数
+    password_reset_locked_until = Column(DateTime(timezone=True), nullable=True)  # 重置锁定到期时间
+    # ================================================================
+    
     # User information
     full_name = Column(String(255))
     username = Column(String(50), unique=True, index=True)
@@ -85,7 +99,6 @@ class User(Base):
     
     # Account status
     is_active = Column(Boolean, default=True, nullable=False)
-    is_verified = Column(Boolean, default=False, nullable=False)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -188,3 +201,74 @@ class User(Base):
             return [t.get('token') for t in tokens if t.get('token')]
         except:
             return []
+    
+    # ==================== EMAIL VERIFICATION METHODS ====================
+    
+    def is_email_verification_token_valid(self) -> bool:
+        """检查邮箱验证令牌是否有效（未过期）"""
+        if not self.email_verification_token or not self.email_verification_sent_at:
+            return False
+        
+        from datetime import datetime, timezone, timedelta
+        from app.core.config import settings
+        
+        expiry_time = self.email_verification_sent_at + timedelta(hours=settings.EMAIL_VERIFICATION_EXPIRE_HOURS)
+        return datetime.now(timezone.utc) < expiry_time
+    
+    def is_password_reset_token_valid(self) -> bool:
+        """检查密码重置令牌是否有效（未过期）"""
+        if not self.password_reset_token or not self.password_reset_sent_at:
+            return False
+        
+        from datetime import datetime, timezone, timedelta
+        from app.core.config import settings
+        
+        expiry_time = self.password_reset_sent_at + timedelta(hours=settings.PASSWORD_RESET_EXPIRE_HOURS)
+        return datetime.now(timezone.utc) < expiry_time
+    
+    def is_password_reset_locked(self) -> bool:
+        """检查密码重置是否被锁定（防止暴力破解）"""
+        if not self.password_reset_locked_until:
+            return False
+        
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc) < self.password_reset_locked_until
+    
+    def can_request_password_reset(self) -> bool:
+        """检查是否可以请求密码重置（考虑频率限制）"""
+        if self.is_password_reset_locked():
+            return False
+        
+        # 检查是否在短时间内多次请求
+        if self.password_reset_sent_at:
+            from datetime import datetime, timezone, timedelta
+            
+            # 10分钟内只能请求一次
+            min_interval = timedelta(minutes=10)
+            if datetime.now(timezone.utc) - self.password_reset_sent_at < min_interval:
+                return False
+        
+        return True
+    
+    def increment_password_reset_attempts(self):
+        """增加密码重置尝试次数，如果超过限制则锁定"""
+        self.password_reset_attempts = (self.password_reset_attempts or 0) + 1
+        
+        # 如果尝试次数超过5次，锁定1小时
+        if self.password_reset_attempts >= 5:
+            from datetime import datetime, timezone, timedelta
+            self.password_reset_locked_until = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    def clear_email_verification_data(self):
+        """清除邮箱验证相关数据"""
+        self.email_verification_token = None
+        self.email_verification_sent_at = None
+    
+    def clear_password_reset_data(self):
+        """清除密码重置相关数据"""
+        self.password_reset_token = None
+        self.password_reset_sent_at = None
+        self.password_reset_attempts = 0
+        self.password_reset_locked_until = None
+    
+    # ================================================================

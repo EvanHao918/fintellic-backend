@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     
     # API
     API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "Fintellic"
+    PROJECT_NAME: str = "HermeSpeed"
     
     # Database
     DATABASE_URL: str
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 days (修改: 从7天改为30天)
     
     # OpenAI
     OPENAI_API_KEY: str
@@ -36,115 +36,119 @@ class Settings(BaseSettings):
     # Limits
     FREE_USER_DAILY_LIMIT: int = 3
     
-    # ==================== SUBSCRIPTION SETTINGS ====================
-    # Pricing Configuration
-    EARLY_BIRD_LIMIT: int = 10000  # 前10,000名用户享受早鸟价
-    EARLY_BIRD_MONTHLY_PRICE: float = 39.00  # 早鸟月付价格
-    EARLY_BIRD_YEARLY_PRICE: float = 280.80  # 早鸟年付价格 (39 * 12 * 0.6)
-    STANDARD_MONTHLY_PRICE: float = 49.00  # 标准月付价格
-    STANDARD_YEARLY_PRICE: float = 352.80  # 标准年付价格 (49 * 12 * 0.6)
-    YEARLY_DISCOUNT: float = 0.6  # 年付折扣 (60% of yearly)
+    # ==================== SIMPLIFIED SUBSCRIPTION SETTINGS ====================
+    # Simplified pricing configuration - only two price sets, controlled by switch
     
-    # Payment Configuration
-    STRIPE_API_KEY: Optional[str] = None
-    STRIPE_WEBHOOK_SECRET: Optional[str] = None
-    STRIPE_PUBLISHABLE_KEY: Optional[str] = None
+    # Price control switch - you can control which price to display via environment variable
+    USE_DISCOUNTED_PRICING: bool = True  # True=show discounted price, False=show original price
+    
+    # Discounted prices
+    DISCOUNTED_MONTHLY_PRICE: float = 39.00  # Discounted monthly price
+    DISCOUNTED_YEARLY_PRICE: float = 280.80  # Discounted yearly price (39 * 12 * 0.6)
+    
+    # Standard prices
+    STANDARD_MONTHLY_PRICE: float = 49.00  # Standard monthly price
+    STANDARD_YEARLY_PRICE: float = 352.80  # Standard yearly price (49 * 12 * 0.6)
+    
+    # Yearly discount
+    YEARLY_DISCOUNT: float = 0.6  # Yearly discount (60% of yearly)
     
     # ==================== APPLE IN-APP PURCHASE ====================
-    # Apple IAP Basic Configuration
+    # Apple IAP Production Configuration
     APPLE_SHARED_SECRET: Optional[str] = None
-    APPLE_SANDBOX: bool = True  # Use sandbox for development
-    APPLE_BUNDLE_ID: Optional[str] = None  # com.fintellic.app
-    APPLE_USE_SANDBOX: bool = True  # Use sandbox environment
+    APPLE_BUNDLE_ID: str = "com.hermespeed.app"
+    APPLE_USE_SANDBOX: bool = True  # Auto-detect based on environment
     
     # Apple IAP URLs
     APPLE_VERIFY_RECEIPT_URL: str = "https://buy.itunes.apple.com/verifyReceipt"
     APPLE_SANDBOX_VERIFY_URL: str = "https://sandbox.itunes.apple.com/verifyReceipt"
     
-    # Apple Product IDs
-    APPLE_MONTHLY_PRODUCT_ID: Optional[str] = None  # com.fintellic.app.monthly
-    APPLE_YEARLY_PRODUCT_ID: Optional[str] = None  # com.fintellic.app.yearly
+    # Apple Product IDs - Real production IDs
+    APPLE_MONTHLY_PRODUCT_ID: str = "com.hermespeed.app.monthly"
+    APPLE_YEARLY_PRODUCT_ID: str = "com.hermespeed.app.yearly"
+    
+    # Apple StoreKit 2 Configuration (optional for advanced features)
+    APPLE_ISSUER_ID: Optional[str] = None
+    APPLE_KEY_ID: Optional[str] = None
+    APPLE_PRIVATE_KEY: Optional[str] = None
     
     # ==================== GOOGLE PLAY BILLING ====================
-    # Google Play Basic Configuration
-    GOOGLE_PLAY_SERVICE_ACCOUNT_KEY: Optional[str] = None
-    GOOGLE_PLAY_PACKAGE_NAME: Optional[str] = None
-    GOOGLE_PACKAGE_NAME: Optional[str] = None  # Alias for GOOGLE_PLAY_PACKAGE_NAME
+    # Google Play Production Configuration
+    GOOGLE_PACKAGE_NAME: str = "com.hermespeed.app"
     
-    # Google Service Account
+    # Google Service Account Configuration
     GOOGLE_SERVICE_ACCOUNT_KEY_PATH: Optional[str] = None
-    GOOGLE_SERVICE_ACCOUNT_KEY_BASE64: Optional[str] = None  # Alternative: base64 encoded
+    GOOGLE_SERVICE_ACCOUNT_KEY_BASE64: Optional[str] = None
+    GOOGLE_SERVICE_ACCOUNT_KEY_JSON: Optional[str] = None
     
-    # Google Product IDs
-    GOOGLE_MONTHLY_PRODUCT_ID: Optional[str] = None  # monthly_subscription
-    GOOGLE_YEARLY_PRODUCT_ID: Optional[str] = None  # yearly_subscription
+    # Google Product IDs - Real production IDs
+    GOOGLE_MONTHLY_PRODUCT_ID: str = "hermespeed_pro_monthly"
+    GOOGLE_YEARLY_PRODUCT_ID: str = "hermespeed_pro_yearly"
     
     # ==================== WEBHOOK CONFIGURATION ====================
-    # Webhook URLs
-    WEBHOOK_BASE_URL: Optional[str] = None  # https://api.fintellic.com
-    APPLE_WEBHOOK_PATH: str = "/api/webhooks/apple"
-    GOOGLE_WEBHOOK_PATH: str = "/api/webhooks/google"
+    # Production Webhook URLs
+    WEBHOOK_BASE_URL: Optional[str] = None  # https://api.hermespeed.com
+    APPLE_WEBHOOK_PATH: str = "/api/v1/subscriptions/webhook/apple"
+    GOOGLE_WEBHOOK_PATH: str = "/api/v1/subscriptions/webhook/google"
     
-    # ==================== FIREBASE PUSH NOTIFICATIONS (PHASE 4) ====================
-    # Firebase Configuration
-    FIREBASE_ENABLED: bool = True  # 启用推送通知
-    FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = None  # Firebase服务账号JSON字符串
-    FIREBASE_SERVICE_ACCOUNT_PATH: Optional[str] = None  # 或者使用文件路径
-    
-    # FCM Settings
-    FCM_SERVER_KEY: Optional[str] = None  # FCM服务器密钥（旧版，可选）
-    FCM_SENDER_ID: Optional[str] = None  # FCM发送者ID
-    
-    # Notification Settings
-    NOTIFICATION_BATCH_SIZE: int = 500  # 批量发送通知的大小
-    NOTIFICATION_RATE_LIMIT: int = 100  # 每秒发送通知数量限制
-    NOTIFICATION_RETRY_ATTEMPTS: int = 3  # 失败重试次数
-    NOTIFICATION_RETRY_DELAY: int = 5  # 重试延迟（秒）
-    
-    # Notification Content Defaults
-    NOTIFICATION_DEFAULT_ICON: str = "ic_notification"  # Android通知图标
-    NOTIFICATION_DEFAULT_COLOR: str = "#E88B00"  # 品牌色（橙色）
-    NOTIFICATION_DEFAULT_SOUND: str = "default"  # 通知声音
-    
-    # Notification Features
-    ENABLE_FILING_NOTIFICATIONS: bool = True  # 财报发布通知
-    ENABLE_DAILY_RESET_NOTIFICATIONS: bool = True  # 每日重置通知
-    ENABLE_SUBSCRIPTION_NOTIFICATIONS: bool = True  # 订阅相关通知
-    ENABLE_MARKET_SUMMARY_NOTIFICATIONS: bool = False  # 市场汇总通知（暂未实现）
-    
-    # Daily Reset Time (EST)
-    DAILY_RESET_HOUR: int = 0  # EST时区的重置时间（0点）
-    DAILY_RESET_MINUTE: int = 0
-    
-    # Test Mode
-    ENABLE_TEST_NOTIFICATIONS: bool = True  # 允许发送测试通知
-    TEST_NOTIFICATION_USER_IDS: List[int] = []  # 允许接收测试通知的用户ID列表
-    # ================================================================
-    
-    # ==================== SUBSCRIPTION FEATURES ====================
-    # Subscription Features
+    # ==================== PAYMENT FEATURES ====================
+    # Payment Features Control
     ENABLE_SUBSCRIPTION: bool = True
-    ENABLE_TRIAL_PERIOD: bool = False  # 暂不启用试用期
+    ENABLE_TRIAL_PERIOD: bool = False
     TRIAL_PERIOD_DAYS: int = 7
-    GRACE_PERIOD_DAYS: int = 3  # 支付失败后的宽限期
+    GRACE_PERIOD_DAYS: int = 3
     
-    # Subscription Notifications
-    SUBSCRIPTION_EXPIRY_REMINDER_DAYS: List[int] = [7, 3, 1]  # 到期前提醒天数
-    ENABLE_SUBSCRIPTION_EMAILS: bool = True
+    # Mock Payment Settings - PRODUCTION SAFE
+    @property
+    def ENABLE_MOCK_PAYMENTS(self) -> bool:
+        """Enable mock payments ONLY in development environment"""
+        return self.ENVIRONMENT == "development"
     
-    # Early Bird Marketing
-    SHOW_EARLY_BIRD_COUNTDOWN: bool = True  # 显示早鸟倒计时
-    EARLY_BIRD_MARKETING_MESSAGE: str = "🔥 Limited Early Bird Offer: Only {slots} spots left!"
+    # ==================== EMAIL CONFIGURATION ====================
+    # Email service configuration
+    ENABLE_PASSWORD_RESET: bool = True
     
-    # ==================== EMAIL NOTIFICATIONS (OPTIONAL) ====================
-    # SMTP Configuration (for future use)
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: Optional[int] = None
+    # SMTP Configuration
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
-    NOTIFICATION_EMAIL: Optional[str] = None
-    # ================================================================
+    SMTP_USE_TLS: bool = True
     
+    # Email settings
+    EMAIL_FROM_NAME: str = "HermeSpeed"
+    EMAIL_FROM_ADDRESS: Optional[str] = None
+    PASSWORD_RESET_EXPIRE_HOURS: int = 1
+    
+    # Frontend URL for email links
+    FRONTEND_URL: str = "http://localhost:19006"
+    
+    # ==================== NOTIFICATION CONFIGURATION ====================
+    # Push Notifications
+    FIREBASE_ENABLED: bool = True
+    FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = None
+    FIREBASE_SERVICE_ACCOUNT_PATH: Optional[str] = None
+    
+    # FCM Settings
+    FCM_SERVER_KEY: Optional[str] = None
+    FCM_SENDER_ID: Optional[str] = None
+    
+    # Notification Settings
+    NOTIFICATION_BATCH_SIZE: int = 500
+    NOTIFICATION_RATE_LIMIT: int = 100
+    NOTIFICATION_RETRY_ATTEMPTS: int = 3
+    NOTIFICATION_RETRY_DELAY: int = 5
+    
+    # Notification Features
+    ENABLE_FILING_NOTIFICATIONS: bool = True
+    ENABLE_DAILY_RESET_NOTIFICATIONS: bool = True
+    ENABLE_SUBSCRIPTION_NOTIFICATIONS: bool = True
+    
+    # Daily Reset Time (EST)
+    DAILY_RESET_HOUR: int = 0
+    DAILY_RESET_MINUTE: int = 0
+    
+    # ==================== PROCESSING SETTINGS ====================
     # Scheduler settings
     SCHEDULER_INTERVAL_MINUTES: int = 1
     FILING_LOOKBACK_MINUTES: int = 2
@@ -155,11 +159,10 @@ class Settings(BaseSettings):
     AI_MODEL: str = "gpt-4o-mini"
     AI_MAX_TOKENS: int = 16000
     
-    # ==================== NEW AI OPTIMIZATION SETTINGS ====================
     # AI Generation Parameters
-    AI_TEMPERATURE: float = 0.3  # 降低temperature以获得更稳定的输出
-    AI_UNIFIED_ANALYSIS_MAX_TOKENS: int = 2000  # 统一分析的最大token数
-    AI_FEED_SUMMARY_MAX_TOKENS: int = 50  # Feed摘要的最大token数
+    AI_TEMPERATURE: float = 0.3
+    AI_UNIFIED_ANALYSIS_MAX_TOKENS: int = 2000
+    AI_FEED_SUMMARY_MAX_TOKENS: int = 50
     
     # Content Generation Settings
     UNIFIED_ANALYSIS_MIN_WORDS: int = 800
@@ -168,14 +171,12 @@ class Settings(BaseSettings):
     
     # Smart Markup Settings
     ENABLE_SMART_MARKUP: bool = True
-    MAX_MARKUP_DENSITY: float = 0.15  # 最多15%的文本被标记
+    MAX_MARKUP_DENSITY: float = 0.15
     MARKUP_TYPES: List[str] = ["number", "concept", "positive", "negative", "insight"]
     
-    # ==================== ENHANCED ACCURACY SETTINGS ====================
-    # Enhanced text extraction and AI processing for better financial data accuracy
-    ENHANCED_EXTRACTION_ENABLED: bool = True    # 启用增强文本提取（Markdown表格）
-    ENHANCED_DATA_MARKING: bool = True          # 启用严格数据标记验证
-    # ================================================================
+    # Enhanced text extraction and AI processing
+    ENHANCED_EXTRACTION_ENABLED: bool = True
+    ENHANCED_DATA_MARKING: bool = True
     
     # ==================== FMP API CONFIGURATION ====================
     # Financial Modeling Prep API
@@ -183,18 +184,15 @@ class Settings(BaseSettings):
     FMP_API_VERSION: str = "v3"
     FMP_BASE_URL: str = "https://financialmodelingprep.com/api"
     FMP_ENABLE: bool = True
-    FMP_CACHE_TTL: int = 3600  # 1 hour cache
+    FMP_CACHE_TTL: int = 3600
     
-    # Analyst Expectations API (now using FMP)
-    ENABLE_EXPECTATIONS_COMPARISON: bool = True  # Re-enabled with FMP
-    EXPECTATIONS_CACHE_TTL: int = 86400  # 24 hours
-    # ================================================================
+    # Analyst Expectations API
+    ENABLE_EXPECTATIONS_COMPARISON: bool = True
+    EXPECTATIONS_CACHE_TTL: int = 86400
     
     # Performance Optimization
-    ENABLE_UNIFIED_PROCESSING: bool = True  # 启用统一处理模式
-    LEGACY_PROCESSING_FALLBACK: bool = True  # 保持向后兼容
-    
-    # ========================================================================
+    ENABLE_UNIFIED_PROCESSING: bool = True
+    LEGACY_PROCESSING_FALLBACK: bool = True
     
     # Feature flags
     ENABLE_IPO_SCANNING: bool = True
@@ -203,17 +201,229 @@ class Settings(BaseSettings):
     
     # Logging settings
     LOG_LEVEL: str = "INFO"
-    LOG_FILE_PATH: str = "logs/fintellic.log"
+    LOG_FILE_PATH: str = "logs/hermespeed.log"
     LOG_MAX_SIZE_MB: int = 100
     LOG_BACKUP_COUNT: int = 5
     
     # API settings
     API_RATE_LIMIT_PER_MINUTE: int = 60
-    API_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    
+    # ==================== ENVIRONMENT-SPECIFIC CONFIGURATIONS ====================
+    
+    @property
+    def API_CORS_ORIGINS(self) -> List[str]:
+        """Dynamic CORS configuration based on environment"""
+        if self.ENVIRONMENT == "development":
+            return [
+                "http://localhost:3000",
+                "http://localhost:8000", 
+                "http://localhost:8080",
+                "http://localhost:8081",
+                "http://localhost:19006",  # Expo web
+                "exp://192.168.1.100:19000",  # Expo development
+                "exp://192.168.1.101:19000",
+            ]
+        elif self.ENVIRONMENT == "staging":
+            return [
+                "https://staging.hermespeed.com",
+                "https://hermespeed-staging.vercel.app",
+                "exp://staging-exp.hermespeed.com",
+            ]
+        elif self.ENVIRONMENT == "production":
+            return [
+                "https://hermespeed.com",
+                "https://www.hermespeed.com", 
+                "https://hermespeed.vercel.app",
+                "https://app.hermespeed.com",
+            ]
+        else:
+            return []
+    
+    @property 
+    def ALLOW_MOCK_ENDPOINTS(self) -> bool:
+        """Allow Mock endpoints only in development and staging"""
+        return self.ENVIRONMENT in ["development", "staging"]
+    
+    @property
+    def APPLE_USE_SANDBOX_AUTO(self) -> bool:
+        """Auto-detect sandbox based on environment"""
+        return self.ENVIRONMENT in ["development", "staging"]
+    
+    # ==================== PRODUCTION SAFETY ENHANCEMENTS ====================
+    
+    @property
+    def is_production_ready(self) -> bool:
+        """Check if configuration is production ready"""
+        if not self.is_production:
+            return True  # Development is always ready
+        
+        # Production checks
+        missing_configs = []
+        
+        if not self.APPLE_SHARED_SECRET:
+            missing_configs.append("APPLE_SHARED_SECRET")
+        
+        if not any([
+            self.GOOGLE_SERVICE_ACCOUNT_KEY_PATH,
+            self.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64,
+            self.GOOGLE_SERVICE_ACCOUNT_KEY_JSON
+        ]):
+            missing_configs.append("GOOGLE_SERVICE_ACCOUNT_KEY")
+        
+        if not self.WEBHOOK_BASE_URL:
+            missing_configs.append("WEBHOOK_BASE_URL")
+        
+        if missing_configs:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Production environment missing configurations: {missing_configs}")
+            return False
+        
+        return True
+    
+    @property
+    def security_level(self) -> str:
+        """Get current security level"""
+        if self.is_production:
+            return "HIGH" if self.is_production_ready else "MEDIUM"
+        elif self.ENVIRONMENT == "staging":
+            return "MEDIUM"
+        else:
+            return "LOW"
+    
+    @property
+    def payment_verification_required(self) -> bool:
+        """Whether payment verification is required"""
+        return not self.ENABLE_MOCK_PAYMENTS
+    
+    # ==================== HELPER METHODS ====================
+    
+    @property
+    def current_monthly_price(self) -> float:
+        """Get current effective monthly price"""
+        return self.DISCOUNTED_MONTHLY_PRICE if self.USE_DISCOUNTED_PRICING else self.STANDARD_MONTHLY_PRICE
+    
+    @property
+    def current_yearly_price(self) -> float:
+        """Get current effective yearly price"""
+        return self.DISCOUNTED_YEARLY_PRICE if self.USE_DISCOUNTED_PRICING else self.STANDARD_YEARLY_PRICE
+    
+    @property
+    def is_discounted_pricing(self) -> bool:
+        """Whether using discounted pricing"""
+        return self.USE_DISCOUNTED_PRICING
+    
+    @property
+    def email_from_address(self) -> str:
+        """Get email sender address"""
+        return self.EMAIL_FROM_ADDRESS or self.SMTP_USER or "noreply@hermespeed.com"
+    
+    def get_pricing_info(self) -> dict:
+        """Get current pricing information"""
+        monthly_price = self.current_monthly_price
+        yearly_price = self.current_yearly_price
+        yearly_savings = (monthly_price * 12) - yearly_price
+        savings_percentage = int((yearly_savings / (monthly_price * 12)) * 100)
+        
+        return {
+            "monthly_price": monthly_price,
+            "yearly_price": yearly_price,
+            "yearly_savings": yearly_savings,
+            "savings_percentage": savings_percentage,
+            "is_discounted": self.is_discounted_pricing,
+            "pricing_type": "discounted" if self.is_discounted_pricing else "standard"
+        }
+    
+    def get_frontend_verification_url(self, token: str) -> str:
+        """Get email verification frontend URL"""
+        return f"{self.FRONTEND_URL}/verify-email?token={token}"
+    
+    def get_frontend_password_reset_url(self, token: str) -> str:
+        """Get password reset frontend URL"""
+        return f"{self.FRONTEND_URL}/reset-password?token={token}"
+    
+    def get_apple_product_ids(self) -> dict:
+        """Get Apple product IDs"""
+        return {
+            "monthly": self.APPLE_MONTHLY_PRODUCT_ID,
+            "yearly": self.APPLE_YEARLY_PRODUCT_ID
+        }
+    
+    def get_google_product_ids(self) -> dict:
+        """Get Google product IDs"""
+        return {
+            "monthly": self.GOOGLE_MONTHLY_PRODUCT_ID,
+            "yearly": self.GOOGLE_YEARLY_PRODUCT_ID
+        }
+    
+    def get_webhook_urls(self) -> dict:
+        """Get webhook URLs"""
+        base_url = self.WEBHOOK_BASE_URL or "https://api.hermespeed.com"
+        return {
+            "apple": f"{base_url}{self.APPLE_WEBHOOK_PATH}",
+            "google": f"{base_url}{self.GOOGLE_WEBHOOK_PATH}"
+        }
+    
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production"""
+        return self.ENVIRONMENT == "production"
+    
+    @property
+    def is_development(self) -> bool:
+        """Check if running in development"""
+        return self.ENVIRONMENT == "development"
+    
+    @property
+    def is_staging(self) -> bool:
+        """Check if running in staging"""
+        return self.ENVIRONMENT == "staging"
+    
+    def get_environment_info(self) -> dict:
+        """Get comprehensive environment information"""
+        return {
+            "environment": self.ENVIRONMENT,
+            "security_level": self.security_level,
+            "production_ready": self.is_production_ready,
+            "mock_payments_enabled": self.ENABLE_MOCK_PAYMENTS,
+            "apple_sandbox": self.APPLE_USE_SANDBOX_AUTO,
+            "subscription_enabled": self.ENABLE_SUBSCRIPTION,
+            "current_pricing": self.get_pricing_info(),
+            "apple_products": self.get_apple_product_ids(),
+            "google_products": self.get_google_product_ids(),
+            "webhook_urls": self.get_webhook_urls() if self.WEBHOOK_BASE_URL else None
+        }
+    
+    def validate_production_config(self) -> List[str]:
+        """Validate production configuration and return any issues"""
+        issues = []
+        
+        if self.is_production:
+            if not self.APPLE_SHARED_SECRET:
+                issues.append("Apple Shared Secret not configured")
+            
+            if not any([
+                self.GOOGLE_SERVICE_ACCOUNT_KEY_PATH,
+                self.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64,
+                self.GOOGLE_SERVICE_ACCOUNT_KEY_JSON
+            ]):
+                issues.append("Google Service Account Key not configured")
+            
+            if not self.WEBHOOK_BASE_URL:
+                issues.append("Webhook base URL not configured")
+            
+            if self.APPLE_USE_SANDBOX:
+                issues.append("Apple sandbox mode enabled in production")
+            
+            if self.ENABLE_MOCK_PAYMENTS:
+                issues.append("Mock payments would be enabled (this should not happen)")
+        
+        return issues
     
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "allow"
 
 # Create settings instance
 settings = Settings()

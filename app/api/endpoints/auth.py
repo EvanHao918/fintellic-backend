@@ -20,13 +20,16 @@ from app.schemas.auth import (
     Token, 
     RegisterRequest, 
     RegisterResponse,
-    AppleSignInRequest,
-    GoogleSignInRequest,
-    BiometricAuthRequest,
-    RefreshTokenRequest
+    RefreshTokenRequest,
+    PasswordResetRequest,
+    PasswordResetConfirm,
+    PasswordResetResponse,
+    SecurityInfoResponse,
+    AuthErrorResponse
 )
 from app.schemas.user import UserCreate, UserDetailResponse
 from app.models.user import User, PricingTier
+from app.services.email_service import email_service
 
 router = APIRouter()
 
@@ -99,7 +102,7 @@ def register(
                 detail="This username is already taken"
             )
     
-    # Create new user (数据库触发器会自动设置user_sequence_number和早鸟状态)
+    # Create new user
     user_create = UserCreate(
         email=user_in.email,
         password=user_in.password,
@@ -112,16 +115,13 @@ def register(
     )
     user = crud_user.create(db, obj_in=user_create)
     
-    # 刷新用户对象以获取触发器设置的值
+    # Refresh user object
     db.refresh(user)
     
     # Create tokens
     tokens = create_tokens(user.id, user_in.device_id)
     
-    # Get early bird stats
-    early_bird_stats = get_early_bird_stats(db)
-    
-    # Build response with subscription info
+    # Build response
     response_data = {
         "id": user.id,
         "email": user.email,
@@ -130,12 +130,12 @@ def register(
         "access_token": tokens["access_token"],
         "refresh_token": tokens["refresh_token"],
         "tier": user.tier,
-        "is_early_bird": user.is_early_bird,
+        "is_early_bird": user.is_early_bird or False,
         "pricing_tier": user.pricing_tier,
         "user_sequence_number": user.user_sequence_number,
         "monthly_price": user.monthly_price,
         "yearly_price": user.yearly_price,
-        "early_bird_slots_remaining": early_bird_stats["early_bird_slots_remaining"]
+        "early_bird_slots_remaining": 0
     }
     
     return RegisterResponse(**response_data)
@@ -197,176 +197,149 @@ def login_access_token(
     return login(db=db, form_data=form_data)
 
 
-# Apple Sign In
-@router.post("/apple", response_model=Token)
-async def apple_sign_in(
+# ==================== PASSWORD RESET ENDPOINTS ====================
+
+@router.post("/password/reset-request", response_model=PasswordResetResponse)
+def request_password_reset(
     *,
     db: Session = Depends(get_db),
-    apple_data: AppleSignInRequest
+    reset_request: PasswordResetRequest
 ) -> Any:
     """
-    Apple Sign In authentication with early bird check
+    Request password reset email
     """
-    # In production, verify the identity token with Apple's servers
-    # For now, we'll extract the email from the token payload
-    # This is a simplified implementation
-    
-    email = apple_data.email
-    apple_user_id = apple_data.user_id
-    
-    if not email:
+    if not settings.ENABLE_PASSWORD_RESET:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email not provided by Apple"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Password reset is not enabled"
         )
     
-    # Check if user exists
-    user = crud_user.get_by_email(db, email=email)
+    # Find user by email
+    user = crud_user.get_by_email(db, email=reset_request.email)
+    
+    # Always return success for security (don't reveal if email exists)
+    success_message = "If the email exists in our system, a password reset email has been sent."
     
     if not user:
-        # Create new user (触发器会自动设置早鸟状态)
-        user_create = UserCreate(
-            email=email,
-            full_name=apple_data.full_name,
-            password=secrets.token_urlsafe(32),  # Random password for social users
-            registration_source="apple",
-            registration_device_type="ios",
-            apple_user_id=apple_user_id
+        return PasswordResetResponse(
+            message=success_message,
+            success=True
         )
-        user = crud_user.create(db, obj_in=user_create)
-        db.refresh(user)  # 刷新以获取触发器设置的值
-    else:
-        # Update Apple user ID if not set
-        if not user.apple_user_id:
-            user.apple_user_id = apple_user_id
-            db.commit()
     
-    # Create tokens
-    tokens = create_tokens(user.id, apple_data.device_id)
+    # Check if user can request password reset (rate limiting)
+    if not user.can_request_password_reset():
+        if user.is_password_reset_locked():
+            return PasswordResetResponse(
+                message="Too many password reset attempts. Please try again later.",
+                success=False,
+                can_retry_after=user.password_reset_locked_until
+            )
+        else:
+            return PasswordResetResponse(
+                message="Please wait before requesting another password reset.",
+                success=False
+            )
     
-    # Add user info
-    tokens["user_info"] = {
-        "id": user.id,
-        "email": user.email,
-        "tier": user.tier.value,
-        "is_early_bird": user.is_early_bird,
-        "pricing_tier": user.pricing_tier.value if user.pricing_tier else None,
-        "is_subscription_active": user.is_subscription_active
-    }
-    
-    return Token(**tokens)
+    # Send password reset email
+    try:
+        email_sent = email_service.send_password_reset_email(user, db)
+        if email_sent:
+            return PasswordResetResponse(
+                message=success_message,
+                success=True
+            )
+        else:
+            # Log error but don't reveal failure to user
+            print(f"Failed to send password reset email to {user.email}")
+            return PasswordResetResponse(
+                message=success_message,
+                success=True
+            )
+    except Exception as e:
+        print(f"Error sending password reset email: {e}")
+        return PasswordResetResponse(
+            message=success_message,
+            success=True
+        )
 
 
-# Google Sign In
-@router.post("/google", response_model=Token)
-async def google_sign_in(
+@router.post("/password/reset-confirm", response_model=PasswordResetResponse)
+def confirm_password_reset(
     *,
     db: Session = Depends(get_db),
-    google_data: GoogleSignInRequest
+    reset_confirm: PasswordResetConfirm
 ) -> Any:
     """
-    Google Sign In authentication with early bird check
+    Confirm password reset using token and set new password
     """
-    # In production, verify the ID token with Google's servers
-    # For now, we'll trust the provided data
-    
-    email = google_data.email
-    google_user_id = google_data.user_id
-    
-    if not email:
+    if not settings.ENABLE_PASSWORD_RESET:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email not provided by Google"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Password reset is not enabled"
         )
     
-    # Check if user exists
-    user = crud_user.get_by_email(db, email=email)
+    # Find user by reset token
+    user = db.query(User).filter(
+        User.password_reset_token == reset_confirm.token
+    ).first()
     
     if not user:
-        # Create new user (触发器会自动设置早鸟状态)
-        user_create = UserCreate(
-            email=email,
-            full_name=google_data.full_name,
-            password=secrets.token_urlsafe(32),  # Random password for social users
-            avatar_url=google_data.photo_url,
-            registration_source="google",
-            registration_device_type="android",
-            google_user_id=google_user_id
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
         )
-        user = crud_user.create(db, obj_in=user_create)
-        db.refresh(user)  # 刷新以获取触发器设置的值
-    else:
-        # Update Google user ID if not set
-        if not user.google_user_id:
-            user.google_user_id = google_user_id
-            db.commit()
     
-    # Create tokens
-    tokens = create_tokens(user.id, google_data.device_id)
+    # Check if token is still valid
+    if not user.is_password_reset_token_valid():
+        user.clear_password_reset_data()
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired"
+        )
     
-    # Add user info
-    tokens["user_info"] = {
-        "id": user.id,
-        "email": user.email,
-        "tier": user.tier.value,
-        "is_early_bird": user.is_early_bird,
-        "pricing_tier": user.pricing_tier.value if user.pricing_tier else None,
-        "is_subscription_active": user.is_subscription_active
-    }
+    # Check if account is locked due to too many attempts
+    if user.is_password_reset_locked():
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Account is temporarily locked. Please try again later."
+        )
     
-    return Token(**tokens)
+    try:
+        # Set new password
+        user.hashed_password = get_password_hash(reset_confirm.new_password)
+        
+        # Clear reset data
+        user.clear_password_reset_data()
+        
+        # Update timestamps
+        from datetime import datetime, timezone
+        user.updated_at = datetime.now(timezone.utc)
+        
+        db.commit()
+        
+        # Send password change notification
+        try:
+            email_service.send_password_changed_notification(user)
+        except Exception as e:
+            print(f"Failed to send password change notification: {e}")
+        
+        return PasswordResetResponse(
+            message="Password reset successfully!",
+            success=True
+        )
+        
+    except Exception as e:
+        db.rollback()
+        user.increment_password_reset_attempts()
+        db.commit()
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reset password"
+        )
 
-
-# Biometric Authentication
-@router.post("/biometric", response_model=Token)
-async def biometric_auth(
-    *,
-    db: Session = Depends(get_db),
-    biometric_data: BiometricAuthRequest
-) -> Any:
-    """
-    Biometric authentication (Face ID/Touch ID/Fingerprint)
-    """
-    # Verify the refresh token
-    payload = verify_token(biometric_data.refresh_token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token"
-        )
-    
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload"
-        )
-    
-    # Get user
-    user = crud_user.get(db, id=int(user_id))
-    if not user or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive"
-        )
-    
-    # In production, you would verify the biometric data
-    # For now, we trust the client's biometric verification
-    
-    # Create new tokens
-    tokens = create_tokens(user.id, biometric_data.device_id)
-    
-    # Add user info
-    tokens["user_info"] = {
-        "id": user.id,
-        "email": user.email,
-        "tier": user.tier.value,
-        "is_early_bird": user.is_early_bird,
-        "pricing_tier": user.pricing_tier.value if user.pricing_tier else None,
-        "is_subscription_active": user.is_subscription_active
-    }
-    
-    return Token(**tokens)
+# ================================================================
 
 
 # Refresh Token
@@ -417,6 +390,33 @@ async def refresh_token(
     }
     
     return Token(**tokens)
+
+
+# Security info endpoint
+@router.get("/security-info", response_model=SecurityInfoResponse)
+def get_security_info(
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Get user security information
+    """
+    # Get social providers
+    social_providers = []
+    if current_user.apple_user_id:
+        social_providers.append("apple")
+    if current_user.google_user_id:
+        social_providers.append("google")
+    if current_user.linkedin_user_id:
+        social_providers.append("linkedin")
+    
+    return SecurityInfoResponse(
+        email_verified=current_user.is_verified,
+        has_password=bool(current_user.hashed_password),
+        social_providers=social_providers,
+        biometric_enabled=bool(current_user.biometric_settings),
+        last_login_at=current_user.last_login_at,
+        is_account_locked=current_user.is_password_reset_locked()
+    )
 
 
 # New endpoint: Get early bird status

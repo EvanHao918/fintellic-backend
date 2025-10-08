@@ -8,6 +8,8 @@ import logging
 from app.api.api import api_router
 # Import scheduler
 from app.services.scheduler import filing_scheduler
+# Import settings for secure CORS
+from app.core.config import settings
 
 # Configure logging
 logging.basicConfig(
@@ -42,23 +44,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS with specific settings - MUST BE FIRST MIDDLEWARE
+# Configure CORS with security-enhanced settings
+cors_origins = settings.get_cors_origins_by_environment() if settings.ENVIRONMENT != "development" else settings.API_CORS_ORIGINS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:8081",
-        "http://localhost:8080",
-        "http://localhost:19006",  # Expo web
-        "exp://192.168.1.*",        # Expo development
-        "*"  # Allow all origins in development
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
+
+logger.info(f"CORS configured for environment: {settings.ENVIRONMENT}")
+logger.info(f"Allowed origins: {cors_origins}")
 
 # Add custom exception handler to ensure CORS headers are always added
 @app.exception_handler(Exception)
@@ -108,7 +108,8 @@ async def root():
         "message": "Welcome to Fintellic API",
         "version": "1.0.0",
         "status": "operational",
-        "scanner": "active" if filing_scheduler.is_running else "inactive"
+        "scanner": "active" if filing_scheduler.is_running else "inactive",
+        "environment": settings.ENVIRONMENT
     }
 
 # Health check endpoint
@@ -117,13 +118,18 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "fintellic-api",
-        "scanner_running": filing_scheduler.is_running
+        "scanner_running": filing_scheduler.is_running,
+        "email_verification_enabled": settings.ENABLE_EMAIL_VERIFICATION,
+        "password_reset_enabled": settings.ENABLE_PASSWORD_RESET
     }
 
 # Manual scan endpoint (for testing)
 @app.post("/api/v1/scan/trigger")
 async def trigger_scan():
     """Manually trigger a filing scan (for testing)"""
+    if not settings.ALLOW_MOCK_ENDPOINTS:
+        return {"error": "Mock endpoints not allowed in this environment"}
+    
     logger.info("Manual scan triggered")
     new_filings = await filing_scheduler.run_single_scan()
     return {

@@ -12,6 +12,7 @@ ENHANCED: Management analysis, S-1 processing, tag quality
 REVOLUTIONARY: Enhanced data source marking and Markdown table processing to prevent hallucination
 FIXED: Added defensive type checking for FilingType to prevent 'str' object has no attribute 'value' errors
 UPDATED: Added FMP company profile data fetching and storage during AI processing
+FIXED: 8-K Exhibit Content Integration - Enhanced exhibit content processing for comprehensive analysis
 """
 import json
 import re
@@ -51,6 +52,7 @@ class AIProcessor:
     REVOLUTIONARY: Enhanced with Markdown table processing and strict data accuracy constraints
     FIXED: Added defensive FilingType handling to prevent attribute errors
     UPDATED: Added FMP company profile data integration
+    FIXED: 8-K Exhibit Content Integration for comprehensive analysis
     """
     
     def __init__(self):
@@ -289,8 +291,15 @@ class AIProcessor:
             else:
                 logger.info(f"Using standard primary content: {len(primary_content)} chars")
             
-            if filing.filing_type == FilingType.FORM_8K and 'exhibit_99_content' in sections:
-                logger.info(f"8-K includes Exhibit 99 content: {len(sections['exhibit_99_content'])} chars")
+            # FIXED: 8-K Exhibit Content Integration
+            if filing.filing_type == FilingType.FORM_8K:
+                exhibit_content = sections.get('important_exhibits_content', '') or sections.get('exhibit_99_content', '')
+                if exhibit_content and len(exhibit_content) > 100:
+                    logger.info(f"Integrating exhibit content: {len(exhibit_content)} chars")
+                    primary_content += f"\n\n{'='*60}\nEXHIBIT CONTENT (PRESS RELEASE/FINANCIAL DATA)\n{'='*60}\n\n{exhibit_content}"
+                    logger.info(f"Enhanced primary content length: {len(primary_content)} chars")
+                else:
+                    logger.info(f"8-K includes Exhibit 99 content: {len(sections.get('exhibit_99_content', ''))} chars")
             
             if not primary_content or len(primary_content) < 100:
                 raise Exception("Insufficient text content extracted")
@@ -963,7 +972,7 @@ Evaluate this IPO opportunity with complete source citations and balanced perspe
         ticker = self._get_safe_ticker(filing)
         company_name = filing.company.name if filing.company else "the company"
         
-        has_exhibit = "EXHIBIT 99 CONTENT" in content or "Exhibit 99:" in content
+        has_exhibit = "EXHIBIT CONTENT" in content or "Exhibit 99:" in content
         event_type = context.get('event_type', 'Material Event')
         item_type = context.get('item_type', '')
         
@@ -1006,7 +1015,7 @@ Target 400-800 words depending on the event's complexity.
 
 CONTENT CONTEXT:
 This 8-K filing reports: {event_type}
-{f"The filing includes Exhibit 99 with detailed supplementary information" if has_exhibit else ""}
+{f"The filing includes Exhibit content with detailed supplementary information" if has_exhibit else ""}
 
 {type_specific_guidance}
 

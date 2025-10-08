@@ -1,6 +1,7 @@
 """
 Google Play Billing Service
-处理Google Play订阅验证和管理
+Production-ready Google Play subscription verification and management
+Phase 2: Removed all mock logic, production-ready implementation
 """
 import json
 import logging
@@ -17,21 +18,21 @@ logger = logging.getLogger(__name__)
 
 
 class GooglePlayService:
-    """Google Play服务类"""
+    """Production-ready Google Play Service"""
     
     def __init__(self):
-        """初始化服务"""
-        self.package_name = settings.GOOGLE_PACKAGE_NAME if hasattr(settings, 'GOOGLE_PACKAGE_NAME') else "com.hermespeed.app"
+        """Initialize Google Play service with production configuration"""
+        self.package_name = settings.GOOGLE_PACKAGE_NAME
         self.service = None
         self._initialize_service()
     
     def _initialize_service(self):
-        """初始化Google Play API服务"""
+        """Initialize Google Play API service"""
         try:
-            # 获取服务账号凭证
+            # Get service account credentials
             credentials = self._get_credentials()
             if credentials:
-                # 构建服务
+                # Build service
                 self.service = build(
                     'androidpublisher', 
                     'v3', 
@@ -40,25 +41,28 @@ class GooglePlayService:
                 )
                 logger.info("Google Play service initialized successfully")
             else:
-                logger.warning("Google Play service not initialized - no credentials")
+                if settings.is_production:
+                    logger.error("Google Play service not initialized - missing credentials in production")
+                else:
+                    logger.warning("Google Play service not initialized - no credentials (development mode)")
                 
         except Exception as e:
             logger.error(f"Failed to initialize Google Play service: {str(e)}")
             self.service = None
     
     def _get_credentials(self):
-        """获取Google服务账号凭证"""
+        """Get Google service account credentials"""
         try:
-            # 方式1：从文件路径读取
-            if hasattr(settings, 'GOOGLE_SERVICE_ACCOUNT_KEY_PATH') and settings.GOOGLE_SERVICE_ACCOUNT_KEY_PATH:
+            # Method 1: From file path
+            if settings.GOOGLE_SERVICE_ACCOUNT_KEY_PATH:
                 logger.info(f"Loading Google credentials from file: {settings.GOOGLE_SERVICE_ACCOUNT_KEY_PATH}")
                 return service_account.Credentials.from_service_account_file(
                     settings.GOOGLE_SERVICE_ACCOUNT_KEY_PATH,
                     scopes=['https://www.googleapis.com/auth/androidpublisher']
                 )
             
-            # 方式2：从base64编码的JSON读取
-            if hasattr(settings, 'GOOGLE_SERVICE_ACCOUNT_KEY_BASE64') and settings.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64:
+            # Method 2: From base64 encoded JSON
+            if settings.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64:
                 logger.info("Loading Google credentials from base64 encoded JSON")
                 key_json = base64.b64decode(settings.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64)
                 key_dict = json.loads(key_json)
@@ -67,8 +71,8 @@ class GooglePlayService:
                     scopes=['https://www.googleapis.com/auth/androidpublisher']
                 )
             
-            # 方式3：从JSON字符串读取
-            if hasattr(settings, 'GOOGLE_SERVICE_ACCOUNT_KEY_JSON') and settings.GOOGLE_SERVICE_ACCOUNT_KEY_JSON:
+            # Method 3: From JSON string
+            if settings.GOOGLE_SERVICE_ACCOUNT_KEY_JSON:
                 logger.info("Loading Google credentials from JSON string")
                 key_dict = json.loads(settings.GOOGLE_SERVICE_ACCOUNT_KEY_JSON)
                 return service_account.Credentials.from_service_account_info(
@@ -76,12 +80,11 @@ class GooglePlayService:
                     scopes=['https://www.googleapis.com/auth/androidpublisher']
                 )
             
-            # 开发环境返回None
-            if settings.ENVIRONMENT == "development":
-                logger.info("Development environment - using mock Google service")
-                return None
-                
-            logger.warning("No Google service account credentials configured")
+            # No credentials configured
+            if settings.is_production:
+                logger.error("No Google service account credentials configured for production")
+            else:
+                logger.info("No Google service account credentials configured for development")
             return None
             
         except Exception as e:
@@ -94,43 +97,57 @@ class GooglePlayService:
         purchase_token: str
     ) -> Dict[str, Any]:
         """
-        验证Google Play订阅
+        Verify Google Play subscription with production-ready error handling
         
         Args:
-            product_id: 产品ID（订阅ID）
-            purchase_token: 购买令牌
+            product_id: Product ID (subscription ID)
+            purchase_token: Purchase token
             
         Returns:
-            验证结果字典
+            Verification result dictionary
         """
+        if not product_id or not purchase_token:
+            return {
+                "is_valid": False,
+                "error": "Product ID and purchase token are required"
+            }
+        
         try:
-            # 开发环境Mock响应
+            # Check if service is available
             if not self.service:
-                if settings.ENVIRONMENT == "development":
-                    logger.info(f"Mock Google verification for product: {product_id}")
-                    return self._mock_verification_response(product_id)
-                else:
-                    return {
-                        "is_valid": False,
-                        "error": "Google Play service not initialized"
-                    }
+                error_msg = "Google Play service not initialized"
+                if settings.is_production:
+                    logger.error(f"{error_msg} - this will cause verification failures")
+                return {
+                    "is_valid": False,
+                    "error": error_msg
+                }
+            
+            # Validate product ID
+            if not self._validate_product_id(product_id):
+                logger.warning(f"Invalid product ID: {product_id}")
+                return {
+                    "is_valid": False,
+                    "error": "Invalid product ID"
+                }
             
             logger.info(f"Verifying Google subscription: {product_id}")
             
-            # 调用Google API验证订阅
+            # Call Google API to verify subscription
             result = self.service.purchases().subscriptions().get(
                 packageName=self.package_name,
                 subscriptionId=product_id,
                 token=purchase_token
             ).execute()
             
-            # 处理验证结果
+            # Process verification result
             processed = self._process_verification_result(result, product_id)
             
-            # 如果订阅有效且未确认，自动确认
+            # Auto-acknowledge if subscription is valid and active but not acknowledged
             if processed.get("is_valid") and processed.get("is_active"):
                 if result.get("acknowledgementState", 0) == 0:
                     await self.acknowledge_subscription(product_id, purchase_token)
+                    processed["acknowledgement_state"] = 1  # Update local state
             
             return processed
             
@@ -138,7 +155,7 @@ class GooglePlayService:
             error_content = e.content.decode('utf-8') if e.content else str(e)
             logger.error(f"Google Play API error: {e.resp.status} - {error_content}")
             
-            # 处理特定错误
+            # Handle specific error codes
             if e.resp.status == 404:
                 return {
                     "is_valid": False,
@@ -149,16 +166,21 @@ class GooglePlayService:
                     "is_valid": False,
                     "error": "Authentication failed"
                 }
+            elif e.resp.status == 403:
+                return {
+                    "is_valid": False,
+                    "error": "Permission denied"
+                }
             else:
                 return {
                     "is_valid": False,
                     "error": f"API error: {e.resp.status}"
                 }
         except Exception as e:
-            logger.error(f"Google Play verification error: {str(e)}")
+            logger.error(f"Google Play verification unexpected error: {str(e)}")
             return {
                 "is_valid": False,
-                "error": str(e)
+                "error": "Verification failed"
             }
     
     def _process_verification_result(
@@ -167,28 +189,28 @@ class GooglePlayService:
         product_id: str
     ) -> Dict[str, Any]:
         """
-        处理Google验证结果
+        Process Google verification result with comprehensive validation
         
         Args:
-            result: Google API返回的结果
-            product_id: 产品ID
+            result: Google API response
+            product_id: Product ID
             
         Returns:
-            处理后的结果
+            Processed verification result
         """
-        # 检查支付状态
+        # Check payment state
         # paymentState: 0 = Payment pending, 1 = Payment received, 2 = Free trial, 3 = Pending deferred upgrade/downgrade
         payment_state = result.get("paymentState", 0)
         
-        # 检查确认状态
+        # Check acknowledgement state
         # acknowledgementState: 0 = Yet to be acknowledged, 1 = Acknowledged
         acknowledgement_state = result.get("acknowledgementState", 0)
         
-        # 检查取消原因
+        # Check cancel reason
         # cancelReason: 0 = User canceled, 1 = System canceled (billing error), 2 = Replaced, 3 = Developer canceled
         cancel_reason = result.get("cancelReason")
         
-        # 解析时间戳（毫秒）
+        # Parse timestamps (milliseconds)
         start_time_ms = result.get("startTimeMillis")
         expiry_time_ms = result.get("expiryTimeMillis")
         
@@ -197,37 +219,54 @@ class GooglePlayService:
         is_active = False
         
         if start_time_ms:
-            start_time = datetime.fromtimestamp(int(start_time_ms) / 1000)
+            try:
+                start_time = datetime.fromtimestamp(int(start_time_ms) / 1000)
+            except (ValueError, TypeError, OSError) as e:
+                logger.warning(f"Failed to parse startTimeMillis: {start_time_ms}, error: {e}")
         
         if expiry_time_ms:
-            expiry_time = datetime.fromtimestamp(int(expiry_time_ms) / 1000)
-            # 订阅有效：未过期且支付已收到或试用中
-            is_active = expiry_time > datetime.now() and payment_state in [1, 2]
+            try:
+                expiry_time = datetime.fromtimestamp(int(expiry_time_ms) / 1000)
+                # Subscription is active if not expired and payment received or in trial
+                is_active = expiry_time > datetime.now() and payment_state in [1, 2]
+            except (ValueError, TypeError, OSError) as e:
+                logger.warning(f"Failed to parse expiryTimeMillis: {expiry_time_ms}, error: {e}")
         
-        # 检查是否自动续订
+        # Check if auto-renewing
         auto_renewing = result.get("autoRenewing", False)
         
-        # 判断订阅类型
+        # Determine subscription type
         subscription_type = self._get_subscription_type(product_id)
         
-        # 获取价格信息
+        # Get price information
         price_amount = None
         currency = result.get("priceCurrencyCode", "USD")
         
         if result.get("priceAmountMicros"):
-            # 价格以微单位存储（1美元 = 1,000,000微单位）
-            price_amount = int(result.get("priceAmountMicros")) / 1000000
-        elif subscription_type == "YEARLY":
-            # 根据产品类型推断价格
-            price_amount = settings.EARLY_BIRD_YEARLY_PRICE if "early" in product_id.lower() else settings.STANDARD_YEARLY_PRICE
-        else:
-            price_amount = settings.EARLY_BIRD_MONTHLY_PRICE if "early" in product_id.lower() else settings.STANDARD_MONTHLY_PRICE
+            try:
+                # Price is stored in micros (1 USD = 1,000,000 micros)
+                price_amount = int(result.get("priceAmountMicros")) / 1000000
+            except (ValueError, TypeError):
+                logger.warning(f"Failed to parse priceAmountMicros: {result.get('priceAmountMicros')}")
         
-        # 获取用户取消时间
+        # Fallback to system configuration if no price from API
+        if not price_amount:
+            if subscription_type == "YEARLY":
+                price_amount = settings.current_yearly_price
+            else:
+                price_amount = settings.current_monthly_price
+        
+        # Get user cancellation time
         user_cancellation_time_ms = result.get("userCancellationTimeMillis")
         cancelled_at = None
         if user_cancellation_time_ms:
-            cancelled_at = datetime.fromtimestamp(int(user_cancellation_time_ms) / 1000).isoformat()
+            try:
+                cancelled_at = datetime.fromtimestamp(int(user_cancellation_time_ms) / 1000).isoformat()
+            except (ValueError, TypeError, OSError):
+                cancelled_at = None
+        
+        # Check if in grace period (payment failed but still active)
+        is_in_grace_period = expiry_time and expiry_time > datetime.now() and payment_state == 0
         
         return {
             "is_valid": True,
@@ -242,14 +281,15 @@ class GooglePlayService:
             "payment_state": payment_state,
             "acknowledgement_state": acknowledgement_state,
             "is_trial": payment_state == 2,
-            "is_in_grace_period": result.get("expiryTimeMillis") and payment_state == 0,  # 宽限期
+            "is_in_grace_period": is_in_grace_period,
             "cancel_reason": cancel_reason,
             "cancelled_at": cancelled_at,
             "price": price_amount,
             "currency": currency,
             "country_code": result.get("countryCode"),
             "developer_payload": result.get("developerPayload"),
-            "linked_purchase_token": result.get("linkedPurchaseToken"),  # 用于升级/降级
+            "linked_purchase_token": result.get("linkedPurchaseToken"),  # For upgrades/downgrades
+            "environment": "production",  # Always production for real Google Play
             "raw_response": result
         }
     
@@ -259,18 +299,19 @@ class GooglePlayService:
         purchase_token: str
     ) -> bool:
         """
-        确认订阅（Google要求在3天内确认）
+        Acknowledge subscription (Google requires acknowledgment within 3 days)
         
         Args:
-            product_id: 产品ID
-            purchase_token: 购买令牌
+            product_id: Product ID
+            purchase_token: Purchase token
             
         Returns:
-            是否成功
+            Whether successful
         """
         try:
             if not self.service:
-                return settings.ENVIRONMENT == "development"  # 开发环境返回True
+                logger.error("Google Play service not available for acknowledgment")
+                return False
             
             logger.info(f"Acknowledging Google subscription: {product_id}")
             
@@ -286,7 +327,7 @@ class GooglePlayService:
             
         except HttpError as e:
             if e.resp.status == 400:
-                # 可能已经确认过了
+                # Might already be acknowledged
                 logger.info(f"Subscription may already be acknowledged: {product_id}")
                 return True
             logger.error(f"Failed to acknowledge subscription: {e}")
@@ -301,18 +342,19 @@ class GooglePlayService:
         purchase_token: str
     ) -> bool:
         """
-        取消订阅
+        Cancel subscription
         
         Args:
-            product_id: 产品ID
-            purchase_token: 购买令牌
+            product_id: Product ID
+            purchase_token: Purchase token
             
         Returns:
-            是否成功
+            Whether successful
         """
         try:
             if not self.service:
-                return settings.ENVIRONMENT == "development"
+                logger.error("Google Play service not available for cancellation")
+                return False
             
             logger.info(f"Cancelling Google subscription: {product_id}")
             
@@ -325,6 +367,9 @@ class GooglePlayService:
             logger.info(f"Successfully cancelled subscription: {product_id}")
             return True
             
+        except HttpError as e:
+            logger.error(f"Failed to cancel subscription: {e}")
+            return False
         except Exception as e:
             logger.error(f"Failed to cancel subscription: {str(e)}")
             return False
@@ -336,19 +381,20 @@ class GooglePlayService:
         desired_expiry_time_ms: int
     ) -> bool:
         """
-        延期订阅
+        Defer subscription expiry
         
         Args:
-            product_id: 产品ID
-            purchase_token: 购买令牌
-            desired_expiry_time_ms: 期望的到期时间（毫秒）
+            product_id: Product ID
+            purchase_token: Purchase token
+            desired_expiry_time_ms: Desired expiry time in milliseconds
             
         Returns:
-            是否成功
+            Whether successful
         """
         try:
             if not self.service:
-                return settings.ENVIRONMENT == "development"
+                logger.error("Google Play service not available for deferral")
+                return False
             
             logger.info(f"Deferring Google subscription: {product_id}")
             
@@ -366,12 +412,15 @@ class GooglePlayService:
             logger.info(f"Successfully deferred subscription: {product_id}")
             return True
             
+        except HttpError as e:
+            logger.error(f"Failed to defer subscription: {e}")
+            return False
         except Exception as e:
             logger.error(f"Failed to defer subscription: {str(e)}")
             return False
     
     def _get_subscription_type(self, product_id: str) -> str:
-        """根据产品ID判断订阅类型"""
+        """Determine subscription type from product ID"""
         if not product_id:
             return "MONTHLY"
         
@@ -380,60 +429,31 @@ class GooglePlayService:
             return "YEARLY"
         return "MONTHLY"
     
-    def _mock_verification_response(self, product_id: str) -> Dict[str, Any]:
+    def _validate_product_id(self, product_id: str) -> bool:
         """
-        开发环境的Mock响应
+        Validate if product ID is one of our configured products
         
         Args:
-            product_id: 产品ID
+            product_id: Product ID to validate
             
         Returns:
-            Mock验证结果
+            Whether product ID is valid
         """
-        subscription_type = self._get_subscription_type(product_id)
-        
-        # 判断是否早鸟价格
-        is_early_bird = "early" in product_id.lower()
-        
-        if subscription_type == "YEARLY":
-            price = settings.EARLY_BIRD_YEARLY_PRICE if is_early_bird else settings.STANDARD_YEARLY_PRICE
-            expiry_delta = timedelta(days=365)
-        else:
-            price = settings.EARLY_BIRD_MONTHLY_PRICE if is_early_bird else settings.STANDARD_MONTHLY_PRICE
-            expiry_delta = timedelta(days=30)
-        
-        now = datetime.now()
-        expiry_time = now + expiry_delta
-        
-        return {
-            "is_valid": True,
-            "is_active": True,
-            "product_id": product_id,
-            "order_id": f"GPA.mock-{now.timestamp()}",
-            "purchase_token": f"mock-token-{now.timestamp()}",
-            "subscription_type": subscription_type,
-            "start_time": now.isoformat(),
-            "expiry_time": expiry_time.isoformat(),
-            "auto_renewing": True,
-            "payment_state": 1,  # Payment received
-            "acknowledgement_state": 1,  # Acknowledged
-            "is_trial": False,
-            "is_in_grace_period": False,
-            "price": price,
-            "currency": "USD",
-            "country_code": "US",
-            "is_mock": True
-        }
+        valid_product_ids = [
+            settings.GOOGLE_MONTHLY_PRODUCT_ID,
+            settings.GOOGLE_YEARLY_PRODUCT_ID
+        ]
+        return product_id in valid_product_ids
     
     def process_rtdn_notification(self, notification_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        处理Google Real-time Developer Notification
+        Process Google Real-time Developer Notification
         
         Args:
-            notification_data: 通知数据
+            notification_data: Notification data
             
         Returns:
-            处理结果
+            Processing result
         """
         try:
             subscription_notification = notification_data.get("subscriptionNotification", {})
@@ -442,21 +462,7 @@ class GooglePlayService:
             product_id = subscription_notification.get("subscriptionId")
             purchase_token = subscription_notification.get("purchaseToken")
             
-            # 通知类型：
-            # 1 = SUBSCRIPTION_RECOVERED - 从账号保留状态恢复
-            # 2 = SUBSCRIPTION_RENEWED - 续订成功
-            # 3 = SUBSCRIPTION_CANCELED - 用户取消
-            # 4 = SUBSCRIPTION_PURCHASED - 新购买
-            # 5 = SUBSCRIPTION_ON_HOLD - 账号保留
-            # 6 = SUBSCRIPTION_IN_GRACE_PERIOD - 宽限期
-            # 7 = SUBSCRIPTION_RESTARTED - 重新启动
-            # 8 = SUBSCRIPTION_PRICE_CHANGE_CONFIRMED - 价格变更确认
-            # 9 = SUBSCRIPTION_DEFERRED - 延期
-            # 10 = SUBSCRIPTION_PAUSED - 暂停
-            # 11 = SUBSCRIPTION_PAUSE_SCHEDULE_CHANGED - 暂停计划变更
-            # 12 = SUBSCRIPTION_REVOKED - 撤销
-            # 13 = SUBSCRIPTION_EXPIRED - 过期
-            
+            # Notification types mapping
             notification_type_names = {
                 1: "SUBSCRIPTION_RECOVERED",
                 2: "SUBSCRIPTION_RENEWED",
@@ -475,6 +481,14 @@ class GooglePlayService:
             
             notification_name = notification_type_names.get(notification_type, "UNKNOWN")
             
+            # Validate product ID
+            if product_id and not self._validate_product_id(product_id):
+                logger.warning(f"RTDN notification for invalid product ID: {product_id}")
+                return {
+                    "is_valid": False,
+                    "error": "Invalid product ID"
+                }
+            
             logger.info(f"Processing Google RTDN: {notification_name} for product: {product_id}")
             
             return {
@@ -491,7 +505,25 @@ class GooglePlayService:
                 "is_valid": False,
                 "error": str(e)
             }
+    
+    def get_service_status(self) -> Dict[str, Any]:
+        """
+        Get service initialization status
+        
+        Returns:
+            Service status information
+        """
+        return {
+            "service_initialized": self.service is not None,
+            "package_name": self.package_name,
+            "environment": settings.ENVIRONMENT,
+            "credentials_configured": bool(
+                settings.GOOGLE_SERVICE_ACCOUNT_KEY_PATH or 
+                settings.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64 or 
+                settings.GOOGLE_SERVICE_ACCOUNT_KEY_JSON
+            )
+        }
 
 
-# 创建服务实例
+# Create service instance
 google_play_service = GooglePlayService()

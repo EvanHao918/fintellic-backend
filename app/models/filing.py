@@ -4,6 +4,7 @@ FIXED: Changed financial_metrics and other JSON fields to Text to avoid type con
 ENHANCED: Added detected_at field for precise filing detection timestamps
 ENHANCED: Added proper indexing and methods for detected_at field
 FIXED: Changed FilingType to inherit from str, enum.Enum for consistency
+v8_web_search: Removed analyst_expectations and expectations_comparison, added references field
 """
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Enum as SQLEnum, JSON, Float, Index
 from sqlalchemy.orm import relationship
@@ -43,7 +44,7 @@ class ManagementTone(str, enum.Enum):
     VERY_OPTIMISTIC = "very_optimistic"
     OPTIMISTIC = "optimistic"
     CONFIDENT = "confident"
-    CONCERNED = "concerned"  # æ·»åŠ è¿™ä¸ªç¼ºå¤±çš„å€¼
+    CONCERNED = "concerned"
     NEUTRAL = "neutral"
     CAUTIOUS = "cautious"
     PESSIMISTIC = "pessimistic"
@@ -123,13 +124,16 @@ class Filing(Base):
     ipo_use_of_proceeds = Column(Text)
     
     # AI Analysis results - Unified fields for all filing types
-    analysis_version = Column(String(10), default="v5")  # Track analysis version
+    analysis_version = Column(String(10), default="v8")  # Track analysis version - UPDATED to v8
     
     # Core unified fields (present in all filing types)
     unified_analysis = Column(Text)  # Main AI analysis with structure
     unified_feed_summary = Column(String(100))  # 50-80 char summary for feed
     key_tags = Column(JSON)
     unified_score = Column(Integer)  # 1-100 overall score
+    
+    # ✅ NEW: Web search references for citations
+    references = Column(JSON)  # List of {id, title, url} from web search
     
     # Common analysis fields
     key_points = Column(JSON)  # Array of key points
@@ -152,7 +156,9 @@ class Filing(Base):
     
     # Smart markup data (keep as JSON)
     smart_markup_data = Column(JSON)  # Smart markup metadata
-    analyst_expectations = Column(JSON)  # Analyst expectations data
+    
+    # ❌ REMOVED: analyst_expectations - No longer needed with web search
+    # ❌ REMOVED: expectations_comparison - No longer needed with web search
     # ===========================================================================
     
     # Filing-specific specialized fields (populated based on filing_type)
@@ -173,7 +179,7 @@ class Filing(Base):
     quarterly_performance = Column(JSON)
     quarterly_guidance = Column(Text)
     quarterly_vs_expectations = Column(JSON)
-    expectations_comparison = Column(Text)
+    # ❌ REMOVED: expectations_comparison = Column(Text)
     cost_structure = Column(Text)
     guidance_update = Column(Text)
     growth_decline_analysis = Column(Text)
@@ -411,7 +417,7 @@ class Filing(Base):
         return value
     
     def to_dict(self, include_analysis=True):
-        """Convert to dictionary for API responses - ENHANCED with detected_at"""
+        """Convert to dictionary for API responses - ENHANCED with detected_at and references"""
         data = {
             'id': self.id,
             'company_id': self.company_id,
@@ -419,8 +425,8 @@ class Filing(Base):
             'filing_type': self.filing_type.value,
             'display_type': self.display_filing_type,
             'filing_date': self.filing_date.isoformat() if self.filing_date else None,
-            'detected_at': self.detected_at.isoformat() if self.detected_at else None,  # ENHANCED: Include detected_at
-            'display_time': self.display_time.isoformat() if self.display_time else None,  # ENHANCED: Best display time
+            'detected_at': self.detected_at.isoformat() if self.detected_at else None,
+            'display_time': self.display_time.isoformat() if self.display_time else None,
             'period_end_date': self.period_end_date.isoformat() if self.period_end_date else None,
             'filing_url': self.filing_url,
             'status': self.status.value,
@@ -434,6 +440,8 @@ class Filing(Base):
             'detection_age_minutes': self.detection_age_minutes,
             'detection_age_hours': self.detection_age_hours,
             'is_recently_detected': self.is_recently_detected,
+            # ✅ NEW: Include references if available
+            'references': self.safe_json_get('references', []),
         }
         
         # Add financial highlights for 10-K/10-Q
@@ -456,7 +464,8 @@ class Filing(Base):
                 'risks': self.safe_json_get('risks', []),
                 'opportunities': self.safe_json_get('opportunities', []),
                 'market_reaction_prediction': self.market_reaction_prediction,
-                'competitive_positioning': self.competitive_positioning
+                'competitive_positioning': self.competitive_positioning,
+                'references': self.safe_json_get('references', [])  # ✅ NEW: Include in analysis
             }
             
             # Add filing-specific analysis
@@ -499,7 +508,7 @@ class Filing(Base):
             return True
             
         # Reprocess if old analysis version
-        if self.status == ProcessingStatus.COMPLETED and self.analysis_version != "v5":
+        if self.status == ProcessingStatus.COMPLETED and self.analysis_version not in ["v7_enhanced_fmp", "v8_web_search"]:
             return True
             
         return False

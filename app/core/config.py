@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 days (修改: 从7天改为30天)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 days (ä¿®æ"¹: ä»Ž7å¤©æ"¹ä¸º30å¤©)
     
     # OpenAI
     OPENAI_API_KEY: str
@@ -156,8 +156,11 @@ class Settings(BaseSettings):
     # Processing settings
     MAX_CONCURRENT_DOWNLOADS: int = 3
     MAX_CONCURRENT_AI_TASKS: int = 2
-    AI_MODEL: str = "gpt-4o-mini"
+    
+    # ✅ UPDATED: AI Model Configuration for Web Search
+    AI_MODEL: str = "gpt-4o-search-preview"  # Changed from gpt-4o-mini
     AI_MAX_TOKENS: int = 16000
+    WEB_SEARCH_ENABLED: bool = True  # New: Enable web search capability
     
     # AI Generation Parameters
     AI_TEMPERATURE: float = 0.3
@@ -186,8 +189,9 @@ class Settings(BaseSettings):
     FMP_ENABLE: bool = True
     FMP_CACHE_TTL: int = 3600
     
-    # Analyst Expectations API
-    ENABLE_EXPECTATIONS_COMPARISON: bool = True
+    # ✅ UPDATED: Analyst Expectations (保留但不再直接用于 AI prompt)
+    # Note: FMP analyst data still used for company enrichment, but not for AI analysis
+    ENABLE_EXPECTATIONS_COMPARISON: bool = False  # Disabled: AI will search for analyst data instead
     EXPECTATIONS_CACHE_TTL: int = 86400
     
     # Performance Optimization
@@ -391,7 +395,9 @@ class Settings(BaseSettings):
             "current_pricing": self.get_pricing_info(),
             "apple_products": self.get_apple_product_ids(),
             "google_products": self.get_google_product_ids(),
-            "webhook_urls": self.get_webhook_urls() if self.WEBHOOK_BASE_URL else None
+            "webhook_urls": self.get_webhook_urls() if self.WEBHOOK_BASE_URL else None,
+            "ai_model": self.AI_MODEL,  # New: Show AI model in use
+            "web_search_enabled": self.WEB_SEARCH_ENABLED  # New: Show web search status
         }
     
     def validate_production_config(self) -> List[str]:

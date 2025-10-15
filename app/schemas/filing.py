@@ -2,6 +2,7 @@
 Filing schemas for API requests and responses
 Updated to support unified analysis fields and enhanced company info
 FIXED: Changed file_url to filing_url for consistency
+v8_web_search: Removed analyst_expectations and expectations_comparison, added references field
 """
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
@@ -29,6 +30,14 @@ class SmartMarkupData(BaseModel):
                     normalized.append(str(item))
             return normalized
         return v
+
+
+class ReferenceItem(BaseModel):
+    """Web search reference item - NEW for v8_web_search"""
+    id: int = Field(..., description="Reference number")
+    title: str = Field(..., description="Source title")
+    url: str = Field(..., description="Source URL")
+    cited_at: Optional[List[int]] = Field(default=None, description="Positions in text where cited")
 
 
 class CompanyInfo(BaseModel):
@@ -71,13 +80,13 @@ class FilingBase(BaseModel):
     form_type: str
     filing_date: datetime
     accession_number: str
-    filing_url: str  # 👈 修改：从 file_url 改为 filing_url
+    filing_url: str
     
 
 class FilingBrief(FilingBase):
     """Brief filing info for lists"""
     id: int
-    company: CompanyInfo  # 使用增强的CompanyInfo
+    company: CompanyInfo
     one_liner: Optional[str] = None
     sentiment: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
@@ -101,16 +110,20 @@ class FilingDetail(FilingBase):
     """Detailed filing info with unified analysis support and enhanced company info"""
     id: int
     cik: str
-    company: CompanyInfo  # 使用增强的CompanyInfo
+    company: CompanyInfo
     status: str
     
     # ==================== UNIFIED ANALYSIS FIELDS ====================
     # Core unified content
     unified_analysis: Optional[str] = Field(None, description="Unified 800-1200 word analysis")
     unified_feed_summary: Optional[str] = Field(None, description="One-line feed summary")
-    analysis_version: Optional[str] = Field(None, description="v1=legacy, v2=unified")
+    analysis_version: Optional[str] = Field(None, description="v8_web_search=latest with web search")
     smart_markup_data: Optional[Union[Dict[str, Any], SmartMarkupData]] = Field(None, description="Smart markup metadata")
-    analyst_expectations: Optional[Dict[str, Any]] = Field(None, description="Analyst expectations data")
+    
+    # ✅ NEW: Web search references
+    references: Optional[List[ReferenceItem]] = Field(default_factory=list, description="Web search references with citations")
+    
+    # ❌ REMOVED: analyst_expectations - No longer needed with web search
     
     # ==================== LEGACY FIELDS (for backward compatibility) ====================
     # AI-generated content
@@ -156,7 +169,7 @@ class FilingDetail(FilingBase):
     market_impact_10k: Optional[str] = None
     
     # 10-Q specific fields
-    expectations_comparison: Optional[str] = None
+    # ❌ REMOVED: expectations_comparison
     cost_structure: Optional[str] = None
     guidance_update: Optional[str] = None
     growth_decline_analysis: Optional[str] = None
@@ -225,13 +238,24 @@ class FilingDetail(FilingBase):
             return v if v else None
         return str(v) if v else None
     
+    @validator('references', pre=True)
+    def normalize_references(cls, v):
+        """Normalize references to list of ReferenceItem"""
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return v
+        return []
+    
     class Config:
         from_attributes = True
         
     @property
     def display_summary(self) -> Optional[str]:
         """Get display summary - prefer unified over legacy"""
-        if self.analysis_version == "v2" and self.unified_analysis:
+        if self.analysis_version and self.analysis_version.startswith("v8") and self.unified_analysis:
+            return self.unified_analysis
+        elif self.analysis_version == "v2" and self.unified_analysis:
             return self.unified_analysis
         return self.ai_summary
     
@@ -243,16 +267,16 @@ class FilingDetail(FilingBase):
         return self.one_liner
 
 
-# 保留其他Detail类不变...
 class Filing10KDetail(FilingBase):
     """10-K specific detail schema with unified support"""
     id: int
-    company: CompanyInfo  # 使用增强的CompanyInfo
+    company: CompanyInfo
     
     # Unified fields
     unified_analysis: Optional[str] = None
     unified_feed_summary: Optional[str] = None
     smart_markup_data: Optional[Union[Dict[str, Any], SmartMarkupData]] = None
+    references: Optional[List[ReferenceItem]] = Field(default_factory=list)  # ✅ NEW
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -311,13 +335,15 @@ class Filing10KDetail(FilingBase):
 class Filing10QDetail(FilingBase):
     """10-Q specific detail schema with unified support"""
     id: int
-    company: CompanyInfo  # 使用增强的CompanyInfo
+    company: CompanyInfo
     
     # Unified fields
     unified_analysis: Optional[str] = None
     unified_feed_summary: Optional[str] = None
     smart_markup_data: Optional[Union[Dict[str, Any], SmartMarkupData]] = None
-    analyst_expectations: Optional[Dict[str, Any]] = None
+    references: Optional[List[ReferenceItem]] = Field(default_factory=list)  # ✅ NEW
+    
+    # ❌ REMOVED: analyst_expectations
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -325,7 +351,7 @@ class Filing10QDetail(FilingBase):
     period_end_date: Optional[datetime] = None
     
     # 10-Q specific - FIXED: All are Optional[str]
-    expectations_comparison: Optional[str] = None
+    # ❌ REMOVED: expectations_comparison
     cost_structure: Optional[str] = None
     guidance_update: Optional[str] = None
     growth_decline_analysis: Optional[str] = None
@@ -376,12 +402,13 @@ class Filing10QDetail(FilingBase):
 class Filing8KDetail(FilingBase):
     """8-K specific detail schema with unified support"""
     id: int
-    company: CompanyInfo  # 使用增强的CompanyInfo
+    company: CompanyInfo
     
     # Unified fields
     unified_analysis: Optional[str] = None
     unified_feed_summary: Optional[str] = None
     smart_markup_data: Optional[Union[Dict[str, Any], SmartMarkupData]] = None
+    references: Optional[List[ReferenceItem]] = Field(default_factory=list)  # ✅ NEW
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -423,12 +450,13 @@ class Filing8KDetail(FilingBase):
 class FilingS1Detail(FilingBase):
     """S-1 specific detail schema with unified support"""
     id: int
-    company: CompanyInfo  # 使用增强的CompanyInfo
+    company: CompanyInfo
     
     # Unified fields
     unified_analysis: Optional[str] = None
     unified_feed_summary: Optional[str] = None
     smart_markup_data: Optional[Union[Dict[str, Any], SmartMarkupData]] = None
+    references: Optional[List[ReferenceItem]] = Field(default_factory=list)  # ✅ NEW
     
     # Common fields
     ai_summary: Optional[str] = None
@@ -494,7 +522,7 @@ class FilingCreate(BaseModel):
     form_type: str
     filing_date: datetime
     accession_number: str
-    filing_url: str  # 👈 修改：从 file_url 改为 filing_url
+    filing_url: str
     company_name: str
 
 

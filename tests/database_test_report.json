@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-09-30T17:25:51.291004",
+  "database_url": "postgresql://fintellic_user@lo...",
+  "total_checks": 8,
+  "passed_checks": 5,
+  "failed_checks": 3,
+  "issues": [
+    "[用户表结构] 用户表缺少字段: payment_method",
+    "[用户表结构] 用户表缺少字段: monthly_price",
+    "[用户表结构] 用户表缺少字段: google_order_id",
+    "[定价方案表结构] 定价方案表缺少字段: plan_type",
+    "[定价方案表结构] 定价方案表缺少字段: monthly_price",
+    "[定价方案表结构] 定价方案表缺少字段: yearly_price",
+    "[订阅数据样本] 订阅数据检查失败: 'User' object has no attribute 'payment_method'"
+  ],
+  "environment": "development"
+}

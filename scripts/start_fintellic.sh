@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Fintellic Backend Startup Script - Fixed Version
+# Fintellic Backend Startup Script - Enhanced Version
 # Optimized for macOS with Celery thread pool
+# Auto-fixes PostgreSQL version issues
 
 # Colors for output
 RED='\033[0;31m'
@@ -71,14 +72,99 @@ start_service() {
     fi
 }
 
-# 1. Check PostgreSQL
-echo -e "${BLUE}Checking PostgreSQL...${NC}"
-if pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ PostgreSQL is running${NC}"
+# ==================== ENHANCED POSTGRESQL VERSION DETECTION ====================
+
+echo -e "${BLUE}Checking PostgreSQL version and configuration...${NC}"
+
+# Check if PostgreSQL is running on port 5432
+if lsof -i :5432 > /dev/null 2>&1; then
+    echo -e "${CYAN}   PostgreSQL is running on port 5432${NC}"
+    
+    # Detect which PostgreSQL instance is running
+    PG_PROCESS=$(ps aux | grep postgres | grep -v grep | grep -E "(bin/postgres|PostgreSQL)" | head -1)
+    
+    if echo "$PG_PROCESS" | grep -q "/Library/PostgreSQL/16"; then
+        echo -e "${YELLOW}⚠️  Detected standalone PostgreSQL 16 (wrong version!)${NC}"
+        echo -e "${YELLOW}   Stopping PostgreSQL 16 and switching to Homebrew PostgreSQL 15...${NC}"
+        
+        # Stop the standalone PostgreSQL 16
+        sudo pkill -f "postgres.*PostgreSQL/16" 2>/dev/null
+        sleep 2
+        
+        # Verify it's stopped
+        if lsof -i :5432 > /dev/null 2>&1; then
+            echo -e "${RED}❌ Failed to stop PostgreSQL 16${NC}"
+            echo "Please manually stop it: sudo pkill -f postgres"
+            exit 1
+        fi
+        
+        echo -e "${GREEN}✅ PostgreSQL 16 stopped${NC}"
+        
+        # Start PostgreSQL 15
+        echo -e "${BLUE}Starting PostgreSQL 15...${NC}"
+        brew services start postgresql@15
+        sleep 3
+        
+    elif echo "$PG_PROCESS" | grep -q "postgresql@15"; then
+        echo -e "${GREEN}✅ Correct version: PostgreSQL 15 (Homebrew)${NC}"
+        
+    elif echo "$PG_PROCESS" | grep -q "postgresql@14"; then
+        echo -e "${YELLOW}⚠️  Detected PostgreSQL 14${NC}"
+        echo -e "${YELLOW}   Switching to PostgreSQL 15...${NC}"
+        
+        brew services stop postgresql@14
+        sleep 2
+        brew services start postgresql@15
+        sleep 3
+        
+    else
+        echo -e "${YELLOW}⚠️  Unknown PostgreSQL instance detected${NC}"
+        echo -e "${CYAN}   Process: $PG_PROCESS${NC}"
+    fi
 else
-    echo -e "${RED}❌ PostgreSQL is not running${NC}"
-    echo "Please start PostgreSQL first:"
-    echo "  brew services start postgresql@14"
+    # No PostgreSQL running, start PostgreSQL 15
+    echo -e "${YELLOW}PostgreSQL is not running${NC}"
+    echo -e "${BLUE}Starting PostgreSQL 15...${NC}"
+    
+    brew services start postgresql@15
+    sleep 3
+fi
+
+# Final verification
+echo -e "${BLUE}Verifying PostgreSQL 15...${NC}"
+if pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
+    # Check if we can connect to fintellic_db
+    if psql -d postgres -c "SELECT 1" > /dev/null 2>&1; then
+        # Check if fintellic_user exists
+        USER_EXISTS=$(psql -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='fintellic_user'" 2>/dev/null)
+        if [ "$USER_EXISTS" != "1" ]; then
+            echo -e "${YELLOW}⚠️  fintellic_user does not exist, creating...${NC}"
+            psql -d postgres -c "CREATE USER fintellic_user;" 2>/dev/null
+        fi
+        
+        # Check if fintellic_db exists
+        DB_EXISTS=$(psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='fintellic_db'" 2>/dev/null)
+        if [ "$DB_EXISTS" != "1" ]; then
+            echo -e "${YELLOW}⚠️  fintellic_db does not exist, creating...${NC}"
+            psql -d postgres -c "CREATE DATABASE fintellic_db OWNER fintellic_user;" 2>/dev/null
+            psql -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE fintellic_db TO fintellic_user;" 2>/dev/null
+        fi
+        
+        echo -e "${GREEN}✅ PostgreSQL 15 is ready${NC}"
+        
+        # Show data directory info
+        PG_DATA_DIR=$(psql -d postgres -tAc "SHOW data_directory" 2>/dev/null)
+        if [[ "$PG_DATA_DIR" == *"postgresql@15"* ]]; then
+            echo -e "${GREEN}   Data directory: $PG_DATA_DIR${NC}"
+        fi
+    else
+        echo -e "${RED}❌ Cannot connect to PostgreSQL${NC}"
+        exit 1
+    fi
+else
+    echo -e "${RED}❌ PostgreSQL is not responding${NC}"
+    echo "Please check PostgreSQL status:"
+    echo "  brew services list | grep postgres"
     exit 1
 fi
 
@@ -132,6 +218,11 @@ except Exception as e:
     print(f'❌ Database error: {e}')
     exit(1)
 "
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ Database health check failed${NC}"
+    exit 1
+fi
 
 # 4. Check Python environment
 echo -e "${BLUE}Verifying Python environment...${NC}"
@@ -240,6 +331,7 @@ echo "   - Auto-scanning every minute"
 echo "   - Redis caching enabled"
 echo "   - S&P 500 + NASDAQ 100 monitoring"
 echo "   - Thread pool for macOS compatibility"
+echo "   - PostgreSQL 15 (Auto-managed)"
 echo ""
 echo "📁 Locations:"
 echo "   - Logs: $LOG_DIR/"
@@ -265,4 +357,7 @@ if command -v redis-cli > /dev/null 2>&1; then
 fi
 
 echo ""
-echo -e "${CYAN}💡 Note: Using thread pool for Celery to avoid macOS fork issues${NC}"
+echo -e "${CYAN}💡 Notes:${NC}"
+echo "   - Using PostgreSQL 15 from Homebrew"
+echo "   - Using thread pool for Celery to avoid macOS fork issues"
+echo "   - Auto-detection and fixing of PostgreSQL version issues"

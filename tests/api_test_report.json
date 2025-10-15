@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-09-30T17:23:05.604562",
+  "base_url": "http://localhost:8000",
+  "total_tests": 2,
+  "successful_tests": 2,
+  "failed_tests": 0,
+  "has_auth_token": false,
+  "environment": "development",
+  "test_results": [
+    {
+      "method": "POST",
+      "path": "/subscriptions/webhook/apple",
+      "description": "Apple Webhook 端点",
+      "status_code": 200,
+      "expected_status": 200,
+      "success": true,
+      "response_time": 0.002966,
+      "content_type": "application/json",
+      "response_body": {
+        "status": "ok"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/subscriptions/webhook/google",
+      "description": "Google Webhook 端点",
+      "status_code": 200,
+      "expected_status": 200,
+      "success": true,
+      "response_time": 0.004773,
+      "content_type": "application/json",
+      "response_body": {
+        "status": "error",
+        "message": "No data"
+      }
+    }
+  ]
+}

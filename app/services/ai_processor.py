@@ -1,10 +1,12 @@
 # app/services/ai_processor.py
 """
-AI Processor Service - Enhanced with Web Search Integration
-Version: v8_web_search
-MAJOR UPDATE: Integrated gpt-4o-search-preview with web search capability
-REMOVED: FMP analyst data dependencies
-ADDED: Web search references processing and citation system
+AI Processor Service - Enhanced with Flash Note Style for o3-mini
+Version: v10_flash_note_o3mini
+MAJOR UPDATE: 
+- Switched to o3-mini reasoning model
+- Restructured 10-Q prompt with Sell-Side Flash Note style
+- Enhanced beat/miss calculation workflow to prevent AI失焦
+- Optimized for autonomous web search and tool use
 """
 import json
 import re
@@ -29,39 +31,65 @@ logger = logging.getLogger(__name__)
 # Initialize OpenAI client
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-# ✅ UPDATED: Enhanced data source marking patterns with web search citations
+# Enhanced data source marking patterns with web search citations
 DATA_SOURCE_PATTERNS = {
     'document': r'\[DOC:\s*([^\]]+)\]',
-    'search': r'\[(\d+)\]',  # NEW: Footnote-style citations for web search
+    'search': r'\[(\d+)\]',
     'calc': r'\[CALC:\s*([^\]]+)\]',
+    'fmp': r'\[FMP\]',
     'no_data': r'\[NO_DATA\]',
     'caution': r'\[CAUTION\]'
 }
 
 class AIProcessor:
     """
-    Process filings using OpenAI with web search integration
-    v8_web_search: Removed FMP analyst data, added web search capability
+    Process filings using OpenAI o3-mini with Flash Note structure
+    v10_flash_note_o3mini: Optimized for reasoning model with analyst estimates integration
     """
     
     def __init__(self):
-        self.model = settings.AI_MODEL  # Now gpt-4o-search-preview
+        self.model = settings.AI_MODEL  # Now using o3-mini
         self.max_tokens = settings.AI_MAX_TOKENS
         self.temperature = settings.AI_TEMPERATURE
         self.enable_web_search = settings.WEB_SEARCH_ENABLED
         
-        # Initialize tokenizer
-        try:
-            self.encoding = tiktoken.encoding_for_model("gpt-4o")  # Use gpt-4o encoding
-        except:
-            self.encoding = tiktoken.get_encoding("cl100k_base")
+        self.encoding = self._initialize_tokenizer()
         
-        # Token limits
         self.max_input_tokens = 100000
         self.target_output_tokens = 3000
     
+    def _initialize_tokenizer(self):
+        """Robust tokenizer initialization with graceful fallbacks"""
+        try:
+            logger.info("Initializing tiktoken with cl100k_base encoding")
+            encoding = tiktoken.get_encoding("cl100k_base")
+            logger.info("✅ Successfully initialized tiktoken with cl100k_base")
+            return encoding
+            
+        except Exception as e1:
+            logger.warning(f"Failed to load cl100k_base encoding: {e1}")
+            
+            try:
+                logger.info("Attempting tiktoken with o200k_base encoding")
+                encoding = tiktoken.get_encoding("o200k_base")
+                logger.info("✅ Successfully initialized tiktoken with o200k_base")
+                return encoding
+                
+            except Exception as e2:
+                logger.warning(f"Failed to load o200k_base encoding: {e2}")
+                
+                try:
+                    logger.info("Attempting tiktoken with p50k_base encoding")
+                    encoding = tiktoken.get_encoding("p50k_base")
+                    logger.info("✅ Successfully initialized tiktoken with p50k_base")
+                    return encoding
+                    
+                except Exception as e3:
+                    logger.error(f"All tiktoken encodings failed. Using character-based estimation.")
+                    return None
+    
     def _get_safe_filing_type_value(self, filing_type: Union[FilingType, str]) -> str:
-        """Safely get filing type value, handling both enum and string types"""
+        """Safely get filing type value"""
         if isinstance(filing_type, str):
             return filing_type
         elif hasattr(filing_type, 'value'):
@@ -69,11 +97,11 @@ class AIProcessor:
         elif isinstance(filing_type, FilingType):
             return filing_type.value
         else:
-            logger.warning(f"Unexpected filing_type type: {type(filing_type)}, value: {filing_type}")
+            logger.warning(f"Unexpected filing_type type: {type(filing_type)}")
             return str(filing_type)
     
     def _get_safe_ticker(self, filing: Filing) -> str:
-        """Get ticker safely, returning a default value if None"""
+        """Get ticker safely"""
         if filing.ticker:
             return filing.ticker
         elif filing.company and filing.company.ticker:
@@ -88,30 +116,28 @@ class AIProcessor:
             return "UNKNOWN"
     
     def _count_tokens(self, text: str) -> int:
-        """Count tokens in text using tiktoken"""
+        """Count tokens with fallback"""
+        if self.encoding is None:
+            return len(text) // 4
+        
         try:
             return len(self.encoding.encode(text))
-        except:
+        except Exception as e:
+            logger.warning(f"Token counting failed: {e}. Using character-based estimation.")
             return len(text) // 4
     
     def _validate_data_marking(self, text: str) -> Tuple[bool, List[str]]:
-        """
-        CRITICAL: Validate that AI output contains proper data source markings
-        Enhanced to support web search citations [1][2][3]
-        """
+        """Validate data source markings"""
         issues = []
         
-        # Extract all numbers and claims
         numbers = re.findall(r'\$[\d,]+[BMK]?|[\d,]+%|\d+\.?\d*\s*(?:million|billion)', text)
         
-        # Check if numbers have nearby citations
         unmarked_numbers = 0
         for number in numbers[:15]:
             pos = text.find(number)
             if pos == -1:
                 continue
                 
-            # Expand search window for citations
             nearby_text = text[max(0, pos-100):pos+100]
             has_citation = any(
                 re.search(pattern, nearby_text) 
@@ -123,7 +149,6 @@ class AIProcessor:
                 if unmarked_numbers <= 3:
                     issues.append(f"Unmarked number: {number}")
         
-        # Check minimum marking density
         total_markings = sum(
             len(re.findall(pattern, text)) 
             for pattern in DATA_SOURCE_PATTERNS.values()
@@ -135,7 +160,6 @@ class AIProcessor:
             if total_markings < expected_markings:
                 issues.append(f"Insufficient data source markings: {total_markings}/{expected_markings} expected")
         
-        # Check for template/placeholder content
         suspicious_patterns = [
             r'\$X\.XB', r'\$\d+\.XB', r'TBD', r'INSERT.*HERE', 
             r'PLACEHOLDER', r'\[AMOUNT\]', r'\[NUMBER\]'
@@ -148,7 +172,7 @@ class AIProcessor:
         return is_valid, issues
     
     def _smart_truncate_content(self, content: str, max_tokens: int, filing_type: Union[FilingType, str]) -> str:
-        """Intelligently truncate content while preserving key sections"""
+        """Intelligently truncate content"""
         current_tokens = self._count_tokens(content)
         
         if current_tokens <= max_tokens:
@@ -210,7 +234,7 @@ class AIProcessor:
         return result
         
     async def process_filing(self, db: Session, filing: Filing) -> bool:
-        """Process a filing using unified AI analysis with web search capability"""
+        """Process a filing using unified AI analysis"""
         try:
             filing.status = ProcessingStatus.ANALYZING
             filing.processing_started_at = datetime.utcnow()
@@ -220,10 +244,13 @@ class AIProcessor:
             company_name = filing.company.name if filing.company else "Unknown Company"
             filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
             
-            logger.info(f"Starting v8 web search AI processing for {ticker} {filing_type_value}")
+            logger.info(f"Starting v10 Flash Note AI processing (o3-mini) for {ticker} {filing_type_value}")
             
-            # Fetch and store FMP company profile data
+            # Fetch FMP company profile
             await self._fetch_and_store_fmp_data(db, filing, ticker)
+            
+            # ✅ Fetch analyst estimates for 10-Q/10-K
+            await self._fetch_and_store_analyst_estimates(db, filing, ticker)
             
             # Get filing directory
             filing_dir = Path(f"data/filings/{filing.company.cik}/{filing.accession_number.replace('-', '')}")
@@ -240,7 +267,7 @@ class AIProcessor:
             if sections.get('enhanced_text'):
                 logger.info(f"Using enhanced Markdown content: {len(primary_content)} chars")
             
-            # 8-K Exhibit Content Integration
+            # 8-K Exhibit integration
             if filing.filing_type == FilingType.FORM_8K:
                 exhibit_content = sections.get('important_exhibits_content', '') or sections.get('exhibit_99_content', '')
                 if exhibit_content and len(exhibit_content) > 100:
@@ -252,10 +279,7 @@ class AIProcessor:
             
             logger.info(f"Extracted content - Primary: {len(primary_content)} chars")
             
-            # ❌ REMOVED: FMP analyst data fetching logic
-            # Web search will handle analyst expectations dynamically
-            
-            # Generate unified analysis with web search
+            # Generate unified analysis with retry
             unified_result = await self._generate_unified_analysis_with_retry(
                 filing, primary_content, full_text
             )
@@ -264,8 +288,8 @@ class AIProcessor:
             filing.unified_analysis = unified_result['unified_analysis']
             filing.unified_feed_summary = unified_result['feed_summary']
             filing.smart_markup_data = unified_result['markup_data']
-            filing.references = unified_result.get('references', [])  # ✅ NEW: Store references
-            filing.analysis_version = "v8_web_search"  # ✅ NEW: Updated version marker
+            filing.references = unified_result.get('references', [])
+            filing.analysis_version = "v10_flash_note_o3mini"
             
             # Extract supplementary fields
             await self._extract_supplementary_fields(filing, unified_result, primary_content, full_text)
@@ -276,18 +300,18 @@ class AIProcessor:
             
             db.commit()
             
-            logger.info(f"✅ v8 web search AI processing completed for {filing.accession_number}")
+            logger.info(f"✅ v10 Flash Note AI processing (o3-mini) completed for {filing.accession_number}")
             return True
             
         except Exception as e:
-            logger.error(f"Error in v8 web search AI processing: {e}")
+            logger.error(f"Error in v10 AI processing: {e}")
             filing.status = ProcessingStatus.FAILED
             filing.error_message = str(e)
             db.commit()
             return False
     
     async def _fetch_and_store_fmp_data(self, db: Session, filing: Filing, ticker: str):
-        """Fetch FMP company profile data for enrichment (not for AI analysis)"""
+        """Fetch FMP company profile for enrichment"""
         if not ticker or ticker in ["UNKNOWN", "PRE-IPO"] or ticker.startswith("CIK"):
             return
         
@@ -342,13 +366,50 @@ class AIProcessor:
         except Exception as e:
             logger.error(f"[FMP Integration] Error fetching FMP data for {ticker}: {e}")
     
+    async def _fetch_and_store_analyst_estimates(self, db: Session, filing: Filing, ticker: str):
+        """
+        ✅ Fetch analyst estimates and store in filing
+        Only for 10-Q and 10-K filings
+        """
+        # Only for quarterly and annual reports
+        if filing.filing_type not in [FilingType.FORM_10Q, FilingType.FORM_10K]:
+            return
+        
+        if not ticker or ticker in ["UNKNOWN", "PRE-IPO"] or ticker.startswith("CIK"):
+            logger.info(f"[FMP Estimates] Skipping for invalid ticker: {ticker}")
+            return
+        
+        try:
+            logger.info(f"[FMP Estimates] Fetching latest estimates for {ticker}")
+            
+            # Use optimized method to get latest estimates
+            estimates = fmp_service.get_latest_analyst_estimates(ticker)
+            
+            if estimates:
+                # Store in filing record
+                filing.estimate_eps = estimates.get('eps')
+                filing.estimate_revenue = estimates.get('revenue')
+                
+                db.commit()
+                
+                logger.info(
+                    f"[FMP Estimates] Stored for {ticker}: "
+                    f"EPS=${estimates.get('eps')}, Revenue=${estimates.get('revenue')}B"
+                )
+            else:
+                logger.info(f"[FMP Estimates] No estimates available for {ticker}")
+                
+        except Exception as e:
+            logger.error(f"[FMP Estimates] Error for {ticker}: {e}")
+            # Don't fail filing processing if FMP fails
+    
     async def _generate_unified_analysis_with_retry(
         self, 
         filing: Filing, 
         primary_content: str, 
         full_text: str
     ) -> Dict:
-        """Generate unified analysis with web search and intelligent retry logic"""
+        """Generate unified analysis with intelligent retry"""
         max_retries = 3
         
         for attempt in range(max_retries):
@@ -358,12 +419,10 @@ class AIProcessor:
                 primary_content, full_text, filing.filing_type, attempt
             )
             
-            # Generate analysis with web search
             unified_result = await self._generate_unified_analysis(
                 filing, processed_content, processed_content
             )
             
-            # Validate data marking
             is_valid, validation_issues = self._validate_data_marking(unified_result['unified_analysis'])
             
             if not is_valid:
@@ -371,7 +430,6 @@ class AIProcessor:
                 if attempt < max_retries - 1:
                     continue
             
-            # Validate word count
             word_count = len(unified_result['unified_analysis'].split())
             
             if filing.filing_type == FilingType.FORM_10K:
@@ -407,7 +465,7 @@ class AIProcessor:
         return unified_result
     
     def _preprocess_content_for_ai(self, primary_content: str, full_text: str, filing_type: Union[FilingType, str], attempt: int) -> str:
-        """Preprocess content to ensure AI gets high-quality input"""
+        """Preprocess content for AI"""
         if attempt == 0:
             content = primary_content
         else:
@@ -424,7 +482,7 @@ class AIProcessor:
         return content
     
     def _clean_content_for_ai(self, content: str) -> str:
-        """Clean content for better AI processing"""
+        """Clean content for AI processing"""
         legal_patterns = [
             r'PURSUANT TO THE REQUIREMENTS.*?(?=\n\n|\Z)',
             r'The information.*?incorporated by reference.*?(?=\n\n|\Z)',
@@ -441,7 +499,7 @@ class AIProcessor:
         return content.strip()
     
     def _validate_content_quality(self, analysis: str, filing_type: Union[FilingType, str]) -> bool:
-        """Validate that the generated analysis has sufficient quality"""
+        """Validate analysis quality"""
         if isinstance(filing_type, str):
             filing_type_value = filing_type
         else:
@@ -470,7 +528,7 @@ class AIProcessor:
         return True
     
     def _contains_template_numbers(self, text: str) -> bool:
-        """Check if analysis contains suspicious template numbers"""
+        """Check for template numbers"""
         template_patterns = [
             r'\$5\.2B', r'exceeded.*by.*6%', r'\$4\.9B',
             r'placeholder', r'INSERT.*HERE', r'TBD',
@@ -488,20 +546,17 @@ class AIProcessor:
         primary_content: str, 
         full_text: str
     ) -> Dict:
-        """
-        Generate unified analysis with web search capability
-        ❌ REMOVED: analyst_data parameter
-        """
+        """Generate unified analysis with filing-specific prompts"""
         content = primary_content
         
         filing_context = self._build_filing_context(filing)
         filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
         
-        # Generate unified analysis with filing-specific prompts
-        if filing_type_value in ['FORM_10K', '10-K']:
-            prompt = self._build_10k_unified_prompt_enhanced(filing, content, filing_context)
-        elif filing_type_value in ['FORM_10Q', '10-Q']:
+        # ✅ UPDATED: Use new Flash Note prompt for 10-Q
+        if filing_type_value in ['FORM_10Q', '10-Q']:
             prompt = self._build_10q_unified_prompt_enhanced(filing, content, filing_context)
+        elif filing_type_value in ['FORM_10K', '10-K']:
+            prompt = self._build_10k_unified_prompt_enhanced(filing, content, filing_context)
         elif filing_type_value in ['FORM_8K', '8-K']:
             prompt = self._build_8k_unified_prompt(filing, content, filing_context)
         elif filing_type_value in ['FORM_S1', 'S-1']:
@@ -512,33 +567,29 @@ class AIProcessor:
         prompt_tokens = self._count_tokens(prompt)
         logger.info(f"Prompt tokens: {prompt_tokens}")
         
-        # ✅ UPDATED: Generate with web search support
         unified_analysis, references = await self._generate_text_with_search(
             prompt, 
             max_tokens=settings.AI_UNIFIED_ANALYSIS_MAX_TOKENS
         )
         
-        # Generate feed summary
         feed_summary = await self._generate_feed_summary_from_unified(
             unified_analysis, 
             filing_type_value,
             filing
         )
         
-        # Extract markup data
         markup_data = self._extract_markup_data(unified_analysis)
         
         return {
             'unified_analysis': unified_analysis,
             'feed_summary': feed_summary,
             'markup_data': markup_data,
-            'references': references  # ✅ NEW: Return references
+            'references': references
         }
     
     def _build_filing_context(self, filing: Filing) -> Dict:
         """
-        Build context dictionary for prompt generation
-        ❌ REMOVED: analyst_data parameter
+        ✅ UPDATED: Build context with FMP estimates
         """
         context = {
             'company_name': filing.company.name if filing.company else "the company",
@@ -550,6 +601,13 @@ class AIProcessor:
             'current_date': datetime.now().strftime('%B %d, %Y'),
         }
         
+        # ✅ NEW: Add FMP estimates if available
+        if hasattr(filing, 'estimate_eps') and filing.estimate_eps:
+            context['estimate_eps'] = filing.estimate_eps
+        
+        if hasattr(filing, 'estimate_revenue') and filing.estimate_revenue:
+            context['estimate_revenue'] = filing.estimate_revenue
+        
         if filing.filing_type == FilingType.FORM_8K:
             context['event_type'] = self._identify_8k_event_type(filing.primary_content if hasattr(filing, 'primary_content') else '')
             context['item_type'] = filing.item_type if hasattr(filing, 'item_type') else ''
@@ -557,228 +615,499 @@ class AIProcessor:
         return context
     
     def _build_data_marking_instructions(self) -> str:
-        """
-        Build instructions for data source marking with web search support
-        ✅ UPDATED: Added web search citation guidance
-        """
+        """Data source attribution instructions"""
         return """
 CRITICAL: Data Source Attribution System
 =========================================
-Every factual claim MUST be attributed to its source using these tags:
+Every factual claim MUST be attributed to its source:
 
-1. [DOC: location] - Information from THIS filing document
-   Examples: [DOC: Income Statement], [DOC: MD&A p.3], [DOC: Risk Factors]
+1. [DOC: location] - From THIS filing
+   Examples: [DOC: Income Statement], [DOC: MD&A]
 
-2. [1], [2], [3]... - Web search results (numbered footnotes)
-   - Use for ALL external data: industry trends, competitor metrics, analyst expectations
-   - Numbers correspond to References section auto-generated at document end
-   - Example: "Industry grew 8% [1], outpacing expectations [2]..."
+2. [1], [2], [3]... - Web search results
+   Use for external data: industry trends, competitor metrics, analyst perspectives
 
-3. [CALC: formula] - Your calculations from filing data
-   Example: [CALC: $15.0B/$13.6B - 1 = 10% YoY growth]
+3. [FMP] - FMP analyst consensus data
+   Use ONLY for pre-provided estimate numbers
 
-4. [NO_DATA] - When specific information is unavailable
-   Example: "Detailed segment breakdown [NO_DATA] in this quarter"
+4. [CALC: formula] - Your calculations
+   Example: [CALC: $XX.XB/$XX.XB - 1 = X.X% YoY]
 
-5. [CAUTION] - For inferences with uncertainty
-   Example: "This suggests [CAUTION] potential pricing power erosion"
+5. [NO_DATA] - Information unavailable
 
-SEARCH GUIDANCE:
-- You have access to real-time web search
-- Search when external context adds material insight (industry data, peer performance, analyst expectations, macro trends)
-- Prioritize authoritative sources: Bloomberg, Reuters, industry research firms
-- Do NOT search for information that should be in the filing itself
+6. [CAUTION] - Inferences with uncertainty
 
-CRITICAL RULES:
-- Financial figures without [DOC:] or [CALC:] tags will be REJECTED
-- Web-sourced claims without [1][2][3] citations will be REJECTED
-- Markdown tables in filing are your most reliable data source
-- Never invent consensus figures - search for them or use [NO_DATA]
+RULES:
+- Financial figures without citations = REJECTED
+- Never invent consensus figures
+- Search when external context adds material insight
 """
-    
-    # ✅ UPDATED: All prompt building methods now reference web search capability
-    # The prompts are loaded from the separate template document you provided
-    # I'll include the key prompt methods here with web search integration
-    
-    def _build_10k_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
-        """Enhanced 10-K prompt with web search guidance"""
-        marking_instructions = self._build_data_marking_instructions()
-        
-        return f"""You are a seasoned equity analyst writing for retail investors who want professional insights in accessible language.
-
-{marking_instructions}
-
-CORE MISSION: 
-Create a comprehensive analysis of this annual report that helps readers understand {context['company_name']} ({context['ticker']}) year in review, future prospects, and management effectiveness.
-
-When peer comparison or industry context would enrich your analysis, you may search for:
-- Industry growth rates and market size data
-- Peer group performance metrics
-- Sector trends and competitive dynamics
-- Analyst perspectives on the company or industry
-
-WORD COUNT GUIDANCE:
-Aim for 800-1200 words if the filing provides rich information.
-
-CRITICAL ANALYSIS AREAS:
-1. **Financial Performance** - Revenue, profitability, cash flow with [DOC:] citations
-2. **Management Discussion** - Strategic priorities and outlook [DOC: MD&A]
-3. **Industry Context** - Search for relevant market data when helpful [1][2]
-4. **Competitive Position** - How does this company compare? [DOC: + search]
-5. **Risk Assessment** - Top material risks [DOC: Risk Factors]
-
-CONTEXT:
-Company: {context['company_name']} ({context['ticker']})
-Fiscal Year: {context.get('fiscal_year', 'FY2024')}
-Current Date: {context['current_date']}
-
-FILING CONTENT:
-{content}
-
-Provide comprehensive analysis with complete source attribution:"""
     
     def _build_10q_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
         """
-        Enhanced 10-Q prompt with web search for analyst expectations
-        ❌ REMOVED: analyst_data parameter and FMP context
+        ✅ NEW: Enhanced 10-Q prompt with Flash Note style for o3-mini
         """
         marking_instructions = self._build_data_marking_instructions()
         
-        return f"""You are a professional equity analyst writing for retail investors seeking clear quarterly insights.
+        # Build beat/miss context if estimates available
+        beat_miss_section = ""
+        critical_estimates = ""
+        if context.get('estimate_eps') or context.get('estimate_revenue'):
+            beat_miss_section = self._build_beat_miss_context(context)
+            # Build critical estimates reminder
+            critical_estimates = "CRITICAL - ANALYST CONSENSUS (FMP):\n"
+            if context.get('estimate_revenue'):
+                critical_estimates += f"- Revenue Estimate: ${context['estimate_revenue']}B\n"
+            if context.get('estimate_eps'):
+                critical_estimates += f"- EPS Estimate: ${context['estimate_eps']}\n"
+            critical_estimates += "\n"
+        
+        return f"""You are a sell-side equity analyst at a top-tier investment bank writing a flash note to institutional clients immediately after {context['company_name']}'s 10-Q filing.
+
+Your clients are Portfolio Managers at hedge funds and mutual funds. They receive 100+ research emails per day.
+
+{critical_estimates}{marking_instructions}
+
+## OUTPUT STRUCTURE (MANDATORY)
+
+---
+
+### SECTION 1: FACT CLARITY
+
+**Format Requirements**:
+
+1. **Headline** (MANDATORY - First Line):
+   - 8-15 words maximum
+   - Capture: Beat/Miss + Key Driver + Action Implication
+   - Examples:
+     * "TICKER Beats on EPS (+XX% YoY); Strong Category Recovery Drives Upside"
+     * "TICKER Misses on Margins; Guidance Cut Pressures Valuation"
+
+2. **Bullet Points** (8-12 bullets):
+   - Each bullet = One metric only
+   - Format: `• **Metric Name**: $XX.XB, +X% YoY [Source] - Commentary`
+   - Use abbreviations: YoY, QoQ, v/s
+   - Bold **BEAT** or **MISS** vs. consensus when applicable [FMP]
+   - Most important metrics first (Revenue, EPS always top 2)
+   
+   **MANDATORY FIRST TWO BULLETS** (if estimates available):
+   • **Total Revenue**: $XX.XB, +X% YoY [DOC: Income Statement] - **BEAT/MISS** by $X.XB vs. estimate [FMP]
+   • **Diluted EPS**: $X.XX, +X% YoY [DOC] - **BEAT/MISS** by $X.XX vs. consensus [FMP]
+
+3. **Length**: 300-450 words maximum
+
+**Quality Bar**: 
+Would a trader understand the key numbers and beat/miss in one quick scan?
+
+**BEFORE WRITING SECTION 1 - DO THIS CALCULATION FIRST**:
+If analyst estimates are available [FMP]:
+  Step 1: Find Actual Revenue in [DOC: Income Statement]
+  Step 2: Find Actual EPS (Diluted) in [DOC: Income Statement]
+  Step 3: Calculate Beat/Miss:
+    - Revenue Delta = Actual Revenue - Estimate Revenue
+    - EPS Delta = Actual EPS - Estimate EPS
+    - If Delta > 0: Write "**BEAT** by $X.XX"
+    - If Delta < 0: Write "**MISS** by $X.XX"
+    - If Delta = 0: Write "**IN-LINE**"
+  
+  CRITICAL: Do NOT reverse the direction. Actual > Estimate = BEAT.
+  
+Then write your bullets using these calculated results.
+
+---
+
+### SECTION 2: MARKET PERSPECTIVE
+
+**Purpose**: Provide context and conviction for position sizing
+
+**Format Requirements**:
+
+1. **Structure** (Natural Prose Paragraphs):
+   - Paragraph 1: Why beat/miss happened + peer comparison (search if needed)
+   - Paragraph 2: Margin/profitability drivers
+   - Paragraph 3: Key operational metrics or risk factors
+   - Paragraph 4-5: Forward catalysts/concerns
+   - Final Paragraph: "Bottom Line" summary
+
+2. **Length**: 600-800 words (strict max: 900 words)
+
+3. **External Context**:
+   - You have web search capability
+   - Use when industry/peer context adds material insight
+   
+   **WHEN to search** (Concrete Examples):
+   ✅ "Competitor's Q3 revenue growth for comparison"
+   ✅ "Industry-wide credit delinquency trends"
+   ✅ "Peer company's recent earnings results"
+   ❌ Don't search for generic statements like "industry is growing"
+   ❌ Don't search if filing already provides sufficient context
+   
+   **CITATION REQUIREMENTS** (CRITICAL):
+   - Every search result MUST be cited as [1], [2], [3]
+   - At bottom of Section 2, list full sources:
+     Example format:
+     [1] Competitor Name Q3 2025 Earnings Release, Month Year
+     [2] Federal Reserve Report Name, Month Year
+   - NO citations without full source details
+   - NO vague references like "according to industry data"
+
+4. **Data Attribution**: 
+   - Same rules as Section 1
+   - Every claim needs source
+
+**Quality Bar**:
+Would a PM trust this enough to increase position size by 2%?
+
+---
+
+## CRITICAL RULES
+
+**Data Source Attribution** (MANDATORY):
+- [DOC: Location] - From this filing
+- [FMP] - Analyst consensus (pre-provided)
+- [CALC: formula] - Your calculations
+- [1], [2] - Web search (with full source at bottom)
+
+**Style**:
+- Active voice: "Revenue grew 11%" not "was up 11%"
+- Specific: "$XX.XB" not "approximately XX billion"
+- Lead with numbers: "EPS $X.XX beat by $X.XX"
+- No vague terms without data: avoid "significant", "impressive" alone
+
+**DON'T**:
+- Repeat info between sections
+- Speculate without data
+- Use marketing language: "game-changing", "revolutionary"
+
+---
+
+{beat_miss_section}
+
+## COMPANY CONTEXT
+
+- **Company**: {context['company_name']} ({context['ticker']})
+- **Quarter**: {context.get('fiscal_quarter', 'Q3')} {context.get('fiscal_year', '2025')}
+- **Period End**: {context.get('period_end_date', 'N/A')}
+- **Filing Date**: {context['filing_date']}
+
+---
+
+## FILING CONTENT
+
+{content}
+
+---
+
+Now generate your two-section analysis following this structure.
+
+**SECTION 1: FACT CLARITY** - Headline + 8-12 bullets (max 450 words)
+**SECTION 2: MARKET PERSPECTIVE** - Analyst commentary (600-800 words)
+"""
+    
+    def _build_beat_miss_context(self, context: Dict) -> str:
+        """
+        ✅ Build structured beat/miss reference table
+        """
+        eps_estimate = context.get('estimate_eps')
+        revenue_estimate = context.get('estimate_revenue')
+        
+        if not eps_estimate and not revenue_estimate:
+            return ""
+        
+        table_rows = []
+        
+        if eps_estimate:
+            table_rows.append(f"| EPS (Diluted) | ${eps_estimate:.2f} | [FMP] |")
+        
+        if revenue_estimate:
+            table_rows.append(f"| Revenue | ${revenue_estimate:.1f}B | [FMP] |")
+        
+        table = "\n".join(table_rows)
+        
+        return f"""
+## CRITICAL: Beat/Miss Reference Data
+
+**IMPORTANT**: This section contains PRE-VERIFIED analyst consensus from FMP.
+
+### Analyst Consensus Estimates
+
+| Metric | Consensus Estimate | Source |
+|--------|-------------------|---------|
+{table}
+
+### YOUR ANALYSIS WORKFLOW:
+
+**Step 1 - Extract Actuals from Filing**:
+Look for "Diluted earnings per share" and "Total revenue" in financial statements.
+
+Write in FACT CLARITY section:
+- **Diluted EPS**: $X.XX [DOC: Income Statement]
+- **Revenue**: $XX.XB [DOC: Income Statement]
+
+**Step 2 - Determine Beat/Miss**:
+FOR EPS:
+- If Actual EPS > Estimate: Write "BEAT by $X.XX"
+- If Actual EPS < Estimate: Write "MISS by $X.XX"
+- If Actual EPS = Estimate: Write "IN-LINE"
+
+FOR REVENUE: Same logic
+
+**Step 3 - Explain in MARKET PERSPECTIVE**:
+Why did the company beat/miss? What does this tell us about execution and market conditions?
+
+Do NOT recalculate. Use the comparison from Step 2 directly.
+
+---
+"""
+    
+    def _build_10k_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
+        """10-K prompt - placeholder for now"""
+        marking_instructions = self._build_data_marking_instructions()
+        
+        return f"""You are a seasoned equity analyst writing for retail investors.
 
 {marking_instructions}
 
-CORE MISSION:
-Analyze {context['company_name']}'s ({context['ticker']}) quarterly results: What happened? Why does it matter? What's management saying?
+Analyze this annual report for {context['company_name']} ({context['ticker']}).
 
-When analyst expectations or peer comparisons would add context, search for:
-- Analyst consensus for revenue/EPS for this quarter
-- Peer quarterly results announced recently
-- Industry quarterly trends and data
+Focus on: Financial performance, strategic priorities, risks, competitive position.
 
-WORD COUNT GUIDANCE:
-Target 600-1000 words based on available information.
-
-CRITICAL ANALYSIS AREAS:
-1. **Quarterly Performance** - Results vs prior year/quarter [DOC: Financial Statements]
-2. **Beat/Miss Analysis** - Compare to expectations if found via search [1][2]
-3. **Management Commentary** - Guidance and outlook [DOC: MD&A]
-4. **Operational Trends** - Margins, segments, key metrics [DOC:]
-5. **Industry Context** - How did peers perform? [search when helpful]
-
-CONTEXT:
-Company: {context['company_name']} ({context['ticker']})
-Quarter: {context.get('fiscal_quarter', 'Q3 2024')}
-Current Date: {context['current_date']}
-
-If you cannot find analyst expectations via search, use [NO_DATA] and focus on sequential and YoY comparisons.
+Maximum: 1200 words total.
 
 FILING CONTENT:
 {content}
 
-Analyze this quarter's performance with complete source attribution:"""
+Provide comprehensive analysis with source attribution."""
     
     def _build_8k_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
-        """8-K prompt with web search for event context"""
+        """
+        8-K prompt using Financial News Analyst style
+        Structure: EVENT SNAPSHOT + IMPACT ANALYSIS
+        """
         marking_instructions = self._build_data_marking_instructions()
         
-        return f"""You are a financial journalist analyzing a material event for {context['company_name']} ({context['ticker']}).
+        # Special handling for Item 2.02 (Earnings Release)
+        # Check if this is an earnings-related 8-K
+        is_earnings_8k = 'item 2.02' in content.lower() or 'results of operations' in content.lower()
+        
+        if is_earnings_8k:
+            # Use 10-Q style prompt for earnings 8-Ks
+            logger.info("Detected Item 2.02 earnings 8-K, using 10-Q prompt structure")
+            return self._build_10q_unified_prompt_enhanced(filing, content, context)
+        
+        # Standard 8-K prompt for other material events
+        return f"""You are a financial news analyst covering breaking corporate events for {context['company_name']}.
+
+A material 8-K filing just hit the wire. Your institutional clients need:
+1. Fast: What happened?
+2. Clear: Why it matters?
+3. Actionable: What should I watch?
 
 {marking_instructions}
 
-CORE MISSION:
-Explain this event's significance and likely impact.
+## OUTPUT STRUCTURE (MANDATORY)
 
-When market context would be valuable, search for:
-- Industry reactions to similar events
-- Peer precedents
-- Analyst commentary on this type of event
+---
 
-WORD COUNT GUIDANCE:
-Target 400-800 words depending on event complexity.
+### SECTION 1: EVENT SNAPSHOT
 
-ANALYSIS FRAMEWORK:
-- Lead with the most newsworthy aspect [DOC:]
-- Provide context and details [DOC:] 
-- Search for industry perspective when relevant [1][2]
-- Explain business impact
-- What to watch next
+**Purpose**: Enable fast comprehension of what happened (30 seconds read)
 
-CONTEXT:
-Event Date: {context['filing_date']}
-Event Type: {context.get('event_type', 'Material Event')}
+**Format**: 2-3 short paragraphs (150-200 words total)
 
-FILING CONTENT:
+**Structure**:
+
+**Paragraph 1 (Lede)**: Lead with what + who + when + how much
+- Present the core facts: What event occurred? Who are the parties? 
+- When did it happen? What are the key numbers?
+- Identify the 8-K Item number in this paragraph
+
+**Paragraph 2 (Details)**: Provide key terms and specifics
+- Include material details: transaction structure, key terms, timing, conditions
+- For M&A: deal structure, earnouts, closing timeline
+- For executive changes: successor details, effective dates, background
+- For financial events: amounts, terms, purpose
+- For regulatory: nature of matter, potential impact
+
+**Paragraph 3 (Context - Optional)**: Immediate significance
+- Brief context if material: operational impact, strategic fit
+- Only include if it adds essential context
+- Skip if the details in Paragraph 2 speak for themselves
+
+**Style**:
+- News-style prose (NOT bullet points)
+- Active voice, past or present tense
+- Specific numbers and dates with sources [DOC: Item X.XX]
+- Facts only - no speculation or analysis (save for Section 2)
+- Check Exhibit 99.1 (press releases) and Exhibit 10.1 (agreements) for key details
+
+**Quality Bar**: 
+A trader can grasp the essential facts in 30 seconds while the market is open.
+
+**Examples of good Lede paragraphs**:
+
+For M&A:
+"Company signed a definitive agreement to acquire Target for $X.XB in cash 
+and stock, disclosed in an 8-K filing Monday [DOC: Item 1.01]. The transaction 
+marks Company's largest acquisition since 20XX."
+
+For Executive Change:
+"Company announced the resignation of CFO Name effective Date, disclosed 
+Tuesday [DOC: Item 5.02]. The board appointed Successor as interim CFO while 
+conducting a search for a permanent successor."
+
+For Debt Issuance:
+"Company priced $X.XB of senior unsecured notes in a two-tranche offering, 
+announced Friday [DOC: Item 2.03, Exhibit 99.1]. Proceeds will fund expansion 
+and general corporate purposes."
+
+---
+
+### SECTION 2: IMPACT ANALYSIS
+
+**Purpose**: Explain why this event matters and what comes next
+
+**Format**: Natural prose paragraphs (500-700 words)
+
+**Structure**: Flexible based on event complexity, but typically includes:
+
+**Paragraph 1 - Strategic Rationale**: Why did management do this? Why now?
+- What problem does this solve or opportunity does it capture?
+- How does this fit the company's stated strategy?
+- Based on [DOC: Item X.XX, Exhibit 99.1] and management commentary if available
+
+**Paragraph 2 - Financial Implications**: Impact on the business
+- How does this affect revenue, costs, cash flow, balance sheet?
+- Use specific numbers from the filing [DOC:]
+- Calculate if needed [CALC:] - e.g., impact on EPS, debt ratios
+
+**Paragraph 3 - Market Context**: How does this compare? (Search when relevant)
+- For M&A: Search for comparable recent transactions in the sector
+- For executive changes: Search for successor's track record at prior companies
+- For debt: Search for current market rates and peer borrowing costs
+- For partnerships: Search for similar deals by competitors
+- Only search when external context materially enhances understanding
+
+**Paragraph 4 - Forward Looking**: Risks, opportunities, what to watch
+- Execution risks or regulatory hurdles
+- Upside scenarios
+- Key milestones or triggers to monitor
+- Management credibility on similar past actions
+
+**WHEN TO SEARCH** (Use your judgment):
+✅ M&A deal → search for "recent {{industry}} acquisitions valuation multiples"
+✅ Executive change → search for "{{successor name}} background track record"
+✅ Debt issuance → search for "corporate bond yields {{industry}} 2025"
+✅ Material agreement → search for "competitor similar partnerships"
+❌ Don't search if the 8-K filing itself provides comprehensive context
+❌ Don't search for generic background that doesn't add insight
+
+**CITATION REQUIREMENTS** (CRITICAL):
+- Every search result MUST be cited as [1], [2], [3]
+- At bottom of Section 2, list full sources with URLs when available:
+  Format:
+  ---
+  **Sources**:
+  [1] "Article Title", Source Name, Date
+  [2] "Report Name", Source, Date
+
+- NO vague references like "according to industry sources"
+- If you cannot find a credible source, use [NO_DATA] rather than speculate
+
+**Quality Bar**:
+Would a PM feel confident adjusting their position based on this analysis?
+
+---
+
+## CRITICAL RULES
+
+**Data Source Attribution** (MANDATORY):
+- [DOC: Item X.XX] - From this 8-K filing
+- [DOC: Exhibit 99.1] - From press release or other exhibits
+- [CALC: formula] - Your calculations
+- [1], [2], [3] - Web search results (with full citation at bottom)
+- [NO_DATA] - Information not available
+
+**Style**:
+- Active voice: "Company acquired" not "was acquired by"
+- Specific: "$X.XB" not "approximately X billion"
+- Present/past tense for facts: "Company announced" or "Company announces"
+- Adapt your analysis to the event type naturally:
+  * M&A needs deal terms and strategic rationale
+  * Executive changes need succession context
+  * Financial events need terms and use of proceeds
+  * Use your judgment as a news analyst would
+
+**DON'T**:
+- Repeat information between Section 1 and Section 2
+- Speculate beyond what's disclosed
+- Use marketing language: "transformative", "game-changing"
+- Make up details not in the filing
+
+---
+
+## COMPANY CONTEXT
+
+- **Company**: {context['company_name']} ({context['ticker']})
+- **Filing Date**: {context['filing_date']}
+- **Event Type**: {context.get('event_type', 'Material Event')}
+- **Item**: {context.get('item_type', 'See filing')}
+
+---
+
+## FILING CONTENT
+
 {content}
 
-Analyze this event with complete source attribution:"""
+---
+
+Now generate your two-section analysis following this structure.
+
+**SECTION 1: EVENT SNAPSHOT** - 2-3 paragraphs (150-200 words)
+**SECTION 2: IMPACT ANALYSIS** - Analytical prose (500-700 words)
+
+Remember: You're a financial news analyst. Write with the urgency and precision 
+of breaking news, then provide the depth of professional analysis.
+"""
     
     def _build_s1_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
-        """S-1 prompt with web search for IPO market context"""
+        """S-1 prompt - placeholder"""
         marking_instructions = self._build_data_marking_instructions()
         
-        return f"""You are an IPO analyst evaluating {context['company_name']}'s public offering.
+        return f"""You are an IPO analyst evaluating {context['company_name']}.
 
 {marking_instructions}
 
-CORE MISSION:
-Help investors understand the opportunity, risks, and competitive position.
+Analyze: Investment thesis, business model, market opportunity, risks, valuation.
 
-When market context would enrich analysis, search for:
-- IPO market conditions and recent comparable offerings
-- Industry growth forecasts
-- Competitive landscape and peer valuations
-
-WORD COUNT GUIDANCE:
-Target 600-1000 words based on disclosure completeness.
-
-CRITICAL AREAS:
-1. **Investment Thesis** - Why go public now? [DOC: Business]
-2. **Business Model** - Revenue model and economics [DOC:]
-3. **Market Opportunity** - Validate TAM claims via search [1][2]
-4. **Competitive Position** - Search for peer analysis [1]
-5. **Risk Assessment** - Top material risks [DOC: Risk Factors]
-6. **Valuation Context** - Search for comparable valuations [1]
-
-CONTEXT:
-Company: {context['company_name']}
-Filing Date: {context['filing_date']}
+Maximum: 1000 words.
 
 FILING CONTENT:
-{content}
-
-Evaluate this IPO opportunity with complete source citations:"""
+{content}"""
     
     def _build_generic_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
-        """Generic prompt for other filing types"""
+        """Generic prompt"""
         marking_instructions = self._build_data_marking_instructions()
         filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
         
-        return f"""You are a financial analyst examining this {filing_type_value} filing for {context['company_name']} ({context['ticker']}).
+        return f"""You are a financial analyst examining this {filing_type_value} for {context['company_name']}.
 
 {marking_instructions}
 
-Write an analysis that:
-- Identifies key disclosures and their significance
-- Uses specific data from filing with [DOC:] citations
-- Searches for external context when it adds value [1][2]
-- Maintains professional clarity
+Identify key disclosures and their significance with proper citations.
 
 FILING CONTENT:
 {content}"""
     
     async def _generate_text_with_search(self, prompt: str, max_tokens: int = 500) -> Tuple[str, List[Dict]]:
-        """
-        ✅ NEW: Generate text using OpenAI with web search support
-        Returns: (text_content, references_list)
-        """
+        """Generate text with web search support using o3-mini"""
         try:
             response = client.chat.completions.create(
-                model=self.model,
+                model=self.model,  # Now using o3-mini
                 messages=[
                     {
                         "role": "system", 
-                        "content": "You are a professional financial analyst with expertise in SEC filings analysis. You have access to web search to enrich your analysis with industry context, peer comparisons, and analyst perspectives. Always cite your sources properly."
+                        "content": "You are a professional financial analyst. You have web search access to enrich analysis with industry context."
                     },
                     {"role": "user", "content": prompt}
                 ],
@@ -788,23 +1117,17 @@ FILING CONTENT:
             
             content = response.choices[0].message.content.strip()
             
-            # ✅ NEW: Extract annotations (web search results)
             annotations = getattr(response.choices[0].message, 'annotations', None) or []
-            
-            # ✅ NEW: Process citations into references
             references = self._process_citations(content, annotations)
             
             return content, references
             
         except Exception as e:
-            logger.error(f"Error generating text with search: {e}")
+            logger.error(f"Error generating text: {e}")
             return "", []
     
     def _process_citations(self, content: str, annotations: List) -> List[Dict]:
-        """
-        ✅ NEW: Process OpenAI annotations into references list
-        Returns: List of {id, title, url} for footnote-style citations
-        """
+        """Process OpenAI annotations into references"""
         if not annotations:
             return []
         
@@ -812,13 +1135,11 @@ FILING CONTENT:
         url_to_id = {}
         
         for idx, annotation in enumerate(annotations, start=1):
-            # Check if annotation has url_citation attribute
             if hasattr(annotation, 'url_citation'):
                 url_citation = annotation.url_citation
                 url = url_citation.url
                 title = url_citation.title if hasattr(url_citation, 'title') else "Source"
                 
-                # Avoid duplicates
                 if url not in url_to_id:
                     url_to_id[url] = idx
                     references.append({
@@ -831,122 +1152,44 @@ FILING CONTENT:
         return references
     
     async def _generate_feed_summary_from_unified(self, unified_analysis: str, filing_type: str, filing: Filing) -> str:
-        """Generate compelling feed summary"""
+        """Generate feed summary"""
         key_numbers = re.findall(r'\*([^*]+)\*', unified_analysis)[:5]
-        key_concepts = re.findall(r'\*\*([^*]+)\*\*', unified_analysis)[:3]
-        positive_points = re.findall(r'\+\[([^\]]+)\]', unified_analysis)[:2]
-        negative_points = re.findall(r'-\[([^\]]+)\]', unified_analysis)[:2]
-        
-        narrative_elements = {
-            'numbers': key_numbers,
-            'concepts': key_concepts,
-            'positive': positive_points,
-            'negative': negative_points,
-            'has_contrast': len(positive_points) > 0 and len(negative_points) > 0,
-            'has_surprise': any(word in unified_analysis.lower() for word in ['exceeded', 'missed', 'surprised']),
-        }
-        
-        if filing_type in ["FORM_10K", "10-K"]:
-            prompt = self._build_10k_summary_prompt(filing, narrative_elements, unified_analysis)
-        elif filing_type in ["FORM_10Q", "10-Q"]:
-            prompt = self._build_10q_summary_prompt(filing, narrative_elements, unified_analysis)
-        elif filing_type in ["FORM_8K", "8-K"]:
-            prompt = self._build_8k_summary_prompt(filing, narrative_elements, unified_analysis)
-        elif filing_type in ["FORM_S1", "S-1"]:
-            prompt = self._build_s1_summary_prompt(filing, narrative_elements, unified_analysis)
-        else:
-            prompt = self._build_generic_summary_prompt(filing, narrative_elements, unified_analysis)
-
-        # Use regular generation for summary (no search needed)
-        summary, _ = await self._generate_text_with_search(prompt, max_tokens=100)
         
         ticker = self._get_safe_ticker(filing)
+        
+        if filing_type in ["FORM_10Q", "10-Q"]:
+            prompt = f"""Create a 2-3 sentence summary (200-300 chars) for {ticker}'s quarterly results.
+
+Lead with beat/miss or biggest change. Include specific % or $.
+
+Analysis excerpt:
+{unified_analysis[:1000]}
+
+Write the summary:"""
+        else:
+            prompt = f"""Create a compelling 2-3 sentence summary (200-300 chars) for {ticker}.
+
+Analysis excerpt:
+{unified_analysis[:1000]}"""
+
+        summary, _ = await self._generate_text_with_search(prompt, max_tokens=100)
+        
         if ticker not in summary:
             summary = f"{ticker}: {summary}"
         
         if len(summary) > 300:
             sentences = summary.split('. ')
-            truncated = sentences[0] + '. ' + sentences[1] + '.'
-            if len(truncated) <= 300:
-                summary = truncated
-            else:
-                summary = sentences[0] + '...'
+            summary = sentences[0] + '. ' + sentences[1] + '.' if len(sentences) > 1 else sentences[0] + '...'
         
-        # Clean up markers
         summary = re.sub(r'\[DOC:[^\]]+\]', '', summary)
-        summary = re.sub(r'\[\d+\]', '', summary)  # ✅ UPDATED: Also clean search citations
-        summary = re.sub(r'\[CALC:[^\]]+\]', '', summary)
+        summary = re.sub(r'\[\d+\]', '', summary)
+        summary = re.sub(r'\[FMP\]', '', summary)
         summary = re.sub(r'\s+', ' ', summary).strip()
         
         return summary
     
-    def _build_10k_summary_prompt(self, filing: Filing, elements: Dict, analysis_excerpt: str) -> str:
-        """Build summary prompt for 10-K"""
-        ticker = self._get_safe_ticker(filing)
-        return f"""Create a compelling 2-3 sentence summary (200-300 chars) for {ticker}'s annual report.
-
-Lead with the most newsworthy aspect. Create interest if there's contrast. Use specific numbers.
-
-Analysis excerpt:
-{analysis_excerpt[:1000]}
-
-Write the summary:"""
-    
-    def _build_10q_summary_prompt(self, filing: Filing, elements: Dict, analysis_excerpt: str) -> str:
-        """Build summary prompt for 10-Q"""
-        ticker = self._get_safe_ticker(filing)
-        return f"""Create a compelling 2-3 sentence summary (200-300 chars) for {ticker}'s quarterly results.
-
-Lead with beat/miss or biggest change. Include specific % or $ that tells the story.
-
-Analysis excerpt:
-{analysis_excerpt[:1000]}
-
-Write the summary:"""
-    
-    def _build_8k_summary_prompt(self, filing: Filing, elements: Dict, analysis_excerpt: str) -> str:
-        """Build summary prompt for 8-K"""
-        ticker = self._get_safe_ticker(filing)
-        return f"""Create a compelling 2-3 sentence summary (200-300 chars) for {ticker}'s material event.
-
-State what happened with specifics. Immediately explain why it matters.
-
-Analysis excerpt:
-{analysis_excerpt[:1000]}
-
-Write the summary:"""
-    
-    def _build_s1_summary_prompt(self, filing: Filing, elements: Dict, analysis_excerpt: str) -> str:
-        """Build summary prompt for S-1"""
-        ticker = self._get_safe_ticker(filing)
-        company_name = filing.company.name if filing.company else ticker
-        identifier = company_name if ticker in ["UNKNOWN", "PRE-IPO"] or ticker.startswith("CIK") else ticker
-        
-        return f"""Create a compelling 2-3 sentence summary (200-300 chars) for {identifier}'s IPO filing.
-
-Capture what makes this IPO unique. Include valuation context or growth rate.
-
-Analysis excerpt:
-{analysis_excerpt[:1000]}
-
-Write the summary:"""
-    
-    def _build_generic_summary_prompt(self, filing: Filing, elements: Dict, analysis_excerpt: str) -> str:
-        """Build generic summary prompt"""
-        ticker = self._get_safe_ticker(filing)
-        filing_type_value = self._get_safe_filing_type_value(filing.filing_type)
-        
-        return f"""Create a compelling 2-3 sentence summary (200-300 chars) for {ticker}'s {filing_type_value}.
-
-Identify the most significant disclosure. Use specific data points.
-
-Analysis excerpt:
-{analysis_excerpt[:1000]}
-
-Write the summary:"""
-    
     def _extract_markup_data(self, text: str) -> Dict:
-        """Extract smart markup metadata"""
+        """Extract markup metadata"""
         markup_data = {
             'numbers': [],
             'concepts': [],
@@ -965,12 +1208,6 @@ Write the summary:"""
         concepts = re.findall(r'\*\*([^*]+)\*\*', text)
         markup_data['concepts'] = concepts[:8]
         
-        positive = re.findall(r'\+\[([^\]]+)\]', text)
-        markup_data['positive'] = positive[:5]
-        
-        negative = re.findall(r'-\[([^\]]+)\]', text)
-        markup_data['negative'] = negative[:5]
-        
         for pattern_name, pattern in DATA_SOURCE_PATTERNS.items():
             matches = re.findall(pattern, text)
             for match in matches[:5]:
@@ -988,8 +1225,6 @@ Write the summary:"""
         markup_patterns = [
             r'\*[^*]+\*',
             r'\*\*[^*]+\*\*',
-            r'\+\[[^\]]+\]',
-            r'-\[[^\]]+\]'
         ]
         markup_patterns.extend(DATA_SOURCE_PATTERNS.values())
         
@@ -1004,40 +1239,33 @@ Write the summary:"""
         return text
     
     async def _extract_supplementary_fields(self, filing: Filing, unified_result: Dict, primary_content: str, full_text: str):
-        """
-        Extract supplementary fields from unified analysis
-        ❌ REMOVED: expectations_comparison logic
-        """
+        """Extract supplementary fields"""
         unified_text = unified_result['unified_analysis']
         ticker = self._get_safe_ticker(filing)
         
-        # Extract enhanced tags
         filing.key_tags = self._generate_enhanced_tags(unified_result['markup_data'], unified_text, filing.filing_type, ticker)
         
-        # Set legacy fields to None for backward compatibility
         filing.management_tone = None
         filing.tone_explanation = None
         filing.key_questions = []
         filing.financial_highlights = None
         filing.ai_summary = None
         
-        # Extract event-specific fields for 8-K
         if filing.filing_type == FilingType.FORM_8K:
             filing.event_type = self._identify_8k_event_type(primary_content)
             filing.item_type = self._extract_8k_item_type(primary_content)
     
     def _generate_enhanced_tags(self, markup_data: Dict, unified_text: str, filing_type: Union[FilingType, str], ticker: str) -> List[str]:
-        """Generate enhanced tags"""
+        """Generate tags"""
         tags = []
         text_lower = unified_text.lower()
         
-        # Industry tags
         industry_keywords = {
             'Technology': ['software', 'cloud', 'saas', 'platform', 'digital', 'ai'],
-            'Healthcare': ['drug', 'clinical', 'fda', 'patient', 'therapeutic'],
-            'Financial': ['banking', 'loan', 'deposit', 'interest rate', 'credit'],
-            'Retail': ['store', 'e-commerce', 'consumer', 'brand'],
-            'Energy': ['oil', 'gas', 'renewable', 'drilling'],
+            'Healthcare': ['drug', 'clinical', 'fda', 'patient'],
+            'Financial': ['banking', 'loan', 'deposit'],
+            'Retail': ['store', 'e-commerce', 'consumer'],
+            'Energy': ['oil', 'gas', 'renewable'],
         }
         
         for industry, keywords in industry_keywords.items():
@@ -1045,18 +1273,6 @@ Write the summary:"""
                 tags.append(industry)
                 break
         
-        # Performance tags
-        if markup_data['positive']:
-            positive_text = ' '.join(markup_data['positive']).lower()
-            if any(term in positive_text for term in ['beat', 'exceed', 'record', 'growth']):
-                tags.append('Outperformance')
-        
-        if markup_data['negative']:
-            negative_text = ' '.join(markup_data['negative']).lower()
-            if any(term in negative_text for term in ['miss', 'below', 'decline']):
-                tags.append('Underperformance')
-        
-        # Filing type tag
         filing_type_tags = {
             'FORM_10K': 'Annual Report',
             '10-K': 'Annual Report',
@@ -1091,7 +1307,7 @@ Write the summary:"""
             return "Corporate Event"
     
     def _extract_8k_item_type(self, content: str) -> Optional[str]:
-        """Extract Item number from 8-K"""
+        """Extract 8-K item number"""
         item_pattern = r'Item\s+(\d+\.\d+)'
         match = re.search(item_pattern, content, re.IGNORECASE)
         return match.group(1) if match else None

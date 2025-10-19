@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     
     # API
     API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "HermeSpeed"
+    PROJECT_NAME: str = "AllSight"
     
     # Database
     DATABASE_URL: str
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 days (ä¿®æ"¹: ä»Ž7å¤©æ"¹ä¸º30å¤©)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 days (Ã¤Â¿Â®Ã¦"Â¹: Ã¤Â»Å½7Ã¥Â¤Â©Ã¦"Â¹Ã¤Â¸Âº30Ã¥Â¤Â©)
     
     # OpenAI
     OPENAI_API_KEY: str
@@ -157,10 +157,10 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_DOWNLOADS: int = 3
     MAX_CONCURRENT_AI_TASKS: int = 2
     
-    # ✅ UPDATED: AI Model Configuration for Web Search
-    AI_MODEL: str = "gpt-4o-search-preview"  # Changed from gpt-4o-mini
+    # ✅ UPDATED: AI Model Configuration - Switched to o3-mini for enhanced reasoning
+    AI_MODEL: str = "o3-mini"  # Changed from gpt-4o-search-preview to o3-mini
     AI_MAX_TOKENS: int = 16000
-    WEB_SEARCH_ENABLED: bool = True  # New: Enable web search capability
+    WEB_SEARCH_ENABLED: bool = True  # o3-mini supports autonomous web search and tool use
     
     # AI Generation Parameters
     AI_TEMPERATURE: float = 0.3
@@ -396,8 +396,8 @@ class Settings(BaseSettings):
             "apple_products": self.get_apple_product_ids(),
             "google_products": self.get_google_product_ids(),
             "webhook_urls": self.get_webhook_urls() if self.WEBHOOK_BASE_URL else None,
-            "ai_model": self.AI_MODEL,  # New: Show AI model in use
-            "web_search_enabled": self.WEB_SEARCH_ENABLED  # New: Show web search status
+            "ai_model": self.AI_MODEL,  # Shows: o3-mini
+            "web_search_enabled": self.WEB_SEARCH_ENABLED  # Shows: True
         }
     
     def validate_production_config(self) -> List[str]:

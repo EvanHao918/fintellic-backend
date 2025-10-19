@@ -71,7 +71,9 @@ wcwidth==0.2.13
 websockets==15.0.1
 yarl==1.20.1
 yfinance==0.2.36
-tiktoken==0.5.2
+# 🔥 CRITICAL FIX: 升级 tiktoken 以支持 gpt-4o 和修复插件冲突
+# 从 0.5.2 升级到 0.8.0 以支持最新 OpenAI 模型
+tiktoken==0.8.0
 
 # 支付相关依赖
 google-auth==2.23.4

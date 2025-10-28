@@ -1,12 +1,14 @@
 # app/services/ai_processor.py
 """
 AI Processor Service - Enhanced with Flash Note Style for o3-mini
-Version: v10_flash_note_o3mini
+Version: v11_o3mini
 MAJOR UPDATE: 
 - Switched to o3-mini reasoning model
 - Restructured 10-Q prompt with Sell-Side Flash Note style
 - Enhanced beat/miss calculation workflow to prevent AI失焦
 - Optimized for autonomous web search and tool use
+- NEW v11: Role-driven concise summaries (120-180 chars)
+- NEW v11: Pure role definition without artificial examples
 """
 import json
 import re
@@ -40,6 +42,24 @@ DATA_SOURCE_PATTERNS = {
     'no_data': r'\[NO_DATA\]',
     'caution': r'\[CAUTION\]'
 }
+
+# Universal writing guidelines for feed summaries
+FEED_SUMMARY_GUIDELINES = """
+ROLE: You're writing a mobile push notification for retail investors who just got alerted.
+
+CORE PRINCIPLES:
+- Count in WORDS, not characters
+- Start with ticker symbol (e.g., "TSLA reports..." or "AAPL beats...")
+- Present tense, active voice
+- Clean number formats: "$5.5B" not "$5.524B", "23%" not "23.4%"
+- Beat/miss without exact amounts: "beats estimates" not "beats by $0.25B"
+- Focus on substance over buzzwords
+
+TONE: Professional, concise, factual - like a Bloomberg terminal alert.
+
+AVOID: Buzzwords ("strategic", "positioned", "innovative"), formal phrases ("announced that"), exact beat/miss amounts, unnecessary details.
+"""
+
 
 class AIProcessor:
     """
@@ -289,7 +309,7 @@ class AIProcessor:
             filing.unified_feed_summary = unified_result['feed_summary']
             filing.smart_markup_data = unified_result['markup_data']
             filing.references = unified_result.get('references', [])
-            filing.analysis_version = "v10_flash_note_o3mini"
+            filing.analysis_version = "v11_o3mini"
             
             # Extract supplementary fields
             await self._extract_supplementary_fields(filing, unified_result, primary_content, full_text)
@@ -861,23 +881,150 @@ Do NOT recalculate. Use the comparison from Step 2 directly.
 """
     
     def _build_10k_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
-        """10-K prompt - placeholder for now"""
+        """
+        10-K prompt - Annual fundamentals review for retail investors
+        Structure: ANNUAL REVIEW + STRATEGIC OUTLOOK
+        """
         marking_instructions = self._build_data_marking_instructions()
         
-        return f"""You are a seasoned equity analyst writing for retail investors.
+        return f"""You are a financial analyst writing an annual report summary for retail investors.
+
+Your readers want to understand: How did the company perform this year? What's the strategy going forward? What are the key risks?
+
+## CORE PRINCIPLE: Facts and Data Drive Your Analysis
+
+Your job is to identify what's IMPORTANT in THIS filing, not to fill in a template blindly.
+
+- If revenue growth is the big story, spend more words explaining it
+- If a new risk factor is material, dive deeper into why it matters  
+- If margins improved significantly, show the numbers and explain why
+- Let the actual content guide your focus, not arbitrary rules
+
+Think like an analyst reading the real document: What jumped out at you? What would investors care most about? Follow the story the data tells you.
+
+Don't force content into boxes - write what matters.
 
 {marking_instructions}
 
-Analyze this annual report for {context['company_name']} ({context['ticker']}).
+## OUTPUT STRUCTURE (MANDATORY)
 
-Focus on: Financial performance, strategic priorities, risks, competitive position.
+---
 
-Maximum: 1200 words total.
+### SECTION 1: ANNUAL REVIEW
 
-FILING CONTENT:
+**Purpose**: Help investors understand the company's full-year performance (3 minute read)
+
+**Format**: Natural prose paragraphs (400-600 words)
+
+**What to cover**:
+
+Start with the financial headline: How did revenue, profit, and cash flow perform compared to last year? Use the 3-year data from the financial statements and MD&A.
+
+Then explain what drove the results: Which products/segments grew or declined? What did management say about the performance drivers in MD&A?
+
+Discuss profitability: How did margins change? What happened to operating expenses?
+
+Cover the balance sheet: Cash position, debt levels, how they used their cash (buybacks, dividends, investments)?
+
+If there are important accounting changes or one-time items mentioned in the Notes, explain them clearly.
+
+**Data Sources**:
+- [DOC: Consolidated Statements of Operations] - Income statement
+- [DOC: MD&A - Results of Operations] - Management's explanation  
+- [DOC: Consolidated Balance Sheets] - Balance sheet
+- [DOC: Statements of Cash Flows] - Cash flow
+- [DOC: Notes to Financial Statements] - If applicable
+
+**Style**:
+- Write like you're explaining to a friend who invests but isn't a finance expert
+- Use clear language: "gross profit margin" not "gross margin compression dynamics"
+- Lead with numbers: "Revenue grew 15% to $5.2B" not "The company experienced revenue growth"
+- Compare to prior year: "vs. $4.5B last year"
+
+**Quality Bar**: 
+A retail investor should understand what happened financially this year without reading the full 10-K.
+
+---
+
+### SECTION 2: STRATEGIC OUTLOOK
+
+**Purpose**: Help investors evaluate the company's future direction and risks (5-7 minute read)
+
+**Format**: Natural prose paragraphs (600-900 words)
+
+**What to cover**:
+
+Start with management's strategy: Based on the MD&A and Business section, what is management focused on? What are they investing in? How are they adapting to market changes?
+
+Discuss competitive position: How is the company positioned in its industry? What advantages does it have? You can search for competitor performance if helpful for context.
+
+Analyze key risks: Pick the 3-5 most important risks from the Risk Factors section - don't just list them, explain why they matter and how likely they are to impact the business.
+
+Look at management's outlook: What did they say about the coming year in MD&A? Any guidance or commentary on trends?
+
+End with key observations: What are the most important things investors should know from this annual report? What should they watch for in the coming year?
+
+**External Context** (Optional):
+- You can use web search if industry/competitor context adds value
+- Example: Search for "competitor earnings 2024" or "industry growth rate 2024"
+- If you search, cite as [1], [2] and list sources at the end:
+  [1] Source Title, Publisher, Date
+  [2] Source Title, Publisher, Date
+
+**Data Sources**:
+- [DOC: MD&A - Business Outlook]
+- [DOC: Item 1 - Business]  
+- [DOC: Risk Factors]
+- [1], [2] if web search used
+
+**Style**:
+- Keep it conversational but professional
+- Explain jargon: "EBITDA (earnings before interest, taxes, depreciation, amortization)"
+- Use analogies if helpful: "Think of free cash flow as the money left after paying all bills"
+- Be balanced: mention both positives and concerns
+
+**Quality Bar**:
+An investor should be able to decide whether this company fits their investment goals after reading this section.
+
+---
+
+## CRITICAL RULES
+
+**What to AVOID**:
+- Don't make investment recommendations: No "Buy", "Sell", "Good for growth investors"
+- Don't repeat information between Section 1 and Section 2
+- Don't use marketing language: "game-changing", "revolutionary", "best-in-class"
+- Don't speculate beyond what's in the filing
+
+**Style**:
+- Active voice: "Revenue grew 15%" not "Revenue was up 15%"
+- Specific numbers: "$5.2B" not "approximately $5 billion"  
+- Clear comparisons: "up from $4.5B last year"
+- Plain English: avoid unnecessary jargon
+
+---
+
+## COMPANY CONTEXT
+
+- **Company**: {context['company_name']} ({context['ticker']})
+- **Fiscal Year**: {context.get('fiscal_year', '2024')}
+- **Filing Date**: {context['filing_date']}
+
+---
+
+## FILING CONTENT
+
 {content}
 
-Provide comprehensive analysis with source attribution."""
+---
+
+Now generate your two-section analysis following this structure.
+
+**SECTION 1: ANNUAL REVIEW** - Natural paragraphs (400-600 words)
+**SECTION 2: STRATEGIC OUTLOOK** - Natural paragraphs (600-900 words)
+
+Remember: Write for retail investors who want to understand the company, not for Wall Street professionals.
+"""
     
     def _build_8k_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
         """
@@ -1071,19 +1218,168 @@ of breaking news, then provide the depth of professional analysis.
 """
     
     def _build_s1_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
-        """S-1 prompt - placeholder"""
+        """
+        S-1 prompt - IPO analysis for retail investors
+        Structure: IPO SNAPSHOT + INVESTMENT ANALYSIS
+        """
         marking_instructions = self._build_data_marking_instructions()
         
-        return f"""You are an IPO analyst evaluating {context['company_name']}.
+        # Handle pre-IPO companies without tickers
+        ticker = self._get_safe_ticker(filing)
+        company_name = context['company_name']
+        
+        return f"""You are a financial analyst explaining an IPO filing to retail investors.
+
+Your readers want to understand: What does this company do? How's the business performing? Should I look deeper into this IPO?
+
+## CORE PRINCIPLE: Facts and Data Drive Your Analysis
+
+Your job is to identify what's IMPORTANT in THIS S-1 filing, not to follow a rigid checklist.
+
+- If the company has explosive growth, show the numbers and explain what's driving it
+- If there's a major customer concentration risk, spend time explaining the impact
+- If the underwriters are top-tier banks, that's worth noting (it signals quality)
+- If pre-IPO investors include well-known VCs, mention them - it's a trust signal
+- Let the actual filing content guide what you emphasize
+
+Think like an analyst evaluating a real IPO: What stands out? What are the key questions investors should ask? Follow what the data reveals.
+
+Don't force every IPO into the same template - each story is different.
 
 {marking_instructions}
 
-Analyze: Investment thesis, business model, market opportunity, risks, valuation.
+## OUTPUT STRUCTURE (MANDATORY)
 
-Maximum: 1000 words.
+---
 
-FILING CONTENT:
-{content}"""
+### SECTION 1: IPO SNAPSHOT
+
+**Purpose**: Help investors quickly understand what this IPO is about (3 minute read)
+
+**Format**: Natural prose with one bullet section (350-500 words)
+
+**What to cover**:
+
+Start with the business: What does this company do? How do they make money? Who are their customers? Keep it simple - explain it like you're telling a friend about a new company going public.
+
+Show the financial trajectory: How has revenue grown over the past 2-3 years? Are they profitable or losing money? If losing money, what's the cash burn rate? Use the financial statements.
+
+Explain the market opportunity: What market are they in? How big is the opportunity? Use data from the Business section if provided.
+
+Then use a clean bullet format for the deal details:
+
+• **Offering Size**: XX million shares at $XX-XX per share [DOC: Prospectus Summary]
+• **Expected Proceeds**: $XXM - $XXM [DOC: Use of Proceeds]
+• **Main Use of Proceeds**: [List 2-3 key uses in plain language] [DOC: Use of Proceeds]
+• **Lead Underwriters**: [List the main investment banks - e.g., Goldman Sachs, Morgan Stanley] [DOC: Underwriting]
+  (Note: Top-tier underwriters signal institutional confidence in the deal)
+• **Major Pre-IPO Investors**: [List top 3-5 with ownership % - e.g., Sequoia Capital 18.2%, Andreessen Horowitz 12.5%] [DOC: Principal Stockholders]
+  (Note: Well-known venture capital backing can indicate quality, though not a guarantee)
+
+**Data Sources**:
+- [DOC: Business] - Company description
+- [DOC: Consolidated Statements of Operations] - Financial history
+- [DOC: Prospectus Summary] - Deal terms
+- [DOC: Use of Proceeds] - How they'll use the money
+- [DOC: Underwriting] - Banks managing the IPO
+- [DOC: Principal Stockholders] - Who owns the company now
+
+**Style**:
+- Explain the business model clearly: "They charge subscription fees" not "monetize via recurring revenue streams"
+- Show growth with simple numbers: "Revenue went from $100M to $500M over 3 years"
+- Make the bullets scannable - investors want to see the deal terms quickly
+
+**Quality Bar**:
+An investor should understand the business and deal basics without any prior knowledge of the company.
+
+---
+
+### SECTION 2: INVESTMENT ANALYSIS  
+
+**Purpose**: Help investors evaluate whether this IPO deserves deeper research (7-10 minute read)
+
+**Format**: Natural prose paragraphs (600-800 words)
+
+**What to cover**:
+
+Assess the growth story: Is the revenue growth sustainable? What's driving it? Look at customer metrics, repeat business, expansion plans from the MD&A and Business sections.
+
+If the company is unprofitable: When might they reach profitability? What needs to happen? Are margins improving?
+
+Discuss the competitive landscape: Who are the competitors? What makes this company different? Use the Business section's competition discussion. You can search for competitor info if helpful.
+
+Analyze the key risks: Pick the 3-5 most important risks from Risk Factors - explain them in plain language and why they matter. For example: "The company gets 40% of revenue from its top 3 customers - losing one would significantly hurt results."
+
+Evaluate the team: Does the management team have relevant experience? Check the Management section for backgrounds.
+
+Consider the backing: The quality of underwriters and pre-IPO investors can be informative signals. Top investment banks (like Goldman Sachs, J.P. Morgan) do extensive due diligence before taking companies public. Well-known venture capital firms (like Sequoia, Andreessen Horowitz) typically invest after deep research. However, strong backing doesn't guarantee success - it's one factor among many. Note if there are any red flags like very small or unknown underwriters.
+
+End with key observations: What are the most important things to know about this IPO? What questions should investors research further before deciding?
+
+**External Context** (Optional):
+- Search for similar companies' IPO performance or valuations if helpful
+- Search for industry growth trends or market data
+- If you search, cite as [1], [2] and list sources at the end:
+  [1] Source Title, Publisher, Date
+  [2] Source Title, Publisher, Date
+
+**Data Sources**:
+- [DOC: Business]
+- [DOC: Risk Factors]  
+- [DOC: Management]
+- [DOC: MD&A]
+- [1], [2] if web search used
+
+**Style**:
+- Keep it accessible: "burn rate" → "how fast they're spending cash"
+- Be honest about risks - IPOs are risky investments
+- Explain financial concepts: "dilution means your ownership percentage goes down"
+- Stay neutral - present information, don't recommend
+
+**Quality Bar**:
+An investor should have enough information to decide if they want to do more research on this IPO.
+
+---
+
+## CRITICAL RULES
+
+**What to AVOID**:
+- Don't make investment recommendations: No "This is a good IPO" or "Wait for a better price"
+- Don't say things like "suitable for aggressive investors" - that's investment advice
+- Don't repeat information between Section 1 and Section 2
+- Don't use hype language: "disruptive", "revolutionary", "game-changing"
+- Don't speculate beyond what's disclosed
+
+**Style**:
+- Active voice: "The company operates" not "is operated"
+- Clear numbers: "$500M revenue" not "half a billion in top-line"
+- Plain language: "profit margin" not "EBITDA margin expansion trajectory"  
+- Conversational but professional
+
+---
+
+## COMPANY CONTEXT
+
+- **Company**: {company_name}
+- **Ticker**: {ticker} (or "Pre-IPO" if not assigned yet)
+- **Filing Date**: {context['filing_date']}
+- **IPO Status**: Registration filed, pricing pending
+
+---
+
+## FILING CONTENT
+
+{content}
+
+---
+
+Now generate your two-section analysis following this structure.
+
+**SECTION 1: IPO SNAPSHOT** - Prose + bullet section (350-500 words)
+**SECTION 2: INVESTMENT ANALYSIS** - Natural paragraphs (600-800 words)
+
+Remember: Write for retail investors who are curious about this IPO but need clear, honest information to evaluate it.
+"""
     
     def _build_generic_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
         """Generic prompt"""
@@ -1152,42 +1448,133 @@ FILING CONTENT:
         return references
     
     async def _generate_feed_summary_from_unified(self, unified_analysis: str, filing_type: str, filing: Filing) -> str:
-        """Generate feed summary"""
-        key_numbers = re.findall(r'\*([^*]+)\*', unified_analysis)[:5]
-        
+        """
+        Generate feed summary with words-based approach
+        v11_o3mini: Ticker-first, 3-sentence structure, flexible third sentence
+        """
         ticker = self._get_safe_ticker(filing)
         
+        # Build filing-type specific prompt with words-based constraints
         if filing_type in ["FORM_10Q", "10-Q"]:
-            prompt = f"""Create a 2-3 sentence summary (200-300 chars) for {ticker}'s quarterly results.
+            max_tokens = 80
+            prompt = f"""{FEED_SUMMARY_GUIDELINES}
 
-Lead with beat/miss or biggest change. Include specific % or $.
+YOUR MISSION: Write a 3-sentence earnings alert.
+
+STRUCTURE (3 sentences, 30-50 words total):
+Sentence 1: Headline - Did {ticker} beat/miss? Key metrics (revenue/EPS)
+Sentence 2: Driver - What caused it? Be specific but concise
+Sentence 3: Implication - What does it mean? (outlook/momentum/concern)
+
+Focus: Tell the earnings story clearly and completely.
 
 Analysis excerpt:
 {unified_analysis[:1000]}
 
-Write the summary:"""
-        else:
-            prompt = f"""Create a compelling 2-3 sentence summary (200-300 chars) for {ticker}.
+Write your 3-sentence alert (30-50 words):"""
+
+        elif filing_type in ["FORM_10K", "10-K"]:
+            max_tokens = 80
+            prompt = f"""{FEED_SUMMARY_GUIDELINES}
+
+YOUR MISSION: Write a 3-sentence annual summary.
+
+STRUCTURE (3 sentences, 30-50 words total):
+Sentence 1: Full-year headline - Growth/performance vs prior year
+Sentence 2: Key driver - What powered results or held them back
+Sentence 3: Forward look - Guidance or strategic direction
+
+Focus: Capture the year in three clear points.
 
 Analysis excerpt:
-{unified_analysis[:1000]}"""
+{unified_analysis[:1000]}
 
-        summary, _ = await self._generate_text_with_search(prompt, max_tokens=100)
+Write your 3-sentence summary (30-50 words):"""
+
+        elif filing_type in ["FORM_8K", "8-K"]:
+            max_tokens = 70
+            prompt = f"""{FEED_SUMMARY_GUIDELINES}
+
+YOUR MISSION: Write a 2-3 sentence event alert.
+
+STRUCTURE (2-3 sentences, 25-45 words total):
+Sentence 1: What happened (the event)
+Sentence 2: Key detail or scale
+Sentence 3 (if needed): Business impact
+
+Be flexible - use 2 sentences if event is simple, 3 if complex.
+
+Analysis excerpt:
+{unified_analysis[:800]}
+
+Write your alert (25-45 words):"""
+
+        elif filing_type in ["FORM_S1", "S-1"]:
+            max_tokens = 85
+            prompt = f"""{FEED_SUMMARY_GUIDELINES}
+
+YOUR MISSION: Write a 3-sentence IPO preview.
+
+STRUCTURE (3 sentences, 35-55 words total):
+Sentence 1: What the company does (business model)
+Sentence 2: Market opportunity or traction (why it matters)
+Sentence 3: Offering details (size/use of proceeds)
+
+Focus: Help investors decide if they want to dig deeper.
+
+Analysis excerpt:
+{unified_analysis[:1000]}
+
+Write your 3-sentence preview (35-55 words):"""
+
+        else:
+            # Generic filing
+            max_tokens = 70
+            prompt = f"""{FEED_SUMMARY_GUIDELINES}
+
+YOUR MISSION: Write a 2-3 sentence filing summary.
+
+STRUCTURE (2-3 sentences, 25-40 words total):
+Sentence 1: What the filing is about
+Sentence 2: Key takeaway or implication
+Sentence 3 (if needed): Additional context
+
+Analysis excerpt:
+{unified_analysis[:1000]}
+
+Write your summary (25-40 words):"""
         
-        if ticker not in summary:
-            summary = f"{ticker}: {summary}"
+        # Generate summary
+        summary, _ = await self._generate_text_with_search(prompt, max_tokens=max_tokens)
         
-        if len(summary) > 300:
-            sentences = summary.split('. ')
-            summary = sentences[0] + '. ' + sentences[1] + '.' if len(sentences) > 1 else sentences[0] + '...'
-        
+        # Clean up any remaining source citations
         summary = re.sub(r'\[DOC:[^\]]+\]', '', summary)
         summary = re.sub(r'\[\d+\]', '', summary)
         summary = re.sub(r'\[FMP\]', '', summary)
+        summary = re.sub(r'\[CALC:[^\]]+\]', '', summary)
         summary = re.sub(r'\s+', ' ', summary).strip()
         
+        # Word count validation (soft limit - log warning if exceeded)
+        word_count = len(summary.split())
+        max_words_map = {
+            "FORM_10Q": 50,
+            "10-Q": 50,
+            "FORM_10K": 50,
+            "10-K": 50,
+            "FORM_8K": 45,
+            "8-K": 45,
+            "FORM_S1": 55,
+            "S-1": 55
+        }
+        max_words = max_words_map.get(filing_type, 50)
+        
+        if word_count > max_words + 5:  # Allow 5-word buffer
+            logger.warning(f"Summary exceeds word limit: {word_count} words (max: {max_words})")
+        
+        logger.info(f"Generated feed summary ({word_count} words): {summary[:100]}...")
+        
         return summary
-    
+
     def _extract_markup_data(self, text: str) -> Dict:
         """Extract markup metadata"""
         markup_data = {

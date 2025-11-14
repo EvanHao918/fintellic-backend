@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, validator
 
@@ -123,7 +123,7 @@ class DeviceRegisterRequest(BaseModel):
 
 
 class DeviceListResponse(BaseModel):
-    devices: list[DeviceInfo]
+    devices: List[DeviceInfo]
     current_device_id: Optional[str] = None
 
 
@@ -147,7 +147,7 @@ class ValidationErrorResponse(BaseModel):
     """验证错误响应"""
     error: str = "validation_error"
     message: str = "Validation failed"
-    details: list[ValidationErrorDetail]
+    details: List[ValidationErrorDetail]
 # ================================================================
 
 
@@ -156,7 +156,7 @@ class SecurityInfoResponse(BaseModel):
     """账户安全信息响应"""
     email_verified: bool
     has_password: bool
-    social_providers: list[str]  # ["apple", "google", "linkedin"]
+    social_providers: List[str]  # ["apple", "google", "linkedin"]
     biometric_enabled: bool
     two_factor_enabled: bool = False
     last_login_at: Optional[datetime] = None

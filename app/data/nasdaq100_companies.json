@@ -1,0 +1,517 @@
+{
+  "companies": [
+    {
+      "ticker": "AAPL",
+      "name": "Apple Inc.",
+      "cik": "0000320193"
+    },
+    {
+      "ticker": "ABNB",
+      "name": "Airbnb",
+      "cik": "0001559720"
+    },
+    {
+      "ticker": "ADBE",
+      "name": "Adobe Inc.",
+      "cik": "0000796343"
+    },
+    {
+      "ticker": "ADI",
+      "name": "Analog Devices",
+      "cik": "0000006281"
+    },
+    {
+      "ticker": "ADP",
+      "name": "Automatic Data Processing",
+      "cik": "0000008670"
+    },
+    {
+      "ticker": "ADSK",
+      "name": "Autodesk",
+      "cik": "0000769397"
+    },
+    {
+      "ticker": "AEP",
+      "name": "American Electric Power",
+      "cik": "0000004904"
+    },
+    {
+      "ticker": "AMAT",
+      "name": "Applied Materials",
+      "cik": "0000006951"
+    },
+    {
+      "ticker": "AMD",
+      "name": "Advanced Micro Devices",
+      "cik": "0000002488"
+    },
+    {
+      "ticker": "AMGN",
+      "name": "Amgen",
+      "cik": "0000318154"
+    },
+    {
+      "ticker": "AMZN",
+      "name": "Amazon",
+      "cik": "0001018724"
+    },
+    {
+      "ticker": "APP",
+      "name": "AppLovin",
+      "cik": "0001751008"
+    },
+    {
+      "ticker": "ARM",
+      "name": "Arm Holdings",
+      "cik": "0001973239"
+    },
+    {
+      "ticker": "ASML",
+      "name": "ASML Holding",
+      "cik": "0000937966"
+    },
+    {
+      "ticker": "AVGO",
+      "name": "Broadcom",
+      "cik": "0001730168"
+    },
+    {
+      "ticker": "AXON",
+      "name": "Axon Enterprise",
+      "cik": "0001069183"
+    },
+    {
+      "ticker": "AZN",
+      "name": "AstraZeneca",
+      "cik": "0000901832"
+    },
+    {
+      "ticker": "BIIB",
+      "name": "Biogen",
+      "cik": "0000875045"
+    },
+    {
+      "ticker": "BKNG",
+      "name": "Booking Holdings",
+      "cik": "0001075531"
+    },
+    {
+      "ticker": "BKR",
+      "name": "Baker Hughes",
+      "cik": "0001701605"
+    },
+    {
+      "ticker": "CCEP",
+      "name": "Coca-Cola Europacific Partners",
+      "cik": "0001650107"
+    },
+    {
+      "ticker": "CDNS",
+      "name": "Cadence Design Systems",
+      "cik": "0000813672"
+    },
+    {
+      "ticker": "CDW",
+      "name": "CDW Corporation",
+      "cik": "0001402057"
+    },
+    {
+      "ticker": "CEG",
+      "name": "Constellation Energy",
+      "cik": "0001868275"
+    },
+    {
+      "ticker": "CHTR",
+      "name": "Charter Communications",
+      "cik": "0001091667"
+    },
+    {
+      "ticker": "CMCSA",
+      "name": "Comcast",
+      "cik": "0001166691"
+    },
+    {
+      "ticker": "COST",
+      "name": "Costco",
+      "cik": "0000909832"
+    },
+    {
+      "ticker": "CPRT",
+      "name": "Copart",
+      "cik": "0000900075"
+    },
+    {
+      "ticker": "CRWD",
+      "name": "CrowdStrike",
+      "cik": "0001535527"
+    },
+    {
+      "ticker": "CSCO",
+      "name": "Cisco",
+      "cik": "0000858877"
+    },
+    {
+      "ticker": "CSGP",
+      "name": "CoStar Group",
+      "cik": "0001057352"
+    },
+    {
+      "ticker": "CSX",
+      "name": "CSX Corporation",
+      "cik": "0000277948"
+    },
+    {
+      "ticker": "CTAS",
+      "name": "Cintas",
+      "cik": "0000723254"
+    },
+    {
+      "ticker": "CTSH",
+      "name": "Cognizant",
+      "cik": "0001058290"
+    },
+    {
+      "ticker": "DASH",
+      "name": "DoorDash",
+      "cik": "0001792789"
+    },
+    {
+      "ticker": "DDOG",
+      "name": "Datadog",
+      "cik": "0001561550"
+    },
+    {
+      "ticker": "DXCM",
+      "name": "DexCom",
+      "cik": "0001093557"
+    },
+    {
+      "ticker": "EA",
+      "name": "Electronic Arts",
+      "cik": "0000712515"
+    },
+    {
+      "ticker": "EXC",
+      "name": "Exelon",
+      "cik": "0001109357"
+    },
+    {
+      "ticker": "FANG",
+      "name": "Diamondback Energy",
+      "cik": "0001539838"
+    },
+    {
+      "ticker": "FAST",
+      "name": "Fastenal",
+      "cik": "0000815556"
+    },
+    {
+      "ticker": "FTNT",
+      "name": "Fortinet",
+      "cik": "0001262039"
+    },
+    {
+      "ticker": "GEHC",
+      "name": "GE HealthCare",
+      "cik": "0001932393"
+    },
+    {
+      "ticker": "GFS",
+      "name": "GlobalFoundries",
+      "cik": "0001709048"
+    },
+    {
+      "ticker": "GILD",
+      "name": "Gilead Sciences",
+      "cik": "0000882095"
+    },
+    {
+      "ticker": "GOOG",
+      "name": "Alphabet Inc. (Class C)",
+      "cik": "0001652044"
+    },
+    {
+      "ticker": "GOOGL",
+      "name": "Alphabet Inc. (Class A)",
+      "cik": "0001652044"
+    },
+    {
+      "ticker": "HON",
+      "name": "Honeywell",
+      "cik": "0000773840"
+    },
+    {
+      "ticker": "IDXX",
+      "name": "Idexx Laboratories",
+      "cik": "0000874716"
+    },
+    {
+      "ticker": "INTC",
+      "name": "Intel",
+      "cik": "0000050863"
+    },
+    {
+      "ticker": "INTU",
+      "name": "Intuit",
+      "cik": "0000896878"
+    },
+    {
+      "ticker": "ISRG",
+      "name": "Intuitive Surgical",
+      "cik": "0001035267"
+    },
+    {
+      "ticker": "KDP",
+      "name": "Keurig Dr Pepper",
+      "cik": "0001418135"
+    },
+    {
+      "ticker": "KHC",
+      "name": "Kraft Heinz",
+      "cik": "0001637459"
+    },
+    {
+      "ticker": "KLAC",
+      "name": "KLA Corporation",
+      "cik": "0000319201"
+    },
+    {
+      "ticker": "LIN",
+      "name": "Linde plc",
+      "cik": "0001707925"
+    },
+    {
+      "ticker": "LRCX",
+      "name": "Lam Research",
+      "cik": "0000707549"
+    },
+    {
+      "ticker": "LULU",
+      "name": "Lululemon",
+      "cik": "0001397187"
+    },
+    {
+      "ticker": "MAR",
+      "name": "Marriott International",
+      "cik": "0001048286"
+    },
+    {
+      "ticker": "MCHP",
+      "name": "Microchip Technology",
+      "cik": "0000827054"
+    },
+    {
+      "ticker": "MDLZ",
+      "name": "Mondelez International",
+      "cik": "0001103982"
+    },
+    {
+      "ticker": "MELI",
+      "name": "Mercado Libre",
+      "cik": "0001099590"
+    },
+    {
+      "ticker": "META",
+      "name": "Meta Platforms",
+      "cik": "0001326801"
+    },
+    {
+      "ticker": "MNST",
+      "name": "Monster Beverage",
+      "cik": "0000865752"
+    },
+    {
+      "ticker": "MRVL",
+      "name": "Marvell Technology",
+      "cik": "0001835632"
+    },
+    {
+      "ticker": "MSFT",
+      "name": "Microsoft",
+      "cik": "0000789019"
+    },
+    {
+      "ticker": "MSTR",
+      "name": "MicroStrategy",
+      "cik": "0001050446"
+    },
+    {
+      "ticker": "MU",
+      "name": "Micron Technology",
+      "cik": "0000723125"
+    },
+    {
+      "ticker": "NFLX",
+      "name": "Netflix, Inc.",
+      "cik": "0001065280"
+    },
+    {
+      "ticker": "NVDA",
+      "name": "Nvidia",
+      "cik": "0001045810"
+    },
+    {
+      "ticker": "NXPI",
+      "name": "NXP Semiconductors",
+      "cik": "0001413447"
+    },
+    {
+      "ticker": "ODFL",
+      "name": "Old Dominion Freight Line",
+      "cik": "0000878927"
+    },
+    {
+      "ticker": "ON",
+      "name": "Onsemi",
+      "cik": "0001097864"
+    },
+    {
+      "ticker": "ORLY",
+      "name": "O'Reilly Automotive",
+      "cik": "0000898173"
+    },
+    {
+      "ticker": "PANW",
+      "name": "Palo Alto Networks",
+      "cik": "0001327567"
+    },
+    {
+      "ticker": "PAYX",
+      "name": "Paychex",
+      "cik": "0000723531"
+    },
+    {
+      "ticker": "PCAR",
+      "name": "Paccar",
+      "cik": "0000075362"
+    },
+    {
+      "ticker": "PDD",
+      "name": "PDD Holdings",
+      "cik": "0001737806"
+    },
+    {
+      "ticker": "PEP",
+      "name": "PepsiCo",
+      "cik": "0000077476"
+    },
+    {
+      "ticker": "PLTR",
+      "name": "Palantir Technologies",
+      "cik": "0001321655"
+    },
+    {
+      "ticker": "PYPL",
+      "name": "PayPal",
+      "cik": "0001633917"
+    },
+    {
+      "ticker": "QCOM",
+      "name": "Qualcomm",
+      "cik": "0000804328"
+    },
+    {
+      "ticker": "REGN",
+      "name": "Regeneron Pharmaceuticals",
+      "cik": "0000872589"
+    },
+    {
+      "ticker": "ROP",
+      "name": "Roper Technologies",
+      "cik": "0000882835"
+    },
+    {
+      "ticker": "ROST",
+      "name": "Ross Stores",
+      "cik": "0000745732"
+    },
+    {
+      "ticker": "SBUX",
+      "name": "Starbucks",
+      "cik": "0000829224"
+    },
+    {
+      "ticker": "SHOP",
+      "name": "Shopify",
+      "cik": "0001594805"
+    },
+    {
+      "ticker": "SNPS",
+      "name": "Synopsys",
+      "cik": "0000883241"
+    },
+    {
+      "ticker": "SOLS",
+      "name": "Solstice Advanced Materials",
+      "cik": "0002064953"
+    },
+    {
+      "ticker": "TEAM",
+      "name": "Atlassian",
+      "cik": "0001650372"
+    },
+    {
+      "ticker": "TMUS",
+      "name": "T-Mobile US",
+      "cik": "0001283699"
+    },
+    {
+      "ticker": "TRI",
+      "name": "Thomson Reuters",
+      "cik": "0001075124"
+    },
+    {
+      "ticker": "TSLA",
+      "name": "Tesla, Inc.",
+      "cik": "0001318605"
+    },
+    {
+      "ticker": "TTD",
+      "name": "Trade Desk (The)",
+      "cik": "0001671933"
+    },
+    {
+      "ticker": "TTWO",
+      "name": "Take-Two Interactive",
+      "cik": "0000946581"
+    },
+    {
+      "ticker": "TXN",
+      "name": "Texas Instruments",
+      "cik": "0000097476"
+    },
+    {
+      "ticker": "VRSK",
+      "name": "Verisk Analytics",
+      "cik": "0001442145"
+    },
+    {
+      "ticker": "VRTX",
+      "name": "Vertex Pharmaceuticals",
+      "cik": "0000875320"
+    },
+    {
+      "ticker": "WBD",
+      "name": "Warner Bros. Discovery",
+      "cik": "0001437107"
+    },
+    {
+      "ticker": "WDAY",
+      "name": "Workday, Inc.",
+      "cik": "0001327811"
+    },
+    {
+      "ticker": "XEL",
+      "name": "Xcel Energy",
+      "cik": "0000072903"
+    },
+    {
+      "ticker": "ZS",
+      "name": "Zscaler",
+      "cik": "0001713683"
+    }
+  ],
+  "count": 102,
+  "last_updated": "2025-11-13 01:30:03",
+  "source": "Wikipedia + SEC Edgar API"
+}

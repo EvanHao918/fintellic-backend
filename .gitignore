@@ -41,3 +41,4 @@ tests/
 nohup.out
 rds_credentials.txt
 hermespeed-firebase.json
+!app/data/*.json

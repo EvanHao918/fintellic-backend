@@ -15,7 +15,7 @@ from app.api import deps
 from app.core.database import get_db
 from app.core.cache import cache
 from app.models.company import Company
-from app.models.filing import Filing
+from app.models.filing import Filing, FilingType
 from app.services.fmp_service import fmp_service
 
 router = APIRouter()
@@ -225,13 +225,67 @@ async def get_company_profile(
 ):
     """
     Get enhanced company profile with FMP data
-    OPTIMIZED: Now primarily uses database-stored FMP data instead of real-time API calls
-    This is the CORE OPTIMIZATION from the FMP API optimization project
+    ENHANCED: Handles IPO companies (ticker prefix "IPO-") gracefully
     """
     try:
-        # First get basic company data from database
+        ticker_upper = ticker.upper()
+        
+        # 🆕 Check if this is an IPO ticker (format: "IPO-{last 4 digits of CIK}")
+        if ticker_upper.startswith("IPO-"):
+            logger.info(f"[API] Handling IPO ticker: {ticker_upper}")
+            
+            # Extract last 4 digits of CIK from ticker (e.g., "IPO-3548" → "3548")
+            cik_suffix = ticker_upper.replace("IPO-", "")
+            
+            if not cik_suffix.isdigit() or len(cik_suffix) != 4:
+                raise HTTPException(status_code=404, detail="Invalid IPO ticker format")
+            
+            # Query company by CIK suffix (CIK ends with these 4 digits)
+            # Example: CIK "0002073548" ends with "3548"
+            company = db.query(Company).filter(
+                Company.cik.like(f"%{cik_suffix}")
+            ).first()
+            
+            if not company:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"No company found with CIK ending in {cik_suffix}"
+                )
+            
+            # Check if this company has S-1 filings
+            has_s1 = db.query(Filing).filter(
+                Filing.company_id == company.id,
+                Filing.filing_type == 'FORM_S1'
+            ).first() is not None
+            
+            # Return IPO company profile
+            return {
+                "ticker": ticker_upper,
+                "name": company.name,
+                "cik": company.cik,
+                "is_ipo": True,
+                "ipo_status": "Pre-IPO (S-1 Filed)" if has_s1 else "Pre-IPO",
+                "description": f"Pre-IPO company (CIK: {company.cik})",
+                # Basic fields for compatibility
+                "market_cap": None,
+                "market_cap_formatted": "Pre-IPO",
+                "pe_ratio": None,
+                "pe_ratio_formatted": "N/A",
+                "website": None,
+                "employees": None,
+                "headquarters": None,
+                "country": "United States",
+                "exchange": "Pending IPO",
+                "sector": getattr(company, 'sector', getattr(company, 'sic_description', None)),
+                "industry": getattr(company, 'industry', None),
+                "founded_year": None,
+                "is_sp500": False,
+                "is_nasdaq100": False,
+            }
+        
+        # First get basic company data from database (normal flow for listed companies)
         company = db.query(Company).filter(
-            Company.ticker == ticker.upper()
+            Company.ticker == ticker_upper
         ).first()
         
         if not company:

@@ -37,35 +37,36 @@ class Settings(BaseSettings):
     FREE_USER_DAILY_LIMIT: int = 3
     
     # ==================== SIMPLIFIED SUBSCRIPTION SETTINGS ====================
-    # Simplified pricing configuration - only two price sets, controlled by switch
+    # Simple monthly-only subscription with two price tiers
     
-    # Price control switch - you can control which price to display via environment variable
-    USE_DISCOUNTED_PRICING: bool = True  # True=show discounted price, False=show original price
+    # Price control switch - toggle between discounted and standard pricing
+    USE_DISCOUNTED_PRICING: bool = True  # True=show $19.99, False=show $29.99
     
-    # Discounted prices
-    DISCOUNTED_MONTHLY_PRICE: float = 39.00  # Discounted monthly price
-    DISCOUNTED_YEARLY_PRICE: float = 280.80  # Discounted yearly price (39 * 12 * 0.6)
+    # Monthly prices (only monthly subscription, no yearly)
+    DISCOUNTED_MONTHLY_PRICE: float = 19.99  # Limited-time promotional price
+    STANDARD_MONTHLY_PRICE: float = 29.99    # Standard price
     
-    # Standard prices
-    STANDARD_MONTHLY_PRICE: float = 49.00  # Standard monthly price
-    STANDARD_YEARLY_PRICE: float = 352.80  # Standard yearly price (49 * 12 * 0.6)
-    
-    # Yearly discount
-    YEARLY_DISCOUNT: float = 0.6  # Yearly discount (60% of yearly)
+    # Note: No yearly subscription - simplified single-tier monthly model
     
     # ==================== APPLE IN-APP PURCHASE ====================
     # Apple IAP Production Configuration
     APPLE_SHARED_SECRET: Optional[str] = None
-    APPLE_BUNDLE_ID: str = "com.hermespeed.app"
+    APPLE_BUNDLE_ID: str = "com.allsight.app"
     APPLE_USE_SANDBOX: bool = True  # Auto-detect based on environment
     
     # Apple IAP URLs
     APPLE_VERIFY_RECEIPT_URL: str = "https://buy.itunes.apple.com/verifyReceipt"
     APPLE_SANDBOX_VERIFY_URL: str = "https://sandbox.itunes.apple.com/verifyReceipt"
     
-    # Apple Product IDs - Real production IDs
-    APPLE_MONTHLY_PRODUCT_ID: str = "com.hermespeed.app.monthly"
-    APPLE_YEARLY_PRODUCT_ID: str = "com.hermespeed.app.yearly"
+    # Apple Product IDs - Two separate products for manual price switching
+    APPLE_MONTHLY_PRODUCT_ID_DISCOUNTED: str = "com.allsight.pro.monthly.discounted"  # $19.99
+    APPLE_MONTHLY_PRODUCT_ID_STANDARD: str = "com.allsight.pro.monthly.standard"      # $29.99
+    
+    # Active product ID (controlled by USE_DISCOUNTED_PRICING flag)
+    @property
+    def APPLE_MONTHLY_PRODUCT_ID(self) -> str:
+        """Get active Apple product ID based on pricing mode"""
+        return self.APPLE_MONTHLY_PRODUCT_ID_DISCOUNTED if self.USE_DISCOUNTED_PRICING else self.APPLE_MONTHLY_PRODUCT_ID_STANDARD
     
     # Apple StoreKit 2 Configuration (optional for advanced features)
     APPLE_ISSUER_ID: Optional[str] = None
@@ -73,17 +74,13 @@ class Settings(BaseSettings):
     APPLE_PRIVATE_KEY: Optional[str] = None
     
     # ==================== GOOGLE PLAY BILLING ====================
-    # Google Play Production Configuration
-    GOOGLE_PACKAGE_NAME: str = "com.hermespeed.app"
-    
-    # Google Service Account Configuration
+    # Google Play - DISABLED (iOS only for now)
+    # Kept for future expansion but not actively used
+    GOOGLE_PACKAGE_NAME: str = "com.allsight.app"
     GOOGLE_SERVICE_ACCOUNT_KEY_PATH: Optional[str] = None
     GOOGLE_SERVICE_ACCOUNT_KEY_BASE64: Optional[str] = None
     GOOGLE_SERVICE_ACCOUNT_KEY_JSON: Optional[str] = None
-    
-    # Google Product IDs - Real production IDs
-    GOOGLE_MONTHLY_PRODUCT_ID: str = "hermespeed_pro_monthly"
-    GOOGLE_YEARLY_PRODUCT_ID: str = "hermespeed_pro_yearly"
+    GOOGLE_MONTHLY_PRODUCT_ID: str = "allsight_pro_monthly"  # Not in use
     
     # ==================== WEBHOOK CONFIGURATION ====================
     # Production Webhook URLs
@@ -308,11 +305,6 @@ class Settings(BaseSettings):
         return self.DISCOUNTED_MONTHLY_PRICE if self.USE_DISCOUNTED_PRICING else self.STANDARD_MONTHLY_PRICE
     
     @property
-    def current_yearly_price(self) -> float:
-        """Get current effective yearly price"""
-        return self.DISCOUNTED_YEARLY_PRICE if self.USE_DISCOUNTED_PRICING else self.STANDARD_YEARLY_PRICE
-    
-    @property
     def is_discounted_pricing(self) -> bool:
         """Whether using discounted pricing"""
         return self.USE_DISCOUNTED_PRICING
@@ -323,19 +315,14 @@ class Settings(BaseSettings):
         return self.EMAIL_FROM_ADDRESS or self.SMTP_USER or "noreply@hermespeed.com"
     
     def get_pricing_info(self) -> dict:
-        """Get current pricing information"""
+        """Get current pricing information - Monthly only"""
         monthly_price = self.current_monthly_price
-        yearly_price = self.current_yearly_price
-        yearly_savings = (monthly_price * 12) - yearly_price
-        savings_percentage = int((yearly_savings / (monthly_price * 12)) * 100)
         
         return {
             "monthly_price": monthly_price,
-            "yearly_price": yearly_price,
-            "yearly_savings": yearly_savings,
-            "savings_percentage": savings_percentage,
             "is_discounted": self.is_discounted_pricing,
-            "pricing_type": "discounted" if self.is_discounted_pricing else "standard"
+            "pricing_type": "discounted" if self.is_discounted_pricing else "standard",
+            "currency": "USD"
         }
     
     def get_frontend_verification_url(self, token: str) -> str:
@@ -347,7 +334,12 @@ class Settings(BaseSettings):
         return f"{self.FRONTEND_URL}/reset-password?token={token}"
     
     def get_apple_product_ids(self) -> dict:
-        """Get Apple product IDs"""
+        """Get Apple product IDs - returns both for reference"""
+        return {
+            "discounted": self.APPLE_MONTHLY_PRODUCT_ID_DISCOUNTED,
+            "standard": self.APPLE_MONTHLY_PRODUCT_ID_STANDARD,
+            "active": self.APPLE_MONTHLY_PRODUCT_ID  # Current active based on flag
+        }
         return {
             "monthly": self.APPLE_MONTHLY_PRODUCT_ID,
             "yearly": self.APPLE_YEARLY_PRODUCT_ID

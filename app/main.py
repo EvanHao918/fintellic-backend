@@ -45,7 +45,7 @@ app = FastAPI(
 )
 
 # Configure CORS with security-enhanced settings
-cors_origins = settings.get_cors_origins_by_environment() if settings.ENVIRONMENT != "development" else settings.API_CORS_ORIGINS
+cors_origins = settings.API_CORS_ORIGINS
 
 app.add_middleware(
     CORSMiddleware,

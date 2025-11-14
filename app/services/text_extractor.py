@@ -38,19 +38,27 @@ class TextExtractor:
         self.exhibit_config = {
             'EX-99': {
                 'priority': 100,
-                'max_chars': 100000,
+                'max_chars': 600000,  # Increased from 100KB to 600KB to avoid truncation
                 'patterns': [
+                    # Standard Exhibit 99 patterns
                     "*ex99*.htm", "*ex99*.html",
                     "*kex99*.htm", "*kex99*.html", 
                     "*dex99*.htm", "*dex99*.html",
                     "ex-99*.htm", "ex-99*.html",
-                    "exhibit99*.htm", "exhibit99*.html"
+                    "exhibit99*.htm", "exhibit99*.html",
+                    # Common earnings/investor materials patterns
+                    "*earningsrelease*.htm", "*earningsrelease*.html",
+                    "*earnings*.htm", "*earnings*.html",
+                    "*investormeetingmate*.htm", "*investormeetingmate*.html",
+                    "*investor*.htm", "*investor*.html",
+                    "*presentation*.htm", "*presentation*.html",
+                    "*pressrelease*.htm", "*pressrelease*.html"
                 ],
                 'description': 'Press Release/Financial Data'
             },
             'EX-10_CONTRACTS': {
                 'priority': 90,
-                'max_chars': 80000,
+                'max_chars': 300000,  # Increased from 80KB to 300KB
                 'patterns': [
                     "*ex10[._-][1-9].htm", "*ex10[._-][1-9].html",
                     "*kex10[._-][1-9].htm", "*dex10[._-][1-9].htm",
@@ -60,7 +68,7 @@ class TextExtractor:
             },
             'EX-10_COMPENSATION': {
                 'priority': 80,
-                'max_chars': 60000,
+                'max_chars': 200000,  # Increased from 60KB to 200KB
                 'patterns': [
                     "*ex10[._-]1[0-9].htm", "*ex10[._-]1[0-9].html",
                     "*ex10[._-][2-9][0-9].htm", "*ex10[._-][2-9][0-9].html",

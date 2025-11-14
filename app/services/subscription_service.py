@@ -46,38 +46,25 @@ class SubscriptionService:
     @staticmethod
     def get_user_pricing(db: Session, user: User) -> PricingInfo:
         """
-        Get user pricing information - simplified version
-        Based on system configuration rather than user sequence
+        Get user pricing information - Monthly only
+        Based on system configuration (USE_DISCOUNTED_PRICING flag)
         """
         try:
             # Get current system pricing configuration
             pricing_config = settings.get_pricing_info()
             
             monthly_price = pricing_config["monthly_price"]
-            yearly_price = pricing_config["yearly_price"]
-            yearly_savings = pricing_config["yearly_savings"]
-            savings_percentage = pricing_config["savings_percentage"]
             is_discounted = pricing_config["is_discounted"]
             
             # Determine pricing tier (maintain backward compatibility)
             pricing_tier = PricingTier.EARLY_BIRD if is_discounted else PricingTier.STANDARD
             
-            # Update user pricing info (maintain data consistency)
-            if user.monthly_price != monthly_price:
-                user.monthly_price = monthly_price
-                user.pricing_tier = pricing_tier
-                db.commit()
-                logger.info(f"Updated pricing for user {user.id}: ${monthly_price}/month, tier={pricing_tier}")
-            
             return PricingInfo(
-                is_early_bird=is_discounted,
+                is_early_bird=is_discounted,  # Backward compatibility
+                is_discounted=is_discounted,
                 user_sequence_number=user.user_sequence_number,
                 pricing_tier=pricing_tier,
                 monthly_price=monthly_price,
-                yearly_price=yearly_price,
-                yearly_savings=yearly_savings,
-                yearly_savings_percentage=savings_percentage,
-                early_bird_slots_remaining=None,
                 currency="USD",
                 features={
                     "unlimited_reports": True,
@@ -174,15 +161,25 @@ class SubscriptionService:
                     payment_required=False
                 )
             
-            # Get pricing information
+            # Get pricing information (monthly only)
             pricing_info = SubscriptionService.get_user_pricing(db, user)
+            price = pricing_info.monthly_price
             
-            if subscription_data.subscription_type == SubscriptionType.MONTHLY:
-                price = pricing_info.monthly_price
-            else:  # YEARLY
-                price = pricing_info.yearly_price
+            logger.info(f"Subscription creation requested for user {user.id}: type=MONTHLY, price=${price}")
             
-            logger.info(f"Subscription creation requested for user {user.id}: type={subscription_data.subscription_type}, price=${price}")
+            return SubscriptionResponse(
+                success=False,
+                message="Payment required - Please complete purchase through Apple App Store",
+                subscription_info=None,
+                payment_required=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in create_subscription for user {user.id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to initiate subscription"
+            )
             
             # Phase 2: Direct subscription creation only for development
             if settings.ENABLE_MOCK_PAYMENTS and settings.is_development:
@@ -508,6 +505,8 @@ class SubscriptionService:
                 "error": str(e)
             }
     
+    # ==================== GOOGLE PLAY (DISABLED - iOS ONLY) ====================
+    
     @staticmethod
     async def process_google_subscription(
         db: Session,
@@ -516,95 +515,17 @@ class SubscriptionService:
         product_id: str,
         order_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Process Google Play subscription with real payment verification"""
-        try:
-            # Validate purchase
-            if not purchase_info.get("is_valid"):
-                return {
-                    "success": False,
-                    "message": "Invalid purchase",
-                    "error": purchase_info.get("error")
-                }
-            
-            if not purchase_info.get("is_active"):
-                return {
-                    "success": False,
-                    "message": "Subscription is not active",
-                    "expiry_time": purchase_info.get("expiry_time")
-                }
-            
-            # Validate product ID
-            from app.services.google_play_service import google_play_service
-            if not google_play_service._validate_product_id(product_id):
-                return {
-                    "success": False,
-                    "message": "Invalid product ID"
-                }
-            
-            # Get subscription info
-            subscription_type = purchase_info.get("subscription_type", "MONTHLY")
-            expiry_time_str = purchase_info.get("expiry_time")
-            expiry_time = None
-            
-            if expiry_time_str:
-                try:
-                    expiry_time = datetime.fromisoformat(expiry_time_str.replace('Z', '+00:00'))
-                    if expiry_time.tzinfo is None:
-                        expiry_time = expiry_time.replace(tzinfo=timezone.utc)
-                except Exception as e:
-                    logger.warning(f"Failed to parse expiry_time: {expiry_time_str}, error: {e}")
-                    current_time = SubscriptionService._get_utc_now()
-                    expiry_time = current_time + timedelta(days=30 if subscription_type == "MONTHLY" else 365)
-            
-            # Determine price
-            price = purchase_info.get("price")
-            if not price:
-                if subscription_type == "YEARLY":
-                    price = settings.current_yearly_price
-                else:
-                    price = settings.current_monthly_price
-            
-            current_time = SubscriptionService._get_utc_now()
-            
-            # Update user subscription status
-            user.tier = UserTier.PRO
-            user.is_subscription_active = True
-            user.subscription_type = subscription_type
-            user.subscription_started_at = user.subscription_started_at or current_time
-            user.subscription_expires_at = expiry_time
-            user.next_billing_date = expiry_time
-            user.subscription_price = price
-            user.subscription_auto_renew = purchase_info.get("auto_renewing", True)
-            user.payment_method = "google"
-            user.google_subscription_id = purchase_info.get("purchase_token")
-            user.google_order_id = order_id or purchase_info.get("order_id")
-            user.last_payment_date = current_time
-            user.last_payment_amount = price
-            user.total_payment_amount = (user.total_payment_amount or 0) + price
-            
-            # Set pricing tier
-            user.pricing_tier = PricingTier.EARLY_BIRD if settings.is_discounted_pricing else PricingTier.STANDARD
-            user.monthly_price = settings.current_monthly_price
-            user.is_early_bird = settings.is_discounted_pricing
-            
-            db.commit()
-            
-            logger.info(f"Google subscription processed successfully for user {user.id}")
-            
-            return {
-                "success": True,
-                "message": "Subscription activated successfully",
-                "subscription_info": SubscriptionService.get_current_subscription(db, user).__dict__
-            }
-            
-        except Exception as e:
-            logger.error(f"Error processing Google subscription: {str(e)}")
-            db.rollback()
-            return {
-                "success": False,
-                "message": "Failed to process subscription",
-                "error": str(e)
-            }
+        """
+        Process Google Play subscription - DISABLED
+        iOS-only mode: Google Play subscriptions not supported
+        Kept for potential future Android expansion
+        """
+        logger.warning(f"Google Play subscription attempted by user {user.id} but iOS-only mode enabled")
+        return {
+            "success": False,
+            "message": "Google Play subscriptions not supported - iOS only",
+            "error": "PLATFORM_NOT_SUPPORTED"
+        }
     
     # ==================== WEBHOOK HANDLERS ====================
     
@@ -726,7 +647,6 @@ class SubscriptionService:
                 "conversion_rate": (pro_users / total_users * 100) if total_users > 0 else 0,
                 "current_pricing": {
                     "monthly_price": settings.current_monthly_price,
-                    "yearly_price": settings.current_yearly_price,
                     "is_discounted": settings.is_discounted_pricing
                 }
             }
@@ -741,7 +661,6 @@ class SubscriptionService:
                 "conversion_rate": 0,
                 "current_pricing": {
                     "monthly_price": settings.current_monthly_price,
-                    "yearly_price": settings.current_yearly_price,
                     "is_discounted": settings.is_discounted_pricing
                 }
             }

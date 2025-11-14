@@ -154,6 +154,39 @@ class EDGARScanner:
             return False
         
         return True
+    
+    def _extract_items_from_rss(self, filing_data: Dict) -> List[str]:
+        """
+        从 RSS filing data 中提取官方 SEC Item 编号
+        
+        Args:
+            filing_data: RSS entry 的字典数据
+            
+        Returns:
+            List of Item numbers (e.g., ["2.03", "9.01"])
+        """
+        # RSS feed 中的 items 字段
+        items_str = filing_data.get('items', '')
+        
+        if not items_str or items_str.strip() == '':
+            return []
+        
+        # 可能是 "2.03" 或 "2.03, 9.01" 格式
+        items = [item.strip() for item in items_str.split(',')]
+        
+        # 过滤掉空字符串和无效格式
+        valid_items = []
+        for item in items:
+            # 验证格式：应该是 X.XX 格式
+            if re.match(r'^\d+\.\d{2}$', item):
+                valid_items.append(item)
+            else:
+                logger.debug(f"Skipping invalid item format: {item}")
+        
+        if valid_items:
+            logger.debug(f"Extracted Items from RSS: {valid_items}")
+        
+        return valid_items
         
     async def scan_for_new_filings(self) -> List[Dict]:
         """
@@ -412,6 +445,7 @@ class EDGARScanner:
         Create a new filing record from RSS data
         ENHANCED: Records precise detection timestamp and ensures ticker is populated
         ENHANCED: Consistent timezone handling
+        ENHANCED: Extract and store official SEC Item numbers for 8-K filings
         
         Args:
             company: Company object
@@ -439,6 +473,13 @@ class EDGARScanner:
         elif detection_time.tzinfo != timezone.utc:
             detection_time = detection_time.astimezone(timezone.utc)
         
+        # ENHANCED: Extract official SEC Item numbers for 8-K filings
+        official_items = []
+        if rss_filing["form"] == "8-K":
+            official_items = self._extract_items_from_rss(rss_filing)
+            if official_items:
+                logger.info(f"8-K filing has official Items: {official_items}")
+        
         # ENHANCED: Create Filing with ticker from company and precise detection time
         filing = Filing(
             company_id=company.id,
@@ -448,7 +489,8 @@ class EDGARScanner:
             form_type=rss_filing["form"],  # Store raw form type too
             filing_date=filing_date_utc,  # Official SEC filing date (UTC)
             detected_at=detection_time,  # ENHANCED: When we detected this filing (precise UTC timestamp)
-            status=ProcessingStatus.PENDING  # Using enum value
+            status=ProcessingStatus.PENDING,  # Using enum value
+            event_items=official_items if official_items else None  # ENHANCED: Store official Items for 8-K
         )
         
         # Set URL fields as attributes after creation
@@ -462,8 +504,10 @@ class EDGARScanner:
             filing.ticker = company.ticker
         
         # Log the creation with timing info
-        logger.debug(f"Created filing record: {filing.ticker} {filing.filing_type.value} "
-                    f"filed={filing_date_utc.isoformat()} detected={detection_time.isoformat()}")
+        log_msg = f"Created filing record: {filing.ticker} {filing.filing_type.value} filed={filing_date_utc.isoformat()} detected={detection_time.isoformat()}"
+        if official_items:
+            log_msg += f" items={official_items}"
+        logger.debug(log_msg)
         
         return filing
     

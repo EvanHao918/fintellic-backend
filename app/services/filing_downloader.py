@@ -10,8 +10,6 @@ from urllib.parse import urlparse, parse_qs, unquote
 from sqlalchemy.orm import Session
 
 from app.models.filing import Filing, ProcessingStatus, FilingType
-# Phase 4: 导入通知服务
-from app.services.notification_service import notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -878,28 +876,6 @@ class FilingDownloader:
                 # Update status to PARSING
                 filing.status = ProcessingStatus.PARSING
                 db.commit()
-                
-                # ========================= Phase 4: 发送推送通知 =========================
-                try:
-                    logger.info(f"Phase 4: Triggering push notification for filing {filing.id}")
-                    
-                    # 调用通知服务发送通知
-                    notification_count = notification_service.send_filing_notification(
-                        db=db,
-                        filing=filing,
-                        notification_type="filing_release"
-                    )
-                    
-                    if notification_count > 0:
-                        logger.info(f"✅ Successfully sent {notification_count} push notifications")
-                    else:
-                        logger.info("No users subscribed to notifications for this filing")
-                        
-                except Exception as notification_error:
-                    # 通知失败不应该影响下载流程
-                    logger.error(f"Failed to send push notifications: {notification_error}")
-                    # 继续执行，不中断下载流程
-                # =========================================================================
                 
                 logger.info(f"🎯 Successfully completed enhanced download for {filing.accession_number}")
                 return True

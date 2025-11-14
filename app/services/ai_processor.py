@@ -60,6 +60,150 @@ TONE: Professional, concise, factual - like a Bloomberg terminal alert.
 AVOID: Buzzwords ("strategic", "positioned", "innovative"), formal phrases ("announced that"), exact beat/miss amounts, unnecessary details.
 """
 
+# SEC Official Item Definitions - Authoritative reference for 8-K classification
+SEC_ITEM_DEFINITIONS = {
+    '1.01': {
+        'title': 'Entry into a Material Definitive Agreement',
+        'category': 'Material Agreement',
+        'description': 'Material agreements such as contracts, partnerships, or licensing deals',
+        'focus_areas': ['parties involved', 'key commercial terms', 'financial impact', 'duration and termination'],
+        'suggested_tags': ['Material Agreement']
+    },
+    '1.02': {
+        'title': 'Termination of a Material Definitive Agreement',
+        'category': 'Agreement Termination',
+        'description': 'Termination or material modification of agreements',
+        'focus_areas': ['agreement being terminated', 'reason for termination', 'financial impact', 'effective date'],
+        'suggested_tags': ['Agreement Termination']
+    },
+    '1.03': {
+        'title': 'Bankruptcy or Receivership',
+        'category': 'Bankruptcy',
+        'description': 'Bankruptcy filings or receivership proceedings',
+        'focus_areas': ['type of proceeding', 'court', 'debts', 'restructuring plans'],
+        'suggested_tags': ['Bankruptcy', 'Financial Distress']
+    },
+    '2.01': {
+        'title': 'Completion of Acquisition or Disposition of Assets',
+        'category': 'M&A Transaction',
+        'description': 'Mergers, acquisitions, or asset sales',
+        'focus_areas': ['target or buyer', 'transaction value', 'deal structure', 'closing date', 'strategic rationale'],
+        'suggested_tags': ['M&A Deal', 'Acquisition']
+    },
+    '2.02': {
+        'title': 'Results of Operations and Financial Condition',
+        'category': 'Earnings Release',
+        'description': 'Quarterly or annual financial results announcement',
+        'focus_areas': ['revenue', 'EPS', 'net income', 'margins', 'guidance'],
+        'suggested_tags': ['Earnings Release']
+    },
+    '2.03': {
+        'title': 'Creation of a Direct Financial Obligation',
+        'category': 'Financing Event',
+        'description': 'New debt issuance, credit facilities, loans, or commercial paper programs',
+        'focus_areas': ['amount', 'maturity', 'interest rate', 'purpose of proceeds', 'covenants'],
+        'suggested_tags': ['Financing', 'Debt Issuance']
+    },
+    '2.04': {
+        'title': 'Triggering Events That Accelerate or Increase Obligations',
+        'category': 'Debt Acceleration',
+        'description': 'Events triggering debt acceleration or default',
+        'focus_areas': ['triggering event', 'obligations affected', 'amounts', 'consequences'],
+        'suggested_tags': ['Debt Default', 'Financial Distress']
+    },
+    '2.05': {
+        'title': 'Costs Associated with Exit or Disposal Activities',
+        'category': 'Restructuring',
+        'description': 'Restructuring charges, facility closures, or workforce reductions',
+        'focus_areas': ['nature of restructuring', 'charges amount', 'affected operations', 'timing', 'expected savings'],
+        'suggested_tags': ['Restructuring', 'Cost Reduction']
+    },
+    '2.06': {
+        'title': 'Material Impairments',
+        'category': 'Impairment Charge',
+        'description': 'Material impairment charges on assets or goodwill',
+        'focus_areas': ['assets impaired', 'impairment amount', 'reason', 'impact on earnings'],
+        'suggested_tags': ['Impairment', 'Asset Write-Down']
+    },
+    '3.01': {
+        'title': 'Notice of Delisting or Failure to Satisfy Listing Rule',
+        'category': 'Delisting Risk',
+        'description': 'Notice of delisting or non-compliance with exchange rules',
+        'focus_areas': ['exchange', 'rule violated', 'company response', 'timeline'],
+        'suggested_tags': ['Delisting Risk', 'Compliance']
+    },
+    '3.02': {
+        'title': 'Unregistered Sales of Equity Securities',
+        'category': 'Private Placement',
+        'description': 'Private placement or unregistered securities sales',
+        'focus_areas': ['securities sold', 'purchasers', 'consideration', 'exemption relied upon'],
+        'suggested_tags': ['Private Placement', 'Equity Issuance']
+    },
+    '4.01': {
+        'title': 'Changes in Registrant\'s Certifying Accountant',
+        'category': 'Auditor Change',
+        'description': 'Change in independent auditor',
+        'focus_areas': ['former auditor', 'new auditor', 'reason for change', 'disagreements'],
+        'suggested_tags': ['Auditor Change']
+    },
+    '4.02': {
+        'title': 'Non-Reliance on Previously Issued Financial Statements',
+        'category': 'Restatement',
+        'description': 'Financial restatement or non-reliance on prior statements',
+        'focus_areas': ['periods affected', 'nature of errors', 'financial impact', 'restatement timeline'],
+        'suggested_tags': ['Restatement', 'Accounting Issue']
+    },
+    '5.01': {
+        'title': 'Changes in Control of Registrant',
+        'category': 'Change of Control',
+        'description': 'Change in control of the company',
+        'focus_areas': ['new controlling party', 'transaction structure', 'terms', 'management changes'],
+        'suggested_tags': ['Change of Control', 'Ownership Change']
+    },
+    '5.02': {
+        'title': 'Departure of Directors or Certain Officers; Election of Directors',
+        'category': 'Executive/Board Change',
+        'description': 'Changes in executive officers or board of directors',
+        'focus_areas': ['name and position', 'effective date', 'reason (if departure)', 'successor details', 'background'],
+        'suggested_tags': ['Executive Change', 'Board Change']
+    },
+    '5.03': {
+        'title': 'Amendments to Articles of Incorporation or Bylaws',
+        'category': 'Governance Change',
+        'description': 'Changes to corporate governance documents',
+        'focus_areas': ['nature of amendment', 'effective date', 'reason', 'shareholder impact'],
+        'suggested_tags': ['Governance Change']
+    },
+    '5.07': {
+        'title': 'Submission of Matters to a Vote of Security Holders',
+        'category': 'Shareholder Vote',
+        'description': 'Results of shareholder meetings and votes',
+        'focus_areas': ['matters voted on', 'vote results', 'outcome', 'next steps'],
+        'suggested_tags': ['Shareholder Vote', 'Annual Meeting']
+    },
+    '7.01': {
+        'title': 'Regulation FD Disclosure',
+        'category': 'Reg FD Disclosure',
+        'description': 'Public disclosure under Regulation Fair Disclosure',
+        'focus_areas': ['information disclosed', 'context', 'significance'],
+        'suggested_tags': ['Reg FD Disclosure']
+    },
+    '8.01': {
+        'title': 'Other Events',
+        'category': 'Other Corporate Event',
+        'description': 'Material events not covered by other Item categories',
+        'focus_areas': ['nature of event', 'parties involved', 'significance', 'next steps'],
+        'suggested_tags': ['Corporate Event']
+    },
+    '9.01': {
+        'title': 'Financial Statements and Exhibits',
+        'category': 'Exhibits',
+        'description': 'Financial statements and exhibits filed with the 8-K (supporting documents)',
+        'focus_areas': ['exhibits listed'],
+        'suggested_tags': []  # Usually accompanies other items
+    }
+}
+
 
 class AIProcessor:
     """
@@ -665,7 +809,8 @@ RULES:
     
     def _build_10q_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
         """
-        ✅ NEW: Enhanced 10-Q prompt with Flash Note style for o3-mini
+        ✅ Enhanced 10-Q prompt v2.0: Quarterly Performance Snapshot
+        Key improvements: Insight-driven headers + Guidance handling + Placeholder examples
         """
         marking_instructions = self._build_data_marking_instructions()
         
@@ -686,6 +831,16 @@ RULES:
 
 Your clients are Portfolio Managers at hedge funds and mutual funds. They receive 100+ research emails per day.
 
+**10-Q Purpose: Quarterly Performance Snapshot**
+
+Focus on THIS quarter:
+- How did this quarter perform vs. expectations?
+- What drove the beat/miss?
+- What are the near-term catalysts or risks?
+- What's the outlook for next quarter?
+
+Keep it focused on the quarterly story, not long-term strategy (save that for 10-K).
+
 {critical_estimates}{marking_instructions}
 
 ## OUTPUT STRUCTURE (MANDATORY)
@@ -696,28 +851,20 @@ Your clients are Portfolio Managers at hedge funds and mutual funds. They receiv
 
 **Format Requirements**:
 
-1. **Headline** (MANDATORY - First Line):
-   - 8-15 words maximum
-   - Capture: Beat/Miss + Key Driver + Action Implication
-   - Examples:
-     * "TICKER Beats on EPS (+XX% YoY); Strong Category Recovery Drives Upside"
-     * "TICKER Misses on Margins; Guidance Cut Pressures Valuation"
+**Bullet Points** (8-12 bullets):
+- Each bullet = One metric only
+- Format: `• **Metric Name**: $X.XB, +X% YoY [Source] - Commentary`
+- Use abbreviations: YoY, QoQ, v/s
+- Bold **BEAT** or **MISS** vs. consensus when applicable [FMP]
+- Most important metrics first (Revenue, EPS always top 2)
 
-2. **Bullet Points** (8-12 bullets):
-   - Each bullet = One metric only
-   - Format: `• **Metric Name**: $XX.XB, +X% YoY [Source] - Commentary`
-   - Use abbreviations: YoY, QoQ, v/s
-   - Bold **BEAT** or **MISS** vs. consensus when applicable [FMP]
-   - Most important metrics first (Revenue, EPS always top 2)
-   
-   **MANDATORY FIRST TWO BULLETS** (if estimates available):
-   • **Total Revenue**: $XX.XB, +X% YoY [DOC: Income Statement] - **BEAT/MISS** by $X.XB vs. estimate [FMP]
-   • **Diluted EPS**: $X.XX, +X% YoY [DOC] - **BEAT/MISS** by $X.XX vs. consensus [FMP]
+**MANDATORY FIRST TWO BULLETS** (if estimates available):
+• **Total Revenue**: $X.XB, +X% YoY [DOC: Income Statement] - **BEAT/MISS** by $X.XB vs. estimate [FMP]
+• **Diluted EPS**: $X.XX, +X% YoY [DOC] - **BEAT/MISS** by $X.XX vs. consensus [FMP]
 
-3. **Length**: 300-450 words maximum
+**Length**: 300-450 words maximum
 
-**Quality Bar**: 
-Would a trader understand the key numbers and beat/miss in one quick scan?
+Goal: Traders can scan key numbers in 10 seconds.
 
 **BEFORE WRITING SECTION 1 - DO THIS CALCULATION FIRST**:
 If analyst estimates are available [FMP]:
@@ -742,16 +889,51 @@ Then write your bullets using these calculated results.
 
 **Format Requirements**:
 
-1. **Structure** (Natural Prose Paragraphs):
-   - Paragraph 1: Why beat/miss happened + peer comparison (search if needed)
-   - Paragraph 2: Margin/profitability drivers
-   - Paragraph 3: Key operational metrics or risk factors
-   - Paragraph 4-5: Forward catalysts/concerns
-   - Final Paragraph: "Bottom Line" summary
+1. **Structure with THESIS-DRIVEN Headers**:
+   
+   Each major paragraph needs a header that states your KEY FINDING (3-7 words).
+   
+   Headers should answer: "What did I discover?" not "What am I analyzing?"
+   The paragraph then provides evidence supporting the header.
+   
+   **Write 3-4 thesis-driven paragraphs:**
+   - 📉/📈 Performance finding (beat/miss drivers, margins)
+   - 📈/⚠️ Operational/risk finding (key metrics or material risks)
+   - 🎯 Forward outlook (industry trends + catalysts + risks, guidance only if provided)
+   - 💡 Bottom line (synthesis)
+   
+   **Headers should be INSIGHT-driven, not administrative:**
+   ✅ Good: "Industry Tailwinds Support Demand"
+   ✅ Good: "Raw Material Costs Pressure Margins"  
+   ❌ Bad: "Forward Outlook Lacks Specific Guidance"
+   ❌ Bad: "Management Commentary on Future"
 
-2. **Length**: 600-800 words (strict max: 900 words)
+2. **Forward Outlook Structure**:
+   
+   Write a "Forward Outlook" paragraph covering:
+   - Industry trends and market context (use [web_search] for peer data if material)
+   - Key catalysts (positive drivers for next quarter/year)
+   - Key risks (headwinds or challenges)
+   - Management guidance (ONLY if explicitly provided with numeric targets)
+   
+   **Guidance Handling**:
+   - IF management provides explicit numeric guidance (revenue/EPS ranges or targets):
+     * State it clearly: "Management guided Q4 revenue to $X.XB-$X.XB [DOC: MD&A]"
+     * Include rationale if given
+   - IF no explicit guidance is provided:
+     * DO NOT mention the absence of guidance
+     * Focus on industry trends, peer comparisons, and business drivers instead
+   
+   **Priority Order** (lead with what matters most):
+   1. Industry trends and competitive context
+   2. Material catalysts or risks
+   3. Guidance (only if provided)
+   
+   Do NOT compare to prior guidance or calculate changes.
 
-3. **External Context**:
+3. **Length**: 600-800 words (strict max: 900 words)
+
+4. **External Context**:
    - You have web search capability
    - Use when industry/peer context adds material insight
    
@@ -771,26 +953,15 @@ Then write your bullets using these calculated results.
    - NO citations without full source details
    - NO vague references like "according to industry data"
 
-4. **Data Attribution**: 
-   - Same rules as Section 1
-   - Every claim needs source
-
-**Quality Bar**:
-Would a PM trust this enough to increase position size by 2%?
+Goal: Provide conviction for position sizing decisions.
 
 ---
 
 ## CRITICAL RULES
 
-**Data Source Attribution** (MANDATORY):
-- [DOC: Location] - From this filing
-- [FMP] - Analyst consensus (pre-provided)
-- [CALC: formula] - Your calculations
-- [1], [2] - Web search (with full source at bottom)
-
 **Style**:
-- Active voice: "Revenue grew 11%" not "was up 11%"
-- Specific: "$XX.XB" not "approximately XX billion"
+- Active voice: "Revenue grew X%" not "was up X%"
+- Specific: "$X.XB" not "approximately X billion"
 - Lead with numbers: "EPS $X.XX beat by $X.XX"
 - No vague terms without data: avoid "significant", "impressive" alone
 
@@ -820,8 +991,37 @@ Would a PM trust this enough to increase position size by 2%?
 
 Now generate your two-section analysis following this structure.
 
-**SECTION 1: FACT CLARITY** - Headline + 8-12 bullets (max 450 words)
+**SECTION 1: FACT CLARITY** - 8-12 bullets (max 450 words)
 **SECTION 2: MARKET PERSPECTIVE** - Analyst commentary (600-800 words)
+
+---
+
+## VISUAL ENHANCEMENT (Retail Readability)
+
+Apply these lightweight visual markings to improve scannability:
+
+**Bold Numbers** (**...**):
+- Key metrics: Revenue, EPS, Net Income, Margins
+- Beat/Miss amounts: "**BEAT** by **$X.XB**"  
+- YoY/QoQ changes: "**+X%** YoY"
+
+**Emoji Direction** (paragraph-level only):
+- 📈 Overall positive paragraph (beats, strong growth)
+- 📉 Overall negative paragraph (misses, declines)
+- 🎯 Guidance updates or forward outlook
+- ⚠️ Risk warnings or concerns
+- 💡 Bottom Line summary (mandatory)
+
+**Mutual Exclusion Rule**:
+❌ NEVER: "📈 **Revenue**: **$X.XB**"
+✅ DO: "📈 Revenue: $X.XB [DOC]" OR "**Revenue**: **$X.XB** [DOC]"
+
+**Application**:
+- Section 1: Bold numbers ONLY (no emoji)
+- Section 2: 1 emoji at paragraph start + bold numbers inside
+- Bottom Line: Always start with 💡
+
+Keep it professional - quality over quantity.
 """
     
     def _build_beat_miss_context(self, context: Dict) -> str:
@@ -882,133 +1082,269 @@ Do NOT recalculate. Use the comparison from Step 2 directly.
     
     def _build_10k_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
         """
-        10-K prompt - Annual fundamentals review for retail investors
-        Structure: ANNUAL REVIEW + STRATEGIC OUTLOOK
+        10-K prompt - Annual strategic review for retail investors v2.0
+        核心定位：帮助投资者理解公司年度表现、战略方向和关键风险
+        关键改进：观点型标题 + 故事化叙事 + 投资者视角 + 风险聚焦
         """
         marking_instructions = self._build_data_marking_instructions()
         
-        return f"""You are a financial analyst writing an annual report summary for retail investors.
+        ticker = self._get_safe_ticker(filing)
+        company_name = context['company_name']
+        
+        return f"""You are a financial analyst writing an annual report analysis for retail investors.
 
-Your readers want to understand: How did the company perform this year? What's the strategy going forward? What are the key risks?
+⚠️ DATA INTEGRITY: All numbers must cite sources [DOC: section] or [NO_DATA]. Never estimate or fabricate.
 
-## CORE PRINCIPLE: Facts and Data Drive Your Analysis
+Your goal: Help investors understand what happened this year and what it means for the company's future.
 
-Your job is to identify what's IMPORTANT in THIS filing, not to fill in a template blindly.
-
-- If revenue growth is the big story, spend more words explaining it
-- If a new risk factor is material, dive deeper into why it matters  
-- If margins improved significantly, show the numbers and explain why
-- Let the actual content guide your focus, not arbitrary rules
-
-Think like an analyst reading the real document: What jumped out at you? What would investors care most about? Follow the story the data tells you.
-
-Don't force content into boxes - write what matters.
+Think of this as an "Annual Strategic Review" - not just numbers, but the story behind them and where the company is headed.
 
 {marking_instructions}
 
+## CORE PRINCIPLE: Story + Strategy + Investment Implications
+
+Your readers want to know:
+1. **What happened this year?** (Performance story with context)
+2. **Where is the company going?** (Strategic direction)
+3. **What are the key risks?** (Deal-breakers, not checklists)
+4. **What should I do with this information?** (Investment perspective)
+
+Annual reports are about understanding the BIG PICTURE, not quarter-to-quarter details.
+
+---
+
 ## OUTPUT STRUCTURE (MANDATORY)
+
+**CRITICAL**: Your analysis MUST follow this exact three-section structure with proper section headers:
+
+```
+### SECTION 1: ANNUAL REVIEW
+[Content with 2-3 thesis-driven paragraphs]
+
+### SECTION 2: STRATEGIC DIRECTION  
+[Content with 2-3 thesis-driven paragraphs including risks]
+
+### SECTION 3: INVESTMENT PERSPECTIVE
+[Final synthesis and investor guidance]
+```
+
+Each section MUST start with the "### SECTION X:" header (exactly as shown).
+Within each section, use thesis-driven subheaders with emojis (📉 📈 🎯 ⚠️ 💡).
 
 ---
 
 ### SECTION 1: ANNUAL REVIEW
+**Reading Time**: 2-3 minutes
 
-**Purpose**: Help investors understand the company's full-year performance (3 minute read)
-
-**Format**: Natural prose paragraphs (400-600 words)
-
-**What to cover**:
-
-Start with the financial headline: How did revenue, profit, and cash flow perform compared to last year? Use the 3-year data from the financial statements and MD&A.
-
-Then explain what drove the results: Which products/segments grew or declined? What did management say about the performance drivers in MD&A?
-
-Discuss profitability: How did margins change? What happened to operating expenses?
-
-Cover the balance sheet: Cash position, debt levels, how they used their cash (buybacks, dividends, investments)?
-
-If there are important accounting changes or one-time items mentioned in the Notes, explain them clearly.
-
-**Data Sources**:
-- [DOC: Consolidated Statements of Operations] - Income statement
-- [DOC: MD&A - Results of Operations] - Management's explanation  
-- [DOC: Consolidated Balance Sheets] - Balance sheet
-- [DOC: Statements of Cash Flows] - Cash flow
-- [DOC: Notes to Financial Statements] - If applicable
-
-**Style**:
-- Write like you're explaining to a friend who invests but isn't a finance expert
-- Use clear language: "gross profit margin" not "gross margin compression dynamics"
-- Lead with numbers: "Revenue grew 15% to $5.2B" not "The company experienced revenue growth"
-- Compare to prior year: "vs. $4.5B last year"
-
-**Quality Bar**: 
-A retail investor should understand what happened financially this year without reading the full 10-K.
+**Structure: 3-4 paragraphs with THESIS-DRIVEN headers**
 
 ---
 
-### SECTION 2: STRATEGIC OUTLOOK
+📉 **[Your Performance Conclusion Header]**
 
-**Purpose**: Help investors evaluate the company's future direction and risks (5-7 minute read)
+Write a header that captures the KEY PERFORMANCE STORY (5-9 words)
 
-**Format**: Natural prose paragraphs (600-900 words)
+The header should state your key finding, not just label the topic.
+Think: "What's the story?" not "What section is this?"
 
-**What to cover**:
+**Content**:
+Tell the performance story with 3-year context:
+- Revenue trend (3-year trajectory, not just YoY)
+- What drove the change? (Customer wins/losses, market dynamics, product mix)
+- Profitability trend (margins, operating income, net income)
+- Key expense changes if material (R&D ramp, restructuring)
 
-Start with management's strategy: Based on the MD&A and Business section, what is management focused on? What are they investing in? How are they adapting to market changes?
+Use specific numbers but focus on the NARRATIVE:
+- Don't just list: "Revenue was $X in 2025, $Y in 2024, $Z in 2023"
+- Instead tell: "Revenue declined for the second year, falling to $X from a $Z peak in 2023, driven by..."
 
-Discuss competitive position: How is the company positioned in its industry? What advantages does it have? You can search for competitor performance if helpful for context.
+Cite [DOC: Consolidated Statements of Operations; MD&A]
 
-Analyze key risks: Pick the 3-5 most important risks from the Risk Factors section - don't just list them, explain why they matter and how likely they are to impact the business.
+---
 
-Look at management's outlook: What did they say about the coming year in MD&A? Any guidance or commentary on trends?
+💰 **[Your Balance Sheet/Cash Flow Conclusion Header]**
 
-End with key observations: What are the most important things investors should know from this annual report? What should they watch for in the coming year?
+Write a header that captures FINANCIAL POSITION or CAPITAL ALLOCATION story (5-9 words)
 
-**External Context** (Optional):
-- You can use web search if industry/competitor context adds value
-- Example: Search for "competitor earnings 2024" or "industry growth rate 2024"
-- If you search, cite as [1], [2] and list sources at the end:
-  [1] Source Title, Publisher, Date
-  [2] Source Title, Publisher, Date
+The header should state your key finding about the company's financial health or capital use.
 
-**Data Sources**:
-- [DOC: MD&A - Business Outlook]
-- [DOC: Item 1 - Business]  
-- [DOC: Risk Factors]
-- [1], [2] if web search used
+**Content**:
+Focus on what matters for investors:
+- Cash position and trend (and why it changed)
+- Operating cash flow strength
+- Capital deployment (buybacks, dividends, capex, M&A)
+- Debt levels and any near-term maturities
+- Working capital if material
 
-**Style**:
-- Keep it conversational but professional
-- Explain jargon: "EBITDA (earnings before interest, taxes, depreciation, amortization)"
-- Use analogies if helpful: "Think of free cash flow as the money left after paying all bills"
-- Be balanced: mention both positives and concerns
+Skip: Detailed line-item changes unless they tell a story
 
-**Quality Bar**:
-An investor should be able to decide whether this company fits their investment goals after reading this section.
+Cite [DOC: Consolidated Balance Sheets; Statements of Cash Flows]
+
+---
+
+### SECTION 2: STRATEGIC DIRECTION
+**Reading Time**: 4-5 minutes
+
+**Structure: 3-4 sections with THESIS-DRIVEN headers**
+
+---
+
+🎯 **[Your Strategy Conclusion Header]**
+
+Write a header that captures STRATEGIC DIRECTION or KEY INITIATIVE (5-9 words)
+
+The header should state what the company is doing or betting on, not just "strategy."
+
+**Content**:
+Explain the company's strategic direction:
+- What are they focused on? (Markets, products, capabilities)
+- Any major initiatives? (M&A, partnerships, capex programs, restructuring)
+- What's the rationale? (Why this strategy makes sense)
+- Include relevant industry context if helpful [1], [2] from web search
+
+If there's a MAJOR strategic event (merger, spin-off, major acquisition), lead with that.
+If ongoing strategy, explain their market positioning and growth vectors.
+
+Cite [DOC: MD&A; Item 1 - Business]
+
+---
+
+⚠️ **[Your Risk Conclusion Header]**
+
+Write a header that captures the TOP 2-3 RISKS (5-9 words)
+
+The header should name the specific risks, not just say "risks."
+
+**Content**:
+Identify and explain 2-3 DEAL-BREAKER risks:
+
+What's a deal-breaker risk in a 10-K context?
+- Could materially alter the investment thesis
+- Examples: Major customer concentration, regulatory existential threat, debt covenant risk, competitive disruption, M&A integration failure
+
+Format as numbered sub-risks:
+**1. [Risk Name]**: [2-3 sentences: what it is + why it matters + cite source]
+**2. [Risk Name]**: [2-3 sentences: what it is + why it matters + cite source]
+**3. [Risk Name]**: [2-3 sentences: what it is + why it matters + cite source]
+
+Then add: "Additional considerations include [brief mention of 2-3 secondary risks in ONE sentence]."
+
+What to SKIP:
+- Generic risks every company has (competition, macro, general market conditions)
+- Boilerplate language from Risk Factors section
+- Minor operational or compliance risks unless material
+
+Cite [DOC: Risk Factors]
+
+---
+
+🔮 **[Outlook/Future Direction Header - OPTIONAL]**
+
+Include only if management provides specific guidance or forward-looking commentary
+
+Examples:
+- "FY2026 Guidance: Targeting Revenue Growth Return"
+- "Management Signals Cautious Near-Term Outlook"
+
+**Content** (if included):
+- Management's stated priorities or guidance
+- Key milestones or catalysts to monitor
+- Cite [DOC: MD&A]
+
+---
+
+### SECTION 3: INVESTMENT PERSPECTIVE
+
+**Content** (MANDATORY):
+
+This is where you synthesize everything into actionable insight for investors.
+
+**Template**:
+
+{company_name} is [describe the phase: navigating transition / capitalizing on tailwinds / in restructuring mode / in growth acceleration] as it [key strategic initiative or challenge].
+
+**Near-term headwinds/considerations**: [List 2-4 items investors should watch]
+- Example: Margin pressure from elevated R&D
+- Example: Regulatory approval timeline for merger
+- Example: Customer contract renewal in Q2
+
+**Long-term question**: [Frame the key investment debate in one sentence]
+- Example: "Can diversification offset customer concentration before margins erode further?"
+- Example: "Will the AI strategy deliver revenue growth before cash runs out?"
+
+**Who should care**:
+- [Investor type 1]: [Why they might be interested]
+- [Investor type 2]: [Why they might be interested]  
+- [Investor type 3]: [What they should wait for]
+
+Example:
+"Growth investors betting on semiconductor consolidation and IoT/EV trends may find this compelling. Income investors should note the strong dividend and buyback track record. Value investors should wait for merger clarity and margin stabilization before committing capital."
+
+**Final thought**: [One sentence on what makes this a binary/compelling/wait-and-see situation]
+
+**Length**: 200-300 words
+
+---
+
+## FORMATTING RULES (Readability First)
+
+**Header Format**:
+- Always: emoji + **bold header with YOUR insight**
+- Keep headers SHORT: 5-9 words
+- Headers = CONCLUSIONS (what you found), not labels (what section this is)
+- Include numbers or concrete terms when impactful
+
+**Visual Marking**:
+- **Bold** all financial numbers: **$4.09B** revenue, **12.2%** margin
+- Use emoji ONLY for major section headers
+- Apply Mutual Exclusion Rule: Don't bold words next to emoji
+
+**Narrative Flow**:
+- Write in paragraphs, not bullet lists (except for numbered risks)
+- Tell a story, don't just report data
+- Connect the dots: "Revenue fell BECAUSE... which LED TO... RESULTING IN..."
 
 ---
 
 ## CRITICAL RULES
 
-**What to AVOID**:
-- Don't make investment recommendations: No "Buy", "Sell", "Good for growth investors"
-- Don't repeat information between Section 1 and Section 2
-- Don't use marketing language: "game-changing", "revolutionary", "best-in-class"
-- Don't speculate beyond what's in the filing
+**Length Discipline** (ABSOLUTE):
+- Section 1: 280-350 words MAX
+- Section 2: 500-650 words MAX  
+- Total: 780-1000 words
+- If approaching limit: Cut weaker points, don't compress language
+
+**Content Focus: Big Picture, Not Details**
+
+10-K is about the ANNUAL STORY and STRATEGIC DIRECTION, not quarter-by-quarter minutiae.
+
+Include what matters:
+- Multi-year trends (3-year context preferred)
+- Major strategic initiatives or changes
+- 2-3 deal-breaker risks (not risk catalog)
+- Investment implications (who should care and why)
+
+Ruthlessly cut:
+- Quarterly fluctuation details (save for 10-Q)
+- Granular line-item changes without strategic significance
+- Generic industry background
+- Long lists of minor risks
+- Boilerplate language from the filing
+
+Avoid hype language and speculation beyond stated plans.
 
 **Style**:
-- Active voice: "Revenue grew 15%" not "Revenue was up 15%"
-- Specific numbers: "$5.2B" not "approximately $5 billion"  
-- Clear comparisons: "up from $4.5B last year"
-- Plain English: avoid unnecessary jargon
+- Narrative prose, not data dump
+- Active voice, specific numbers, plain language
+- Write like a strategy consultant presenting annual review, not an accountant reading financials
 
 ---
 
 ## COMPANY CONTEXT
 
-- **Company**: {context['company_name']} ({context['ticker']})
-- **Fiscal Year**: {context.get('fiscal_year', '2024')}
-- **Filing Date**: {context['filing_date']}
+- **Company**: {company_name} ({ticker})
+- **Fiscal Year Ended**: {context['filing_date']}
+- **Filing Type**: Annual Report (10-K)
 
 ---
 
@@ -1018,31 +1354,83 @@ An investor should be able to decide whether this company fits their investment 
 
 ---
 
-Now generate your two-section analysis following this structure.
+Now generate your two-section analysis:
 
-**SECTION 1: ANNUAL REVIEW** - Natural paragraphs (400-600 words)
-**SECTION 2: STRATEGIC OUTLOOK** - Natural paragraphs (600-900 words)
+**SECTION 1: ANNUAL REVIEW** - Performance story + financial position with THESIS-DRIVEN headers (280-350 words)
+**SECTION 2: STRATEGIC DIRECTION** - Strategy + risks + investment perspective with THESIS-DRIVEN headers (500-650 words)
 
-Remember: Write for retail investors who want to understand the company, not for Wall Street professionals.
+Remember:
+- This is an ANNUAL STRATEGIC REVIEW, not a quarterly earnings recap
+- Headers should be YOUR CONCLUSIONS, not generic labels
+- Focus on multi-year trends and strategic direction
+- Include "Investment Perspective" to help readers understand implications
+- Be ruthless about cutting non-essential details
 """
     
     def _build_8k_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
         """
         8-K prompt using Financial News Analyst style
         Structure: EVENT SNAPSHOT + IMPACT ANALYSIS
+        ENHANCED: Inject official SEC Item guidance when available
         """
         marking_instructions = self._build_data_marking_instructions()
         
-        # Special handling for Item 2.02 (Earnings Release)
-        # Check if this is an earnings-related 8-K
-        is_earnings_8k = 'item 2.02' in content.lower() or 'results of operations' in content.lower()
+        # Get official Items from filing (populated by edgar_scanner)
+        official_items = filing.event_items if filing.event_items else None
         
-        if is_earnings_8k:
-            # Use 10-Q style prompt for earnings 8-Ks
+        # Get official guidance
+        if official_items:
+            guidance = self._get_official_item_guidance(official_items)
+            logger.info(f"Using official Item guidance: {guidance['item_number']} - {guidance['title']}")
+        else:
+            # Try to extract from content as fallback
+            content_lower = content.lower()
+            item_pattern = r'item\s+(\d+\.\d+)'
+            items_in_content = re.findall(item_pattern, content_lower)
+            if items_in_content:
+                official_items = items_in_content
+                guidance = self._get_official_item_guidance(items_in_content)
+                logger.info(f"Extracted Items from content: {items_in_content}")
+            else:
+                guidance = self._get_official_item_guidance(None)
+        
+        # Special handling for Item 2.02 (Earnings Release)
+        if guidance['category'] == 'Earnings Release':
             logger.info("Detected Item 2.02 earnings 8-K, using 10-Q prompt structure")
             return self._build_10q_unified_prompt_enhanced(filing, content, context)
         
-        # Standard 8-K prompt for other material events
+        # Build official guidance section
+        item_guidance = f"""
+## SEC OFFICIAL CLASSIFICATION
+
+The SEC has classified this 8-K filing as:
+
+**Item {guidance['item_number'] or 'N/A'}**: {guidance['title']}
+
+**Category**: {guidance['category']}
+
+**What this means**: {guidance['description']}
+
+---
+
+## ANALYSIS APPROACH
+
+**Content-Driven Analysis**:
+
+Let the filing content guide your analysis. Based on the event category above, identify and explain what matters most to investors from what's actually disclosed in the document.
+
+Focus on substance over checklist completion. Your goal is to provide insight, not to mechanically fill fields. If certain details aren't material or aren't disclosed, don't force them into the analysis.
+
+Ask yourself:
+- What is the nature and significance of this event?
+- What are the key terms or facts that impact the company's position?
+- Why is this happening now?
+- What should investors pay attention to?
+
+---
+"""
+        
+        # Standard 8-K prompt with official guidance
         return f"""You are a financial news analyst covering breaking corporate events for {context['company_name']}.
 
 A material 8-K filing just hit the wire. Your institutional clients need:
@@ -1051,6 +1439,8 @@ A material 8-K filing just hit the wire. Your institutional clients need:
 3. Actionable: What should I watch?
 
 {marking_instructions}
+
+{item_guidance}
 
 ## OUTPUT STRUCTURE (MANDATORY)
 
@@ -1215,146 +1605,288 @@ Now generate your two-section analysis following this structure.
 
 Remember: You're a financial news analyst. Write with the urgency and precision 
 of breaking news, then provide the depth of professional analysis.
+
+---
+
+## VISUAL ENHANCEMENT (Event Clarity Focus)
+
+Apply these lightweight visual markings to clarify event type and materiality:
+
+**Bold Numbers** (**...**):
+- Transaction amounts: "**$4B** enterprise value"
+- Key dates: "effective **December 8, 2025**"
+- Material terms: "**40%** ownership retained"
+
+**Emoji Event Type** (minimal use - events are inherently urgent):
+- 💰 M&A, acquisitions, divestitures, financing
+- 👤 Executive changes (CEO, CFO, Board)
+- 📋 Material contracts, agreements, partnerships
+- ⚠️ Litigation, regulatory issues, compliance
+- 📊 Dividend announcements (if substantial)
+- 💡 Bottom Line summary (mandatory)
+
+**Mutual Exclusion Rule**:
+❌ NEVER: "💰 **Transaction value**: **$4B**"
+✅ DO: "💰 Transaction value: $4B in cash and stock" OR "Transaction value: **$4B** in cash and stock"
+
+**Application**:
+- Section 1: Use 1 event-type emoji at the very start to categorize; bold amounts inside
+- Section 2: Minimal emoji (only ⚠️ for risks, 💡 for Bottom Line)
+- Keep professional - the event itself creates urgency
+
+Purpose: Help readers instantly identify event category.
 """
     
     def _build_s1_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
         """
-        S-1 prompt - IPO analysis for retail investors
-        Structure: IPO SNAPSHOT + INVESTMENT ANALYSIS
+        S-1 prompt - IPO快速筛选工具 v2.0
+        核心定位：2-3分钟内判断"这个IPO是否值得深入研究"
+        关键改进：观点型标题 + 压缩篇幅 + 机构背书信号化
         """
         marking_instructions = self._build_data_marking_instructions()
         
-        # Handle pre-IPO companies without tickers
         ticker = self._get_safe_ticker(filing)
         company_name = context['company_name']
         
-        return f"""You are a financial analyst explaining an IPO filing to retail investors.
+        return f"""You are an IPO analyst writing a screening report for retail investors.
 
-Your readers want to understand: What does this company do? How's the business performing? Should I look deeper into this IPO?
+⚠️ DATA INTEGRITY: All numbers must cite sources [DOC: section] or [NO_DATA]. Never estimate or fabricate.
 
-## CORE PRINCIPLE: Facts and Data Drive Your Analysis
+Your goal: Help readers quickly decide if this IPO deserves deeper research.
 
-Your job is to identify what's IMPORTANT in THIS S-1 filing, not to follow a rigid checklist.
-
-- If the company has explosive growth, show the numbers and explain what's driving it
-- If there's a major customer concentration risk, spend time explaining the impact
-- If the underwriters are top-tier banks, that's worth noting (it signals quality)
-- If pre-IPO investors include well-known VCs, mention them - it's a trust signal
-- Let the actual filing content guide what you emphasize
-
-Think like an analyst evaluating a real IPO: What stands out? What are the key questions investors should ask? Follow what the data reveals.
-
-Don't force every IPO into the same template - each story is different.
+Think of this as "Tinder for IPOs" - give essential information for a yes/no decision, not a complete prospectus summary.
 
 {marking_instructions}
 
+## CORE PRINCIPLE: Classification + Key Facts + Insight-Driven Headers
+
+Your readers want to know:
+1. **What TYPE of IPO is this?** (Growth? Value? Distressed? Concept?)
+2. **What's the BEST thing about it?** (1-2 sentences)
+3. **What's the BIGGEST risk?** (1-2 sentences)
+4. **Who should care?** (What kind of investor)
+
+Let the actual filing content guide what you emphasize. Each IPO tells a different story.
+
+---
+
 ## OUTPUT STRUCTURE (MANDATORY)
+
+**CRITICAL**: Your analysis MUST follow this exact two-section structure with proper section headers:
+
+```
+### SECTION 1: IPO SNAPSHOT
+[IPO Type, Institutional Backing, Business Core, Financial Snapshot, Deal Terms]
+
+### SECTION 2: INVESTMENT ANALYSIS
+[Growth analysis, Risk analysis, Optional competitive position, Bottom Line]
+```
+
+Each section MUST start with the "### SECTION X:" header (exactly as shown).
+Within each section, use thesis-driven subheaders with emojis (📈 📉 ⚠️ 💡 🏢 💰).
 
 ---
 
 ### SECTION 1: IPO SNAPSHOT
+**Target Length**: 250-350 words (FIRM CAP)
+**Reading Time**: 2 minutes
 
-**Purpose**: Help investors quickly understand what this IPO is about (3 minute read)
+**Opening (MANDATORY - Always start with this)**:
 
-**Format**: Natural prose with one bullet section (350-500 words)
+🏢 **IPO Type**: [Choose EXACTLY ONE from the list below - DO NOT leave blank]
 
-**What to cover**:
+**Required Categories** (choose the best match):
+- High-Growth Tech (fast-growing, unprofitable)
+- Profitable Value Play (profitable, stable business)
+- Pre-Revenue Concept (no revenue, early stage)
+- Distressed Restructuring (bankruptcy, debt restructuring)
+- Passive Investment Vehicle (SPAC, fund, holding company)
+- Other (specify the type if none above fit)
 
-Start with the business: What does this company do? How do they make money? Who are their customers? Keep it simple - explain it like you're telling a friend about a new company going public.
-
-Show the financial trajectory: How has revenue grown over the past 2-3 years? Are they profitable or losing money? If losing money, what's the cash burn rate? Use the financial statements.
-
-Explain the market opportunity: What market are they in? How big is the opportunity? Use data from the Business section if provided.
-
-Then use a clean bullet format for the deal details:
-
-• **Offering Size**: XX million shares at $XX-XX per share [DOC: Prospectus Summary]
-• **Expected Proceeds**: $XXM - $XXM [DOC: Use of Proceeds]
-• **Main Use of Proceeds**: [List 2-3 key uses in plain language] [DOC: Use of Proceeds]
-• **Lead Underwriters**: [List the main investment banks - e.g., Goldman Sachs, Morgan Stanley] [DOC: Underwriting]
-  (Note: Top-tier underwriters signal institutional confidence in the deal)
-• **Major Pre-IPO Investors**: [List top 3-5 with ownership % - e.g., Sequoia Capital 18.2%, Andreessen Horowitz 12.5%] [DOC: Principal Stockholders]
-  (Note: Well-known venture capital backing can indicate quality, though not a guarantee)
-
-**Data Sources**:
-- [DOC: Business] - Company description
-- [DOC: Consolidated Statements of Operations] - Financial history
-- [DOC: Prospectus Summary] - Deal terms
-- [DOC: Use of Proceeds] - How they'll use the money
-- [DOC: Underwriting] - Banks managing the IPO
-- [DOC: Principal Stockholders] - Who owns the company now
-
-**Style**:
-- Explain the business model clearly: "They charge subscription fees" not "monetize via recurring revenue streams"
-- Show growth with simple numbers: "Revenue went from $100M to $500M over 3 years"
-- Make the bullets scannable - investors want to see the deal terms quickly
-
-**Quality Bar**:
-An investor should understand the business and deal basics without any prior knowledge of the company.
+**CRITICAL**: You MUST select one category. If uncertain, choose "Other" and specify.
 
 ---
 
-### SECTION 2: INVESTMENT ANALYSIS  
+💰 **Institutional Backing**: [Choose EXACTLY ONE: Strong 🟢 | Neutral 🟡 | Weak 🔴]
+• Underwriters: [Top-tier banks (GS/MS/JPM) OR mid-tier OR none/resale only]
+• Pre-IPO investors: [Known VCs/PE with % OR strategic investors OR exiting PE]
+• Signal: [1-sentence interpretation, e.g., "Top-tier validation" OR "Insider exit - caution"]
 
-**Purpose**: Help investors evaluate whether this IPO deserves deeper research (7-10 minute read)
+**Examples of Institutional Backing:**
 
-**Format**: Natural prose paragraphs (600-800 words)
+Strong 🟢:
+• Underwriters: Goldman Sachs, Morgan Stanley
+• Pre-IPO: Sequoia Capital (18%), Andreessen Horowitz (12%)
+• Signal: Top-tier institutional validation
 
-**What to cover**:
+Neutral 🟡:
+• Underwriters: Mid-tier regional banks
+• Pre-IPO: No major VC names disclosed
+• Signal: Standard offering without standout backers
 
-Assess the growth story: Is the revenue growth sustainable? What's driving it? Look at customer metrics, repeat business, expansion plans from the MD&A and Business sections.
+Weak 🔴:
+• Underwriters: None (shareholder resale only)
+• Pre-IPO: PE firms exiting via this offering
+• Signal: Insider exit + no fresh capital = distress
 
-If the company is unprofitable: When might they reach profitability? What needs to happen? Are margins improving?
+**Example Output:**
 
-Discuss the competitive landscape: Who are the competitors? What makes this company different? Use the Business section's competition discussion. You can search for competitor info if helpful.
+🏢 **IPO Type**: Profitable Value Play
 
-Analyze the key risks: Pick the 3-5 most important risks from Risk Factors - explain them in plain language and why they matter. For example: "The company gets 40% of revenue from its top 3 customers - losing one would significantly hurt results."
+💰 **Institutional Backing**: Strong 🟢
+• Underwriters: Goldman Sachs, Morgan Stanley
+• Pre-IPO investors: Digital Currency Group (DCG) controlling shareholder, Bain Capital Ventures, FirstMark Capital [DOC: Corporate Information]
+• Signal: Top-tier institutional validation with strategic backing from leading blockchain-focused investors
 
-Evaluate the team: Does the management team have relevant experience? Check the Management section for backgrounds.
+Weak 🔴:
+• Underwriters: None (shareholder resale only)
+• Pre-IPO: PE firms exiting via this offering
+• Signal: Insider exit + no fresh capital = distress
 
-Consider the backing: The quality of underwriters and pre-IPO investors can be informative signals. Top investment banks (like Goldman Sachs, J.P. Morgan) do extensive due diligence before taking companies public. Well-known venture capital firms (like Sequoia, Andreessen Horowitz) typically invest after deep research. However, strong backing doesn't guarantee success - it's one factor among many. Note if there are any red flags like very small or unknown underwriters.
+---
 
-End with key observations: What are the most important things to know about this IPO? What questions should investors research further before deciding?
+**Then cover in natural prose (NO headers needed for these)**:
 
-**External Context** (Optional):
-- Search for similar companies' IPO performance or valuations if helpful
-- Search for industry growth trends or market data
-- If you search, cite as [1], [2] and list sources at the end:
-  [1] Source Title, Publisher, Date
-  [2] Source Title, Publisher, Date
+**Business Core**:
+What does this company do? How do they make money?
+- Focus on business model ONLY
+- Delete: industry background, "founded in...", market trends
+- Example: "Operates SaaS platform for X, charges $Y/user/month, serves 500+ enterprise clients"
 
-**Data Sources**:
-- [DOC: Business]
-- [DOC: Risk Factors]  
-- [DOC: Management]
-- [DOC: MD&A]
-- [1], [2] if web search used
+**Financial Snapshot**:
+Show 2-3 year revenue trend + profitability status
+- If profitable: mention margins
+- If unprofitable: burn rate + runway
+- Example: "Revenue grew $10M → $50M → $120M (2023-2025), still unprofitable but gross margins improved to 65%"
 
-**Style**:
-- Keep it accessible: "burn rate" → "how fast they're spending cash"
-- Be honest about risks - IPOs are risky investments
-- Explain financial concepts: "dilution means your ownership percentage goes down"
-- Stay neutral - present information, don't recommend
+**Market Context** (OPTIONAL):
+Include ONLY if compelling
+- Large market size with growth OR unique market position
+- Skip generic industry descriptions
+- Example: "Targets $50B enterprise security market growing 20% annually"
 
-**Quality Bar**:
-An investor should have enough information to decide if they want to do more research on this IPO.
+---
+
+💰 **Deal Terms** (bullet format - clean and scannable):
+• Offering Size: [X shares at $Y-Z range] [DOC: Prospectus Summary]
+• Expected Proceeds: [Net proceeds amount] [DOC: Use of Proceeds]
+• Main Use: [Top 2 uses only, plain language] [DOC: Use of Proceeds]
+
+---
+
+### SECTION 2: INVESTMENT ANALYSIS
+**Target Length**: 400-600 words (FIRM CAP)
+**Reading Time**: 3-4 minutes
+
+**CRITICAL: All headers must be THESIS-DRIVEN (state your findings, not just topic labels)**
+
+---
+
+📈 **[Your Growth Conclusion Header]**
+
+Write a header that captures YOUR KEY FINDING about growth (3-7 words)
+
+The header should state the growth story and financial health, not just "performance."
+
+**Content**:
+- Is growth sustainable? What's driving it?
+- Customer metrics, retention, expansion plans [DOC: MD&A, Business]
+- Profitability path if unprofitable
+- Cite specific numbers with [DOC: source]
+
+---
+
+⚠️ **[Your Risk Conclusion Header]**
+
+Write a header that captures YOUR KEY RISK FINDING (3-7 words)
+
+The header should name the specific critical risks, not just "risks."
+
+**Content**:
+Focus on 2-3 DEAL-BREAKER risks only
+
+What's a deal-breaker risk?
+- Would make you NOT invest
+- Examples: Going concern, >40% revenue concentration, existential regulatory threat, insider mass exit
+
+What to SKIP:
+- Generic risks every company has ("competition exists", "macro uncertainty")
+- Minor operational risks
+- Standard disclosures
+
+**Format for each risk**:
+1. State it clearly in one sentence
+2. Explain the impact (why it matters)
+3. Cite source [DOC: Risk Factors]
+
+---
+
+📊 **[Your Competitive Position Header - OPTIONAL]**
+
+Include ONLY if there's something material to say:
+- Unique moat or clear differentiation
+- Specific market share data
+- Skip generic competition sections
+
+**Content**:
+- Unique competitive advantages with evidence
+- Market position vs. public comparables
+- Cite [DOC: Business] or [1], [2] if using external data
+
+---
+
+💡 **Bottom Line**
+
+**Content**:
+Synthesize the key takeaway: IPO type, main strength, main weakness, and who should care.
+
+---
+
+## FORMATTING RULES (Readability First)
+
+**Header Format**:
+- Always use: emoji + **bold header with YOUR insight**
+- Keep headers SHORT: 3-7 words
+- Headers must be CONCLUSIONS (what you found), not labels (what section this is)
+- Be specific: include numbers or concrete terms when possible
+
+**Visual Marking**:
+- **Bold** all financial numbers: **$500M** revenue, **45%** margins
+- Use emoji ONLY for major section headers (don't overuse)
+- Apply Mutual Exclusion Rule: Never bold a word already next to emoji
 
 ---
 
 ## CRITICAL RULES
 
+**Length Discipline** (ABSOLUTE):
+- Section 1: 250-350 words MAX
+- Section 2: 400-600 words MAX
+- If approaching limit: Cut weaker points, don't compress language
+
+**Content Focus: Decision-Relevant Only**
+
+Every sentence should help investors decide: "Should I research this IPO deeper?"
+
+Include what matters:
+- How they make money + who pays them
+- Financial trajectory: growth trend + profitability/burn status
+- 2-3 deal-breaker risks (would stop investment)
+- Quality signals (backing, unique moats if material)
+
+Ruthlessly cut:
+- Background that doesn't explain THIS company's specific performance
+- Generic risks or statements that apply to any company
+- Details irrelevant to the investment decision
+
 **What to AVOID**:
-- Don't make investment recommendations: No "This is a good IPO" or "Wait for a better price"
-- Don't say things like "suitable for aggressive investors" - that's investment advice
-- Don't repeat information between Section 1 and Section 2
-- Don't use hype language: "disruptive", "revolutionary", "game-changing"
-- Don't speculate beyond what's disclosed
+- Investment recommendations ("good IPO", "buy", "suitable for aggressive investors")
+- Hype language ("disruptive", "revolutionary", "innovative", "transformative")
+- Speculation beyond filing disclosures
 
 **Style**:
-- Active voice: "The company operates" not "is operated"
-- Clear numbers: "$500M revenue" not "half a billion in top-line"
-- Plain language: "profit margin" not "EBITDA margin expansion trajectory"  
-- Conversational but professional
+- Active voice, specific numbers, plain language
+- Write like a smart analyst, not a prospectus
 
 ---
 
@@ -1363,7 +1895,6 @@ An investor should have enough information to decide if they want to do more res
 - **Company**: {company_name}
 - **Ticker**: {ticker} (or "Pre-IPO" if not assigned yet)
 - **Filing Date**: {context['filing_date']}
-- **IPO Status**: Registration filed, pricing pending
 
 ---
 
@@ -1373,12 +1904,16 @@ An investor should have enough information to decide if they want to do more res
 
 ---
 
-Now generate your two-section analysis following this structure.
+Now generate your two-section analysis:
 
-**SECTION 1: IPO SNAPSHOT** - Prose + bullet section (350-500 words)
-**SECTION 2: INVESTMENT ANALYSIS** - Natural paragraphs (600-800 words)
+**SECTION 1: IPO SNAPSHOT** - Type + backing + core facts (250-350 words)
+**SECTION 2: INVESTMENT ANALYSIS** - Growth + risks + bottom line with INSIGHT-DRIVEN headers (400-600 words)
 
-Remember: Write for retail investors who are curious about this IPO but need clear, honest information to evaluate it.
+Remember: 
+- This is a SCREENING TOOL, not a prospectus rewrite
+- Headers should be YOUR CONCLUSIONS, not generic labels
+- Focus on decision-relevant information only
+- Be ruthless about cutting non-essential content
 """
     
     def _build_generic_unified_prompt(self, filing: Filing, content: str, context: Dict) -> str:
@@ -1630,7 +2165,16 @@ Write your summary (25-40 words):"""
         unified_text = unified_result['unified_analysis']
         ticker = self._get_safe_ticker(filing)
         
-        filing.key_tags = self._generate_enhanced_tags(unified_result['markup_data'], unified_text, filing.filing_type, ticker)
+        # Get official Items from filing.event_items (populated by edgar_scanner)
+        official_items = filing.event_items if filing.event_items else None
+        
+        filing.key_tags = self._generate_enhanced_tags(
+            unified_result['markup_data'], 
+            unified_text, 
+            filing.filing_type, 
+            ticker,
+            official_items=official_items
+        )
         
         filing.management_tone = None
         filing.tone_explanation = None
@@ -1639,57 +2183,253 @@ Write your summary (25-40 words):"""
         filing.ai_summary = None
         
         if filing.filing_type == FilingType.FORM_8K:
-            filing.event_type = self._identify_8k_event_type(primary_content)
+            filing.event_type = self._identify_8k_event_type(primary_content, official_items=official_items)
             filing.item_type = self._extract_8k_item_type(primary_content)
     
-    def _generate_enhanced_tags(self, markup_data: Dict, unified_text: str, filing_type: Union[FilingType, str], ticker: str) -> List[str]:
-        """Generate tags"""
+    def _generate_enhanced_tags(self, markup_data: Dict, unified_text: str, filing_type: Union[FilingType, str], ticker: str, official_items: List[str] = None) -> List[str]:
+        """
+        Generate intelligent, context-aware tags from filing analysis
+        Strategy: Extract meaningful business/event/financial characteristics, not generic categories
+        ENHANCED: Use official SEC Item numbers for 8-K tags when available
+        """
         tags = []
         text_lower = unified_text.lower()
-        
-        industry_keywords = {
-            'Technology': ['software', 'cloud', 'saas', 'platform', 'digital', 'ai'],
-            'Healthcare': ['drug', 'clinical', 'fda', 'patient'],
-            'Financial': ['banking', 'loan', 'deposit'],
-            'Retail': ['store', 'e-commerce', 'consumer'],
-            'Energy': ['oil', 'gas', 'renewable'],
-        }
-        
-        for industry, keywords in industry_keywords.items():
-            if any(keyword in text_lower for keyword in keywords):
-                tags.append(industry)
-                break
-        
-        filing_type_tags = {
-            'FORM_10K': 'Annual Report',
-            '10-K': 'Annual Report',
-            'FORM_10Q': 'Quarterly Results',
-            '10-Q': 'Quarterly Results',
-            'FORM_8K': 'Material Event',
-            '8-K': 'Material Event',
-            'FORM_S1': 'IPO Filing',
-            'S-1': 'IPO Filing'
-        }
-        
         filing_type_key = self._get_safe_filing_type_value(filing_type) if not isinstance(filing_type, str) else filing_type
-        if filing_type_key in filing_type_tags:
-            tags.append(filing_type_tags[filing_type_key])
         
-        tags = list(dict.fromkeys(tags))[:7]
+        # === LAYER 1: Business Model & Technology Tags (Specific, not generic) ===
+        business_patterns = {
+            # AI & Advanced Tech
+            'AI Platform': ['artificial intelligence', 'machine learning', 'ai-driven', 'ai platform', 'neural network'],
+            'Generative AI': ['generative ai', 'large language model', 'llm', 'gpt', 'chatbot'],
+            'Cloud Infrastructure': ['cloud infrastructure', 'data center', 'aws', 'azure', 'serverless'],
+            'SaaS': ['software as a service', 'saas', 'subscription software', 'recurring revenue'],
+            'Cybersecurity': ['cybersecurity', 'threat detection', 'zero trust', 'endpoint security'],
+            
+            # Healthcare & Biotech
+            'Biotech': ['biotech', 'biologics', 'gene therapy', 'cell therapy', 'monoclonal antibody'],
+            'Medical Device': ['medical device', 'imaging system', 'diagnostic equipment', 'surgical robot'],
+            'Digital Health': ['telehealth', 'remote patient', 'digital therapeutics', 'health tech'],
+            'Clinical Stage': ['clinical trial', 'phase 2', 'phase 3', 'fda approval', 'regulatory submission'],
+            
+            # Fintech & Financial Services
+            'Fintech': ['fintech', 'digital payment', 'payment processing', 'neobank'],
+            'Crypto/Blockchain': ['cryptocurrency', 'blockchain', 'bitcoin', 'crypto exchange', 'digital asset'],
+            'Banking': ['commercial bank', 'retail bank', 'lending', 'deposit', 'net interest'],
+            
+            # Consumer & Retail
+            'E-commerce': ['e-commerce', 'online retail', 'marketplace', 'direct-to-consumer', 'd2c'],
+            'Consumer Brand': ['consumer brand', 'brand portfolio', 'cpg', 'consumer packaged'],
+            
+            # Energy & Sustainability
+            'Clean Energy': ['solar', 'wind energy', 'renewable', 'battery storage', 'clean energy'],
+            'EV/Mobility': ['electric vehicle', 'ev maker', 'autonomous', 'self-driving', 'battery technology'],
+            
+            # Industrial & Manufacturing
+            'Semiconductor': ['semiconductor', 'chip design', 'wafer fabrication', 'foundry'],
+            'Aerospace': ['aerospace', 'defense contractor', 'satellite', 'aviation'],
+        }
+        
+        for tag_name, keywords in business_patterns.items():
+            if any(keyword in text_lower for keyword in keywords):
+                tags.append(tag_name)
+                if len(tags) >= 2:  # Limit business tags to 2
+                    break
+        
+        # === LAYER 2: Event-Specific Tags (8-K focus) ===
+        if filing_type_key in ['FORM_8K', '8-K']:
+            # ENHANCED: Use official SEC Item definitions if available
+            if official_items:
+                guidance = self._get_official_item_guidance(official_items)
+                suggested_tags = guidance.get('suggested_tags', [])
+                tags.extend(suggested_tags)
+                logger.debug(f"Using official Item tags: {suggested_tags}")
+            else:
+                # Fallback: keyword-based detection
+                event_patterns = {
+                    'Executive Change': ['ceo', 'chief executive', 'president', 'appoint', 'resign', 'transition'],
+                    'M&A Deal': ['merger', 'acquisition', 'acquire', 'definitive agreement', 'purchase agreement'],
+                    'Earnings Release': ['financial results', 'quarter ended', 'net income', 'revenue', 'earnings per share'],
+                    'Restructuring': ['restructuring', 'cost reduction', 'workforce reduction', 'impairment', 'facility closure'],
+                    'Financing': ['credit facility', 'loan agreement', 'senior notes', 'debt offering', 'equity offering'],
+                    'Partnership': ['strategic partnership', 'collaboration', 'joint venture', 'licensing agreement'],
+                    'Regulatory': ['fda', 'regulatory approval', 'compliance', 'investigation', 'settlement'],
+                }
+                
+                for event_tag, keywords in event_patterns.items():
+                    if any(keyword in text_lower for keyword in keywords):
+                        tags.append(event_tag)
+                        break  # Only one event tag
+        
+        # === LAYER 3: Financial Performance Tags (10-Q/10-K focus) ===
+        if filing_type_key in ['FORM_10Q', '10-Q', 'FORM_10K', '10-K']:
+            performance_patterns = {
+                'Revenue Beat': ['revenue beat', 'revenue exceeded', 'revenue above', 'beat estimate'],
+                'Revenue Miss': ['revenue miss', 'revenue below', 'revenue declined', 'missed estimate'],
+                'Guidance Raised': ['raised guidance', 'increased outlook', 'upgraded forecast', 'raised full-year'],
+                'Guidance Cut': ['lowered guidance', 'reduced outlook', 'cut forecast', 'revised down'],
+                'Margin Expansion': ['margin expansion', 'margin improvement', 'operating margin increased', 'gross margin up'],
+                'Cost Pressure': ['cost pressure', 'margin compression', 'headwinds', 'expense growth', 'margin decline'],
+                'Profitable': ['net income', 'profitable', 'positive earnings', 'profit margin'],
+                'Loss-Making': ['net loss', 'operating loss', 'unprofitable', 'negative earnings'],
+            }
+            
+            for perf_tag, keywords in performance_patterns.items():
+                if any(keyword in text_lower for keyword in keywords):
+                    tags.append(perf_tag)
+                    if len([t for t in tags if t in performance_patterns.keys()]) >= 2:
+                        break  # Max 2 performance tags
+        
+        # === LAYER 4: IPO Characteristics (S-1 focus) ===
+        if filing_type_key in ['FORM_S1', 'S-1']:
+            ipo_patterns = {
+                'Pre-Revenue': ['pre-revenue', 'no revenue', 'minimal revenue', 'early stage'],
+                'High Growth': ['rapid growth', 'high growth', 'growth rate', 'yoy growth'],
+                'Profitable IPO': ['profitable', 'positive earnings', 'net income'],
+                'Mega Raise': ['raise', 'offering', 'ipo'],  # Will check amount separately
+            }
+            
+            for ipo_tag, keywords in ipo_patterns.items():
+                if any(keyword in text_lower for keyword in keywords):
+                    tags.append(ipo_tag)
+            
+            # Check for large offering amount
+            import re
+            amount_matches = re.findall(r'\$(\d+(?:,\d+)?(?:\.\d+)?)\s*(million|billion)', text_lower)
+            if amount_matches:
+                try:
+                    for amount_str, unit in amount_matches:
+                        amount = float(amount_str.replace(',', ''))
+                        if unit == 'billion' or (unit == 'million' and amount >= 100):
+                            tags.append('$100M+ Raise')
+                            break
+                except:
+                    pass
+        
+        # === LAYER 5: Extract Key Concepts from Markup Data ===
+        if markup_data and 'concepts' in markup_data and markup_data['concepts']:
+            # Extract 1-2 meaningful concepts that aren't generic words
+            generic_words = {'revenue', 'growth', 'company', 'business', 'quarter', 'year', 'increase', 'decrease'}
+            for concept in markup_data['concepts'][:5]:
+                concept_clean = str(concept).strip().title()
+                if (concept_clean.lower() not in generic_words and 
+                    len(concept_clean) > 3 and 
+                    concept_clean not in tags):
+                    tags.append(concept_clean)
+                    if len([t for t in tags if t.istitle()]) >= 1:  # Max 1 extracted concept
+                        break
+        
+        # === FINAL: Deduplicate and limit to 5 tags ===
+        tags = list(dict.fromkeys(tags))[:5]
+        
+        logger.info(f"Generated enhanced tags for {ticker}: {tags}")
         return tags
     
-    def _identify_8k_event_type(self, content: str) -> str:
-        """Identify 8-K event type"""
-        content_lower = content.lower()
+    def _get_official_item_guidance(self, official_items: List[str]) -> Dict:
+        """
+        Get official SEC Item guidance for 8-K classification
         
-        if 'item 2.02' in content_lower:
+        Args:
+            official_items: List of Item numbers from RSS (e.g., ["2.03", "9.01"])
+            
+        Returns:
+            Dict with Item guidance including category, description, focus areas, and tags
+        """
+        if not official_items:
+            # No official Item provided
+            return {
+                'item_number': None,
+                'title': 'Corporate Event',
+                'category': 'Other Corporate Event',
+                'description': 'Material corporate event - details to be determined from document content',
+                'focus_areas': ['event description', 'parties involved', 'key terms', 'significance'],
+                'suggested_tags': ['Corporate Event']
+            }
+        
+        # Filter out 9.01 (Exhibits - not a substantive event)
+        substantive_items = [item for item in official_items if not item.startswith('9.')]
+        
+        if not substantive_items:
+            # Only exhibits, no substantive items
+            return {
+                'item_number': official_items[0],
+                'title': 'Financial Statements and Exhibits',
+                'category': 'Exhibits Only',
+                'description': 'Filing contains exhibits without substantive event disclosure',
+                'focus_areas': ['exhibits listed'],
+                'suggested_tags': ['Corporate Event']
+            }
+        
+        # Take the first substantive Item as primary
+        primary_item = substantive_items[0]
+        
+        # Look up official definition
+        item_def = SEC_ITEM_DEFINITIONS.get(primary_item)
+        
+        if item_def:
+            # Found official definition
+            result = {
+                'item_number': primary_item,
+                'title': item_def['title'],
+                'category': item_def['category'],
+                'description': item_def['description'],
+                'focus_areas': item_def['focus_areas'],
+                'suggested_tags': item_def['suggested_tags']
+            }
+            
+            # If multiple substantive items, note them
+            if len(substantive_items) > 1:
+                result['additional_items'] = substantive_items[1:]
+                logger.info(f"Multiple Items detected: primary={primary_item}, additional={substantive_items[1:]}")
+            
+            logger.info(f"✅ Using official Item {primary_item}: {item_def['title']}")
+            return result
+        else:
+            # Unknown Item number (rare)
+            logger.warning(f"Unknown Item number: {primary_item}")
+            return {
+                'item_number': primary_item,
+                'title': f'Item {primary_item}',
+                'category': 'Other Corporate Event',
+                'description': 'Refer to document for event details (uncommon Item type)',
+                'focus_areas': ['event description', 'key terms', 'significance'],
+                'suggested_tags': ['Corporate Event']
+            }
+    
+    def _identify_8k_event_type(self, content: str, official_items: List[str] = None) -> str:
+        """
+        Identify 8-K event type using official Item numbers when available
+        
+        Args:
+            content: Filing content
+            official_items: Official Item numbers from RSS (e.g., ["2.03", "9.01"])
+            
+        Returns:
+            Event type description
+        """
+        # If we have official Items, use them
+        if official_items:
+            guidance = self._get_official_item_guidance(official_items)
+            return guidance['title']  # Return official SEC title
+        
+        # Fallback: extract from content
+        content_lower = content.lower()
+        item_pattern = r'item\s+(\d+\.\d+)'
+        items_in_content = re.findall(item_pattern, content_lower)
+        
+        if items_in_content:
+            # Found Items in content, use first one
+            guidance = self._get_official_item_guidance(items_in_content)
+            return guidance['title']
+        
+        # Last resort: keyword-based detection
+        if 'item 2.02' in content_lower or 'results of operations' in content_lower:
             return "Earnings Release"
         elif 'item 1.01' in content_lower:
             return "Material Agreement"
         elif 'item 5.02' in content_lower:
-            return "Executive Change"
-        elif 'results of operations' in content_lower:
-            return "Earnings Release"
+            return "Executive/Board Change"
+        elif 'item 2.03' in content_lower:
+            return "Financing Event"
         else:
             return "Corporate Event"
     

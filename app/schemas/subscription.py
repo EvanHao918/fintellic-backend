@@ -8,7 +8,7 @@ from enum import Enum
 # Enums (matching database)
 class SubscriptionType(str, Enum):
     MONTHLY = "MONTHLY"
-    YEARLY = "YEARLY"
+    # YEARLY removed - monthly-only subscription model
 
 
 class PricingTier(str, Enum):
@@ -24,9 +24,9 @@ class SubscriptionStatus(str, Enum):
 
 
 class PaymentMethod(str, Enum):
-    STRIPE = "stripe"
-    APPLE = "apple"
-    GOOGLE = "google"
+    STRIPE = "stripe"  # Not actively used
+    APPLE = "apple"    # Primary payment method
+    # GOOGLE removed - iOS only
 
 
 # Request Schemas
@@ -53,16 +53,19 @@ class SubscriptionCancel(BaseModel):
 
 # Response Schemas
 class PricingInfo(BaseModel):
-    """价格信息（用于前端显示）"""
-    is_early_bird: bool
+    """价格信息（用于前端显示）- Monthly only"""
+    is_early_bird: bool  # Backward compatibility
+    is_discounted: Optional[bool] = None  # New field for clarity
     user_sequence_number: Optional[int] = None
     pricing_tier: PricingTier
     monthly_price: float
-    yearly_price: float
-    yearly_savings: float
-    yearly_savings_percentage: int = 40
-    early_bird_slots_remaining: Optional[int] = None
     currency: str = "USD"
+    
+    # Deprecated yearly fields (kept for backward compatibility, but optional)
+    yearly_price: Optional[float] = None
+    yearly_savings: Optional[float] = None
+    yearly_savings_percentage: Optional[int] = None
+    early_bird_slots_remaining: Optional[int] = None
     
     # Features
     features: Dict[str, bool] = {

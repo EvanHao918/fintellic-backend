@@ -296,8 +296,13 @@ def process_filing_task(self, filing_id: int):
                 # and caches are cleared before notifications
                 time.sleep(0.5)
                 
-                # INTEGRATED: Send real notifications instead of placeholder
-                send_filing_notifications.delay(filing_id)
+                # INTEGRATED: Trigger notification task after AI processing completes
+                try:
+                    send_filing_notifications.delay(filing_id)
+                    logger.info(f"Queued notification task for filing {filing_id}")
+                except Exception as notification_queue_error:
+                    logger.error(f"Failed to queue notification task: {notification_queue_error}")
+                    # Don't fail the entire task if notification queueing fails
         
         finally:
             # CRITICAL FIX: Ensure session is properly closed

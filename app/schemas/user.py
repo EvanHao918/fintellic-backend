@@ -11,7 +11,7 @@ class UserTier(str):
 
 class SubscriptionType(str):
     MONTHLY = "MONTHLY"
-    YEARLY = "YEARLY"
+    # YEARLY removed - monthly-only model
 
 class PricingTier(str):
     EARLY_BIRD = "EARLY_BIRD"
@@ -105,16 +105,19 @@ class SubscriptionInfo(BaseModel):
 
 
 class PricingInfo(BaseModel):
-    """价格信息（用于前端显示）"""
+    """价格信息（用于前端显示）- Monthly only"""
     is_early_bird: bool
+    is_discounted: Optional[bool] = None
     user_sequence_number: Optional[int] = None
     pricing_tier: str
     monthly_price: float
-    yearly_price: float
-    yearly_savings: float
-    yearly_savings_percentage: int = 40
-    early_bird_slots_remaining: Optional[int] = None
     currency: str = "USD"
+    
+    # Deprecated yearly fields (optional)
+    yearly_price: Optional[float] = None
+    yearly_savings: Optional[float] = None
+    yearly_savings_percentage: Optional[int] = None
+    early_bird_slots_remaining: Optional[int] = None
     
     # Features
     features: Dict[str, bool] = Field(default_factory=lambda: {
@@ -146,8 +149,8 @@ class UserResponse(UserBase):
     is_subscription_active: bool = False
     is_early_bird: bool = False
     subscription_status: str = "inactive"
-    monthly_price: float = 49.00
-    yearly_price: float = 352.80
+    monthly_price: float = 19.99  # Updated default price
+    yearly_price: Optional[float] = None  # Deprecated, optional
     next_billing_date: Optional[datetime] = None
     subscription_auto_renew: bool = True
     

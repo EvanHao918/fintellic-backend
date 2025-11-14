@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Fetch current NASDAQ 100 companies list
+Fetch current NASDAQ 100 companies list with real CIKs from SEC
+ENHANCED: Automatically fetches CIKs from SEC Edgar API
 """
 import json
 import httpx
@@ -8,8 +9,48 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import sys
 from pathlib import Path
+import time
 
 sys.path.append(str(Path(__file__).parent.parent))
+
+
+def fetch_cik_from_sec(ticker: str) -> str:
+    """
+    Fetch CIK from SEC Edgar API using ticker symbol
+    
+    Args:
+        ticker: Stock ticker symbol (e.g., 'AAPL')
+        
+    Returns:
+        10-digit CIK string, or None if not found
+    """
+    try:
+        # SEC Company Tickers JSON endpoint
+        url = "https://www.sec.gov/files/company_tickers.json"
+        headers = {
+            'User-Agent': 'YourCompany contact@example.com',  # SEC requires identification
+            'Accept-Encoding': 'gzip, deflate',
+            'Host': 'www.sec.gov'
+        }
+        
+        response = httpx.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        companies = response.json()
+        
+        # Search for the ticker
+        for key, company in companies.items():
+            if company.get('ticker', '').upper() == ticker.upper():
+                cik_number = company.get('cik_str')
+                if cik_number:
+                    # Pad to 10 digits
+                    return str(cik_number).zfill(10)
+        
+        return None
+        
+    except Exception as e:
+        print(f"  ⚠️ Error fetching CIK for {ticker}: {e}")
+        return None
 
 
 def fetch_nasdaq100_from_wikipedia():
@@ -35,8 +76,8 @@ def fetch_nasdaq100_from_wikipedia():
         
         for table in tables:
             # Check if this is the right table by looking for "Ticker" in headers
-            headers = table.find_all('th')
-            header_text = ' '.join([h.text.strip() for h in headers])
+            headers_row = table.find_all('th')
+            header_text = ' '.join([h.text.strip() for h in headers_row])
             
             if 'Ticker' in header_text or 'Symbol' in header_text:
                 rows = table.find_all('tr')[1:]  # Skip header
@@ -57,14 +98,15 @@ def fetch_nasdaq100_from_wikipedia():
                             if ticker and name:
                                 companies.append({
                                     "ticker": ticker,
-                                    "name": name
+                                    "name": name,
+                                    "cik": None  # Will be fetched later
                                 })
                     except Exception as e:
                         continue
                 
                 break  # Found the right table
         
-        print(f"\nFetched {len(companies)} NASDAQ 100 companies")
+        print(f"\nFetched {len(companies)} NASDAQ 100 companies from Wikipedia")
         return companies
         
     except Exception as e:
@@ -72,101 +114,183 @@ def fetch_nasdaq100_from_wikipedia():
         return []
 
 
+def enrich_with_ciks(companies):
+    """Fetch CIKs from SEC for all companies"""
+    print("\nFetching CIKs from SEC Edgar API...")
+    print("(This may take a few minutes)")
+    
+    enriched = []
+    failed = []
+    
+    for i, company in enumerate(companies):
+        ticker = company['ticker']
+        print(f"[{i+1}/{len(companies)}] Fetching CIK for {ticker}...", end=' ')
+        
+        cik = fetch_cik_from_sec(ticker)
+        
+        if cik:
+            company['cik'] = cik
+            enriched.append(company)
+            print(f"✅ {cik}")
+        else:
+            failed.append(ticker)
+            print(f"❌ Not found")
+        
+        # Rate limiting - be nice to SEC
+        if (i + 1) % 10 == 0:
+            print("  (Pausing to respect rate limits...)")
+            time.sleep(1)
+    
+    print(f"\n✅ Successfully fetched CIKs: {len(enriched)}/{len(companies)}")
+    
+    if failed:
+        print(f"\n⚠️ Failed to fetch CIKs for {len(failed)} companies:")
+        for ticker in failed:
+            print(f"  - {ticker}")
+        print("\nThese companies will be skipped in monitoring.")
+    
+    return enriched
+
+
 def save_nasdaq100_list(companies):
     """Save NASDAQ 100 list to JSON file"""
     data_dir = Path(__file__).parent.parent / "app" / "data"
     data_dir.mkdir(exist_ok=True)
     
+    # Only include companies with valid CIKs
+    valid_companies = [c for c in companies if c.get('cik') and c['cik'] != '0000000000']
+    
     data = {
-        "companies": sorted(companies, key=lambda x: x['ticker']),
-        "count": len(companies),
+        "companies": sorted(valid_companies, key=lambda x: x['ticker']),
+        "count": len(valid_companies),
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "source": "Wikipedia"
+        "source": "Wikipedia + SEC Edgar API"
     }
     
     json_path = data_dir / "nasdaq100_companies.json"
     with open(json_path, 'w') as f:
         json.dump(data, f, indent=2)
     
-    print(f"\nSaved to: {json_path}")
+    print(f"\n✅ Saved {len(valid_companies)} companies to: {json_path}")
     
-    # Show sample
+    # Show sample with CIKs
     print("\nSample companies:")
-    for company in companies[:10]:
-        print(f"  {company['ticker']}: {company['name']}")
+    for company in valid_companies[:10]:
+        print(f"  {company['ticker']}: {company['name']} (CIK: {company['cik']})")
     print("  ...")
 
 
-def update_database():
-    """Update database with NASDAQ 100 flags"""
+def update_database(companies):
+    """Update database with NASDAQ 100 flags and CIKs"""
     from sqlalchemy.orm import Session
     from app.core.database import SessionLocal
-    from app.models import Company
+    from app.models.company import Company
     
-    print("\nUpdating database with NASDAQ 100 flags...")
+    print("\nUpdating database with NASDAQ 100 data...")
     
-    # Load the JSON file
-    data_dir = Path(__file__).parent.parent / "app" / "data"
-    json_path = data_dir / "nasdaq100_companies.json"
-    
-    with open(json_path, 'r') as f:
-        data = json.load(f)
-    
-    nasdaq100_tickers = {company['ticker'] for company in data['companies']}
+    nasdaq100_tickers = {c['ticker']: c for c in companies if c.get('cik')}
     
     db: Session = SessionLocal()
     try:
         # Reset all NASDAQ 100 flags first
         db.query(Company).update({"is_nasdaq100": False})
         
-        # Set NASDAQ 100 flags for matching companies
+        # Update or create companies
         updated = 0
-        for ticker in nasdaq100_tickers:
+        created = 0
+        
+        for ticker, data in nasdaq100_tickers.items():
             company = db.query(Company).filter(Company.ticker == ticker).first()
+            
             if company:
+                # Update existing company
                 company.is_nasdaq100 = True
+                # Update CIK if it was a placeholder
+                if not company.cik or company.cik.startswith('N') or company.cik == '0000000000':
+                    company.cik = data['cik']
+                    print(f"  ✅ Updated {ticker} (CIK: {data['cik']})")
+                else:
+                    print(f"  ✅ Updated {ticker} (kept existing CIK)")
                 updated += 1
-                print(f"  Updated {ticker}")
+            else:
+                # Create new company
+                company = Company(
+                    ticker=ticker,
+                    name=data['name'],
+                    cik=data['cik'],
+                    is_nasdaq100=True,
+                    is_sp500=False,
+                    is_active=True
+                )
+                db.add(company)
+                print(f"  ➕ Created {ticker} (CIK: {data['cik']})")
+                created += 1
         
         db.commit()
-        print(f"\n✅ Updated {updated} companies as NASDAQ 100 members")
         
-        # Show companies that are in both indices
+        print(f"\n✅ Database update complete:")
+        print(f"   - Updated: {updated} companies")
+        print(f"   - Created: {created} companies")
+        
+        # Show statistics
         both_indices = db.query(Company).filter(
             Company.is_sp500 == True,
             Company.is_nasdaq100 == True
-        ).all()
+        ).count()
         
-        print(f"\nCompanies in both S&P 500 and NASDAQ 100: {len(both_indices)}")
-        for company in both_indices[:5]:
-            print(f"  {company.ticker}: {company.name}")
-        if len(both_indices) > 5:
-            print(f"  ... and {len(both_indices) - 5} more")
-            
+        nasdaq_only = db.query(Company).filter(
+            Company.is_nasdaq100 == True,
+            Company.is_sp500 == False
+        ).count()
+        
+        print(f"\n📊 Statistics:")
+        print(f"   - In both S&P 500 and NASDAQ 100: {both_indices}")
+        print(f"   - NASDAQ 100 only: {nasdaq_only}")
+        print(f"   - Total NASDAQ 100: {both_indices + nasdaq_only}")
+        
+    except Exception as e:
+        print(f"\n❌ Error updating database: {e}")
+        db.rollback()
+        raise
     finally:
         db.close()
 
 
 def main():
     """Main function"""
-    print("NASDAQ 100 Company List Fetcher")
-    print("=" * 50)
+    print("=" * 70)
+    print("NASDAQ 100 Company List Fetcher (Enhanced with CIK lookup)")
+    print("=" * 70)
+    print()
     
-    # Fetch from Wikipedia
+    # Step 1: Fetch from Wikipedia
     companies = fetch_nasdaq100_from_wikipedia()
     
-    if companies:
-        save_nasdaq100_list(companies)
-        
-        # Update database
-        try:
-            update_database()
-        except Exception as e:
-            print(f"\nError updating database: {e}")
-            print("You may need to run this after setting up the database")
-    else:
-        print("\nFailed to fetch NASDAQ 100 list")
+    if not companies:
+        print("\n❌ Failed to fetch NASDAQ 100 list from Wikipedia")
         return 1
+    
+    # Step 2: Enrich with CIKs from SEC
+    enriched_companies = enrich_with_ciks(companies)
+    
+    if not enriched_companies:
+        print("\n❌ Failed to fetch any CIKs from SEC")
+        return 1
+    
+    # Step 3: Save to JSON
+    save_nasdaq100_list(enriched_companies)
+    
+    # Step 4: Update database
+    try:
+        update_database(enriched_companies)
+    except Exception as e:
+        print(f"\n❌ Database update failed: {e}")
+        print("The JSON file was saved, but database update failed.")
+        return 1
+    
+    print("\n" + "=" * 70)
+    print("✅ All done! NASDAQ 100 companies updated successfully.")
+    print("=" * 70)
     
     return 0
 

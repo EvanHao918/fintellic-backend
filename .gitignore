@@ -1,37 +1,43 @@
-data/
+# 环境变量（敏感信息）
+.env
+.env.*
+.env.local
 
-# Python cache files
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
 *.so
+venv/
+.venv/
+env/
 
-# Logs
-logs/
-*.log
-
-# Backup files
-*.backup
-
-# Test files (optional - 如果您想保留测试文件，可以注释掉这部分)
-# tests/
-logs/
-*.backup
-logs/
-.env
-.env.*
-.env
-.env.*
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# 数据和日志
+data/
 logs/
 pids/
-*.pyc
-__pycache__/
-__pycache__/
-*.pyc
-*.pyo
+*.log
+*.backup
+
+# 数据库
+*.db
+*.sqlite3
+dump.rdb
+celerybeat-schedule.db
+
+# IDE
+.DS_Store
+.vscode/
+.idea/
+
+# 测试
+tests/
+.pytest_cache/
+
+# 临时文件
+*.pid
+nohup.out
+rds_credentials.txt
+hermespeed-firebase.json

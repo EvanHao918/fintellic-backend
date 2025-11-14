@@ -3,12 +3,9 @@ runtime: python3
 build:
   commands:
     build:
-      - echo "Using Dockerfile for build"
+      - pip install --upgrade pip
+      - pip install -r requirements_simple.txt
 run:
-  runtime: python3
   command: uvicorn app.main:app --host 0.0.0.0 --port 8000
   network:
     port: 8000
-    env:
-      - name: PORT
-        value: "8000"

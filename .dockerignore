@@ -1,0 +1,50 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+ENV/
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov/
+tests/
+
+# Logs and data
+logs/
+pids/
+data/filings/*
+*.log
+*.db
+dump.rdb
+celerybeat-schedule.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Scripts
+scripts/start_fintellic.sh
+scripts/stop_fintellic.sh
+
+# Temporary files
+*.pid
+nohup.out
+hermespeed-firebase.json

@@ -96,3 +96,7 @@ wcwidth==0.2.13
 websockets==15.0.1
 yarl==1.20.1
 yfinance==0.2.36
+pytz==2023.3
+aiohttp==3.9.1
+celery==5.3.4
+redis==5.0.1

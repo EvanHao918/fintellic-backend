@@ -236,6 +236,8 @@ class Settings(BaseSettings):
                 "https://www.hermespeed.com", 
                 "https://hermespeed.vercel.app",
                 "https://app.hermespeed.com",
+                "http://localhost:8081",
+                "http://localhost:8080",
             ]
         else:
             return []

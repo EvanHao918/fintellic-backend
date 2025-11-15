@@ -1,0 +1,45 @@
+# Railway ignore file - exclude unnecessary files from deployment
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local data and logs
+data/filings/
+logs/
+pids/
+*.log
+
+# Database files
+*.db
+*.sqlite
+dump.rdb
+celerybeat-schedule.db
+
+# IDE and system files
+.DS_Store
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Test files
+tests/
+
+# Backup files
+*.backup
+*.bak
+*.save
+
+# Environment files (will be set via Railway UI)
+.env
+.env.*

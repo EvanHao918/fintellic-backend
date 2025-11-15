@@ -95,3 +95,7 @@ firebase-admin==6.1.0
 # proto-plus==1.22.3
 # protobuf==4.24.4
 # ================================================================
+# ==================== PRODUCTION DEPLOYMENT ====================
+# Additional packages for Railway deployment
+gunicorn==21.2.0
+psycopg2-binary==2.9.9

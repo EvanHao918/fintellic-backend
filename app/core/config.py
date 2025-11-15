@@ -425,3 +425,22 @@ class Settings(BaseSettings):
 
 # Create settings instance
 settings = Settings()
+
+# ==================== RAILWAY DEPLOYMENT SUPPORT ====================
+# Auto-detect Railway environment and override database/redis URLs
+
+# Railway sets RAILWAY_ENVIRONMENT variable
+IS_RAILWAY = os.getenv("RAILWAY_ENVIRONMENT") is not None
+
+if IS_RAILWAY:
+    # Railway provides DATABASE_URL and REDIS_URL as environment variables
+    railway_db_url = os.getenv("DATABASE_URL")
+    railway_redis_url = os.getenv("REDIS_URL")
+    
+    if railway_db_url:
+        settings.DATABASE_URL = railway_db_url
+    
+    if railway_redis_url:
+        settings.REDIS_URL = railway_redis_url
+        settings.CELERY_BROKER_URL = railway_redis_url
+        settings.CELERY_RESULT_BACKEND = railway_redis_url

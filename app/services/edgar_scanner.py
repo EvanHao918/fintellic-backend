@@ -27,6 +27,55 @@ from app.tasks.filing_tasks import process_filing_task
 logger = logging.getLogger(__name__)
 
 
+class SmartLogger:
+    """
+    Smart logging helper that reduces log noise while maintaining observability
+    - Logs important events immediately (new filings found)
+    - Logs periodic health checks (hourly)
+    - Suppresses repetitive "no new data" messages
+    """
+    def __init__(self):
+        self.last_hourly_log = None
+        self.session_start = datetime.now(timezone.utc)
+        self.total_scans = 0
+        self.total_filings_found = 0
+    
+    def should_log_hourly_check(self) -> bool:
+        """Check if we should log hourly health check"""
+        now = datetime.now(timezone.utc)
+        if self.last_hourly_log is None:
+            return True
+        
+        # Log once per hour, at the top of the hour (first scan after XX:00)
+        time_since_last = now - self.last_hourly_log
+        return time_since_last >= timedelta(hours=1) and now.minute < 5
+    
+    def log_scan_result(self, filings_found: int, companies_monitored: int):
+        """Log scan result with smart filtering"""
+        self.total_scans += 1
+        self.total_filings_found += filings_found
+        
+        if filings_found > 0:
+            # Always log when new filings are found
+            logger.info(f"🎯 Found {filings_found} new filings! Total monitored companies: {companies_monitored}")
+        elif self.should_log_hourly_check():
+            # Periodic health check
+            uptime = datetime.now(timezone.utc) - self.session_start
+            hours = int(uptime.total_seconds() / 3600)
+            logger.info(
+                f"✅ Hourly health check - System running normally | "
+                f"Uptime: {hours}h | Scans: {self.total_scans} | "
+                f"Total filings found: {self.total_filings_found} | "
+                f"Monitoring: {companies_monitored} companies"
+            )
+            self.last_hourly_log = datetime.now(timezone.utc)
+        # Else: Silent operation - no logs for "no new data" scans
+
+
+# Global smart logger instance
+smart_logger = SmartLogger()
+
+
 class EDGARScanner:
     """
     Scans SEC EDGAR for new filings using RSS feeds
@@ -44,16 +93,9 @@ class EDGARScanner:
         # Load all monitored CIKs from database (S&P 500 + NASDAQ 100)
         self.monitored_ciks = self._load_monitored_ciks()
         
-        # Debug output
+        # Debug output - only log summary on initialization
         if self.monitored_ciks:
-            logger.info(f"✅ Loaded {len(self.monitored_ciks)} companies for monitoring (S&P 500 + NASDAQ 100)")
-            sp500_only = len(self.sp500_ciks)
-            total = len(self.monitored_ciks)
-            logger.info(f"   - S&P 500 from JSON: {sp500_only}")
-            logger.info(f"   - Total monitored (including NASDAQ 100): {total}")
-            logger.info(f"   - Additional from database: {total - sp500_only}")
-            sample = list(self.monitored_ciks)[:5]
-            logger.info(f"Sample monitored CIKs: {sample}")
+            logger.info(f"📊 Scanner initialized: monitoring {len(self.monitored_ciks)} companies (S&P 500 + NASDAQ 100)")
         else:
             logger.error("❌ No companies loaded for monitoring!")
     
@@ -196,12 +238,8 @@ class EDGARScanner:
         Returns:
             List of new filings discovered
         """
-        logger.info("Starting EDGAR RSS scan...")
-        logger.info(f"DEBUG: Monitoring {len(self.monitored_ciks)} companies (S&P 500 + NASDAQ 100)")
-        
         # ENHANCED: Record the precise scan time in UTC - this will be our detection timestamp
         scan_start_time = datetime.now(timezone.utc)
-        logger.debug(f"Scan started at: {scan_start_time.isoformat()}")
         
         # Get recent filings from RSS (last 60 minutes to ensure overlap)
         all_rss_filings = await sec_client.get_rss_filings(
@@ -210,7 +248,7 @@ class EDGARScanner:
         )
         
         if not all_rss_filings:
-            logger.info("No new filings found in RSS feed")
+            smart_logger.log_scan_result(0, len(self.monitored_ciks))
             return []
         
         # Filter for monitored companies (S&P 500 + NASDAQ 100)
@@ -218,36 +256,14 @@ class EDGARScanner:
         for f in all_rss_filings:
             # Validate filing data first
             if not self._validate_filing_data(f):
-                logger.warning(f"Skipping invalid filing entry from {f.get('company_name', 'Unknown')}")
                 continue
                 
             # S-1 filings (IPOs) are not limited to our indices
             if f['form'] == 'S-1':
                 relevant_filings.append(f)
-                logger.info(f"Including S-1 filing from {f.get('company_name', 'Unknown')} (CIK: {f['cik']})")
             # Check if CIK is in our monitored list
             elif f['cik'] in self.monitored_ciks:
                 relevant_filings.append(f)
-        
-        logger.info(f"Found {len(relevant_filings)} relevant filings out of {len(all_rss_filings)} total")
-        
-        # Log some examples if we found filings
-        if relevant_filings:
-            for filing in relevant_filings[:3]:  # Show first 3
-                if filing['form'] == 'S-1':
-                    logger.info(f"IPO filing: {filing.get('company_name', 'Unknown')} - S-1 ({filing['filing_date']})")
-                else:
-                    # Try to find company in database for better info
-                    db = SessionLocal()
-                    try:
-                        company = db.query(Company).filter(Company.cik == filing['cik']).first()
-                        if company:
-                            indices = company.indices or "Unknown"
-                            logger.info(f"{indices} filing: {company.ticker} - {filing['form']} ({filing['filing_date']})")
-                        else:
-                            logger.info(f"Filing: {filing.get('company_name', 'Unknown')} - {filing['form']} ({filing['filing_date']})")
-                    finally:
-                        db.close()
         
         # Process each filing
         new_filings = []
@@ -336,7 +352,8 @@ class EDGARScanner:
             finally:
                 db.close()
         
-        logger.info(f"Successfully processed {len(new_filings)} new filings")
+        # Use smart logger to conditionally log scan results
+        smart_logger.log_scan_result(len(new_filings), len(self.monitored_ciks))
         
         # ENHANCED: Update any filings with missing tickers or timestamps
         self._update_missing_data()

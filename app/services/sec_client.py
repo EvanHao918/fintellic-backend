@@ -71,7 +71,11 @@ class SECClient:
             pass
         
         try:
-            logger.info(f"Fetching RSS feed for {form_type} filings...")
+            current_time = datetime.now()
+            logger.info(f"🔍 Starting RSS feed fetch for {form_type} filings...")
+            logger.info(f"   Current time: {current_time}")
+            logger.info(f"   Lookback window: {lookback_minutes} minutes")
+            logger.info(f"   Cutoff time will be: {current_time - timedelta(minutes=lookback_minutes)}")
             
             all_filings = []
             
@@ -215,6 +219,9 @@ class SECClient:
                     published = entry.get('published', entry.get('updated', ''))
                     filed_datetime = None
                     
+                    logger.debug(f"📅 Parsing date for: {company_name} ({cik})")
+                    logger.debug(f"   Published string: {published}")
+                    
                     date_formats = [
                         '%a, %d %b %Y %H:%M:%S %Z',  # Mon, 23 Jun 2025 16:30:00 EDT
                         '%Y-%m-%dT%H:%M:%S%z',       # 2025-06-23T16:30:00-04:00
@@ -228,6 +235,8 @@ class SECClient:
                             date_str = published.replace('EDT', '-0400').replace('EST', '-0500')
                             date_str = date_str.replace('PDT', '-0700').replace('PST', '-0800')
                             filed_datetime = datetime.strptime(date_str, fmt)
+                            logger.debug(f"   ✅ Parsed with format: {fmt}")
+                            logger.debug(f"   Parsed datetime: {filed_datetime}")
                             break
                         except:
                             continue
@@ -235,15 +244,21 @@ class SECClient:
                     if not filed_datetime:
                         # Use current time as fallback
                         filed_datetime = datetime.now()
-                        logger.debug(f"Could not parse date: {published}, using current time")
+                        logger.warning(f"⚠️  Could not parse date for {company_name}: {published}, using current time")
                     
                     # Remove timezone info for comparison
+                    original_datetime = filed_datetime
                     if filed_datetime.tzinfo:
                         filed_datetime = filed_datetime.replace(tzinfo=None)
+                        logger.debug(f"   Removed timezone: {original_datetime} -> {filed_datetime}")
                     
                     # Skip if older than lookback period
                     if filed_datetime < cutoff_time:
-                        logger.debug(f"Skipping old filing from {filed_datetime}")
+                        time_diff = cutoff_time - filed_datetime
+                        logger.info(f"⏭️  FILTERED OUT (too old): {form} - {company_name} (CIK: {cik})")
+                        logger.info(f"   Filed: {filed_datetime}")
+                        logger.info(f"   Cutoff: {cutoff_time}")
+                        logger.info(f"   Time difference: {time_diff} (older than {lookback_minutes} minutes)")
                         continue
                     
                     # Successfully parsed filing
@@ -262,7 +277,9 @@ class SECClient:
                     filings.append(filing_data)
                     
                     # Log successful parsing for debugging
-                    logger.debug(f"Successfully parsed: {form} - {company_name} (CIK: {cik})")
+                    logger.info(f"✅ PASSED FILTER: {form} - {company_name} (CIK: {cik}) filed at {filed_datetime}")
+                    logger.debug(f"   Accession: {accession_number}")
+                    logger.debug(f"   Link: {link}")
                     
                 except Exception as e:
                     logger.error(f"Error parsing RSS entry: {e}", exc_info=True)
@@ -272,7 +289,7 @@ class SECClient:
             # Sort by filing datetime (newest first)
             filings.sort(key=lambda x: x['filing_datetime'], reverse=True)
             
-            logger.info(f"Successfully parsed {len(filings)} filings from RSS feed")
+            logger.info(f"📊 RSS parsing completed: {len(filings)} filings passed time filter (out of {len(all_filings)} total entries)")
             
             # Log some statistics
             if filings:
@@ -280,7 +297,11 @@ class SECClient:
                 for f in filings:
                     form_type = f['form'].split('/')[0]  # Base form type
                     form_counts[form_type] = form_counts.get(form_type, 0) + 1
-                logger.info(f"Filing breakdown: {form_counts}")
+                logger.info(f"   Filing breakdown: {form_counts}")
+                logger.info(f"   Newest filing: {filings[0]['form']} - {filings[0]['company_name']} at {filings[0]['filing_datetime']}")
+                logger.info(f"   Oldest filing: {filings[-1]['form']} - {filings[-1]['company_name']} at {filings[-1]['filing_datetime']}")
+            else:
+                logger.warning(f"⚠️  No filings passed the time filter! All {len(all_filings)} entries were too old.")
             
             return filings
             

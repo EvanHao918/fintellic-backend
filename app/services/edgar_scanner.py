@@ -241,29 +241,57 @@ class EDGARScanner:
         # ENHANCED: Record the precise scan time in UTC - this will be our detection timestamp
         scan_start_time = datetime.now(timezone.utc)
         
+        logger.info(f"🚀 Starting scan at {scan_start_time.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        logger.info(f"   Monitored companies: {len(self.monitored_ciks)}")
+        
         # Get recent filings from RSS (last 60 minutes to ensure overlap)
         all_rss_filings = await sec_client.get_rss_filings(
             form_type="all",
             lookback_minutes=60
         )
         
+        logger.info(f"📡 RSS returned {len(all_rss_filings)} filings total")
+        
         if not all_rss_filings:
+            logger.warning("⚠️  No filings returned from RSS feed!")
             smart_logger.log_scan_result(0, len(self.monitored_ciks))
             return []
         
         # Filter for monitored companies (S&P 500 + NASDAQ 100)
         relevant_filings = []
+        filtered_out_count = 0
+        
+        logger.info(f"🔍 Filtering for monitored companies...")
+        
         for f in all_rss_filings:
             # Validate filing data first
             if not self._validate_filing_data(f):
+                logger.debug(f"   ❌ Failed validation: {f.get('form', 'unknown')} - {f.get('company_name', 'unknown')} (CIK: {f.get('cik', 'unknown')})")
+                filtered_out_count += 1
                 continue
                 
             # S-1 filings (IPOs) are not limited to our indices
             if f['form'] == 'S-1':
+                logger.info(f"   ✅ S-1 filing (IPO): {f['company_name']} (CIK: {f['cik']})")
                 relevant_filings.append(f)
             # Check if CIK is in our monitored list
             elif f['cik'] in self.monitored_ciks:
+                logger.info(f"   ✅ MONITORED COMPANY: {f['form']} - {f['company_name']} (CIK: {f['cik']})")
                 relevant_filings.append(f)
+            else:
+                logger.debug(f"   ⏭️  Not monitored: {f['form']} - {f['company_name']} (CIK: {f['cik']})")
+                filtered_out_count += 1
+        
+        logger.info(f"📊 Filtering results:")
+        logger.info(f"   Total RSS filings: {len(all_rss_filings)}")
+        logger.info(f"   Passed validation + in whitelist: {len(relevant_filings)}")
+        logger.info(f"   Filtered out: {filtered_out_count}")
+        
+        if len(relevant_filings) == 0:
+            logger.warning(f"⚠️  NO MONITORED COMPANIES found in RSS feed!")
+            logger.warning(f"   This means none of the {len(all_rss_filings)} filings matched our {len(self.monitored_ciks)} monitored CIKs")
+            smart_logger.log_scan_result(0, len(self.monitored_ciks))
+            return []
         
         # Process each filing
         new_filings = []

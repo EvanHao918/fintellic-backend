@@ -17,8 +17,10 @@ celery_app = Celery(
     "fintellic",
     broker=redis_url,
     backend=redis_url,
-    include=["app.tasks.filing_tasks"]
 )
+
+# CRITICAL FIX: Auto-discover tasks from all modules
+celery_app.autodiscover_tasks(['app.tasks'])
 
 # Configure Celery
 celery_app.conf.update(

@@ -103,7 +103,9 @@ class Settings(BaseSettings):
     
     # ==================== EMAIL CONFIGURATION ====================
     # Email service configuration
+    ENABLE_EMAIL_VERIFICATION: bool = True  # Enable email verification
     ENABLE_PASSWORD_RESET: bool = True
+    EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24  # Verification link expiry
     
     # SMTP Configuration
     SMTP_HOST: str = "smtp.gmail.com"

@@ -432,7 +432,9 @@ settings = Settings()
 # Auto-detect Railway environment and override database/redis URLs
 
 # Railway sets RAILWAY_ENVIRONMENT variable
-IS_RAILWAY = os.getenv("RAILWAY_ENVIRONMENT") is not None
+# Detect Railway environment by checking if REDIS_URL contains railway.internal
+redis_url_env = os.getenv("REDIS_URL", "")
+IS_RAILWAY = "railway.internal" in redis_url_env
 
 if IS_RAILWAY:
     # Railway provides DATABASE_URL and REDIS_URL as environment variables

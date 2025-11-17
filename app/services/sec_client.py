@@ -3,7 +3,7 @@ import asyncio
 import feedparser
 import re
 from typing import List, Dict, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from app.core.config import settings
 
@@ -71,11 +71,7 @@ class SECClient:
             pass
         
         try:
-            current_time = datetime.now()
-            logger.info(f"🔍 Starting RSS feed fetch for {form_type} filings...")
-            logger.info(f"   Current time: {current_time}")
-            logger.info(f"   Lookback window: {lookback_minutes} minutes")
-            logger.info(f"   Cutoff time will be: {current_time - timedelta(minutes=lookback_minutes)}")
+            logger.info(f"Fetching RSS feed for {form_type} filings...")
             
             all_filings = []
             
@@ -133,7 +129,10 @@ class SECClient:
                     logger.info(f"Entry {i+1}: {entry.get('title', 'No title')}")
             
             filings = []
-            cutoff_time = datetime.now() - timedelta(minutes=lookback_minutes)
+            # CRITICAL FIX: Use timezone-aware datetime for cutoff
+            # Railway server may be in different timezone than development machine
+            current_time_utc = datetime.now(timezone.utc)
+            cutoff_time = current_time_utc - timedelta(minutes=lookback_minutes)
             
             for entry in all_filings:
                 try:
@@ -246,28 +245,31 @@ class SECClient:
                         filed_datetime = datetime.now()
                         logger.warning(f"⚠️  Could not parse date for {company_name}: {published}, using current time")
                     
-                    # Remove timezone info for comparison
-                    original_datetime = filed_datetime
+                    # CRITICAL FIX: Convert to UTC for timezone-aware comparison
+                    # Don't remove timezone info - convert to UTC instead
                     if filed_datetime.tzinfo:
-                        filed_datetime = filed_datetime.replace(tzinfo=None)
-                        logger.debug(f"   Removed timezone: {original_datetime} -> {filed_datetime}")
+                        # Convert to UTC
+                        filed_datetime_utc = filed_datetime.astimezone(timezone.utc)
+                    else:
+                        # Naive datetime - assume it's already in UTC
+                        filed_datetime_utc = filed_datetime.replace(tzinfo=timezone.utc)
                     
-                    # Skip if older than lookback period
-                    if filed_datetime < cutoff_time:
-                        time_diff = cutoff_time - filed_datetime
-                        logger.info(f"⏭️  FILTERED OUT (too old): {form} - {company_name} (CIK: {cik})")
-                        logger.info(f"   Filed: {filed_datetime}")
-                        logger.info(f"   Cutoff: {cutoff_time}")
-                        logger.info(f"   Time difference: {time_diff} (older than {lookback_minutes} minutes)")
+                    # Skip if older than lookback period (both are now UTC timezone-aware)
+                    if filed_datetime_utc < cutoff_time:
+                        # Only log at debug level to reduce noise
+                        logger.debug(f"Filtered out (too old): {form} - {company_name} (CIK: {cik}), filed {filed_datetime_utc}")
                         continue
                     
                     # Successfully parsed filing
+                    # Store as naive datetime for filing_datetime field (backward compatibility)
+                    filing_datetime_naive = filed_datetime_utc.replace(tzinfo=None)
+                    
                     filing_data = {
                         "cik": cik,
                         "form": form,
                         "company_name": company_name,
-                        "filing_date": filed_datetime.strftime('%Y-%m-%d'),
-                        "filing_datetime": filed_datetime,
+                        "filing_date": filing_datetime_naive.strftime('%Y-%m-%d'),
+                        "filing_datetime": filing_datetime_naive,
                         "accession_number": accession_number,
                         "primary_document": "",  # Will get from detail API if needed
                         "rss_link": link,
@@ -276,10 +278,8 @@ class SECClient:
                     
                     filings.append(filing_data)
                     
-                    # Log successful parsing for debugging
-                    logger.info(f"✅ PASSED FILTER: {form} - {company_name} (CIK: {cik}) filed at {filed_datetime}")
-                    logger.debug(f"   Accession: {accession_number}")
-                    logger.debug(f"   Link: {link}")
+                    # Log successful parsing at debug level
+                    logger.debug(f"Parsed: {form} - {company_name} (CIK: {cik})")
                     
                 except Exception as e:
                     logger.error(f"Error parsing RSS entry: {e}", exc_info=True)
@@ -289,19 +289,15 @@ class SECClient:
             # Sort by filing datetime (newest first)
             filings.sort(key=lambda x: x['filing_datetime'], reverse=True)
             
-            logger.info(f"📊 RSS parsing completed: {len(filings)} filings passed time filter (out of {len(all_filings)} total entries)")
+            logger.info(f"Successfully parsed {len(filings)} filings from RSS feed (out of {len(all_filings)} total entries)")
             
-            # Log some statistics
+            # Log breakdown only at debug level
             if filings:
                 form_counts = {}
                 for f in filings:
                     form_type = f['form'].split('/')[0]  # Base form type
                     form_counts[form_type] = form_counts.get(form_type, 0) + 1
-                logger.info(f"   Filing breakdown: {form_counts}")
-                logger.info(f"   Newest filing: {filings[0]['form']} - {filings[0]['company_name']} at {filings[0]['filing_datetime']}")
-                logger.info(f"   Oldest filing: {filings[-1]['form']} - {filings[-1]['company_name']} at {filings[-1]['filing_datetime']}")
-            else:
-                logger.warning(f"⚠️  No filings passed the time filter! All {len(all_filings)} entries were too old.")
+                logger.debug(f"Filing breakdown: {form_counts}")
             
             return filings
             

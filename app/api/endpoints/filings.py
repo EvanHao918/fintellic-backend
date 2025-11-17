@@ -152,8 +152,8 @@ async def get_filings(
     query = db.query(Filing).options(joinedload(Filing.company))
     
     # Apply filters
-    if form_type:
-        query = query.filter(Filing.filing_type == form_type)
+    if form_type and form_type != 'all':
+        query = query.filter(Filing.form_type == form_type)
     if ticker:
         query = query.join(Company).filter(Company.ticker == ticker)
     

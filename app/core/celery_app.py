@@ -4,16 +4,19 @@ Celery configuration for async task processing
 """
 import os
 from celery import Celery
-from app.core.config import settings
 
 # Fix macOS fork issue
 os.environ['OBJC_DISABLE_INITIALIZE_FORK_SAFETY'] = 'YES'
 
+# CRITICAL FIX: Read REDIS_URL directly from environment variable
+# This ensures we use Railway's Redis URL, not the default from settings
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
 # Create Celery instance
 celery_app = Celery(
     "fintellic",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
+    broker=redis_url,
+    backend=redis_url,
     include=["app.tasks.filing_tasks"]
 )
 

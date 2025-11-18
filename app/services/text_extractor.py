@@ -40,12 +40,18 @@ class TextExtractor:
                 'priority': 100,
                 'max_chars': 600000,  # Increased from 100KB to 600KB to avoid truncation
                 'patterns': [
-                    # Standard Exhibit 99 patterns
+                    # Standard Exhibit 99 patterns (strict matching)
                     "*ex99*.htm", "*ex99*.html",
                     "*kex99*.htm", "*kex99*.html", 
                     "*dex99*.htm", "*dex99*.html",
                     "ex-99*.htm", "ex-99*.html",
                     "exhibit99*.htm", "exhibit99*.html",
+                    
+                    # Non-standard patterns with company prefixes (edge case compatibility)
+                    # Case: hd_exhibit991x11022025.htm (Home Depot, 2025-11-18)
+                    # Companies may concatenate "99.1" as "991" or add prefixes to filenames
+                    "*exhibit99*.htm", "*exhibit99*.html",  # Matches prefix+exhibit99[any]
+                    
                     # Common earnings/investor materials patterns
                     "*earningsrelease*.htm", "*earningsrelease*.html",
                     "*earnings*.htm", "*earnings*.html",

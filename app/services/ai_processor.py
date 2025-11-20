@@ -1,7 +1,7 @@
 # app/services/ai_processor.py
 """
 AI Processor Service - Enhanced with Flash Note Style for o3-mini
-Version: v11_o3mini
+Version: v12_unified_markup
 MAJOR UPDATE: 
 - Switched to o3-mini reasoning model
 - Restructured 10-Q prompt with Sell-Side Flash Note style
@@ -9,6 +9,11 @@ MAJOR UPDATE:
 - Optimized for autonomous web search and tool use
 - NEW v11: Role-driven concise summaries (120-180 chars)
 - NEW v11: Pure role definition without artificial examples
+- NEW v12: Unified visual markup system across all filing types
+  * Removed emoji from all analysis outputs
+  * Three inline emphasis types: **highlight**, __bold__, *italic*
+  * Consistent ## subheader format
+  * Professional appearance without emoji clutter
 """
 import json
 import re
@@ -896,11 +901,14 @@ Then write your bullets using these calculated results.
    Headers should answer: "What did I discover?" not "What am I analyzing?"
    The paragraph then provides evidence supporting the header.
    
-   **Write 3-4 thesis-driven paragraphs:**
-   - 📉/📈 Performance finding (beat/miss drivers, margins)
-   - 📈/⚠️ Operational/risk finding (key metrics or material risks)
-   - 🎯 Forward outlook (industry trends + catalysts + risks, guidance only if provided)
-   - 💡 Bottom line (synthesis)
+   **Write 3-4 thesis-driven paragraphs with headers:**
+   
+   Format: `## Header Text` (no emoji, just clear insight statement)
+   
+   Examples:
+   - `## Strong Revenue Growth Drives Performance`
+   - `## Raw Material Costs Pressure Margins`
+   - `## Industry Tailwinds Support Demand`
    
    **Headers should be INSIGHT-driven, not administrative:**
    ✅ Good: "Industry Tailwinds Support Demand"
@@ -996,32 +1004,49 @@ Now generate your two-section analysis following this structure.
 
 ---
 
-## VISUAL ENHANCEMENT (Retail Readability)
+## VISUAL ENHANCEMENT (Professional Readability)
 
 Apply these lightweight visual markings to improve scannability:
 
-**Bold Numbers** (**...**):
-- Key metrics: Revenue, EPS, Net Income, Margins
-- Beat/Miss amounts: "**BEAT** by **$X.XB**"  
-- YoY/QoQ changes: "**+X%** YoY"
+**Three types of inline emphasis:**
 
-**Emoji Direction** (paragraph-level only):
-- 📈 Overall positive paragraph (beats, strong growth)
-- 📉 Overall negative paragraph (misses, declines)
-- 🎯 Guidance updates or forward outlook
-- ⚠️ Risk warnings or concerns
-- 💡 Bottom Line summary (mandatory)
+1. **Yellow Highlight** (**...**):
+   - Numbers and metrics: **$X.XB**, **X%**, **$X.XX**
+   - Beat/Miss indicators: **BEAT**, **MISS**, **IN-LINE**
+   - YoY/QoQ changes: **+X%**, **-X%**
 
-**Mutual Exclusion Rule**:
-❌ NEVER: "📈 **Revenue**: **$X.XB**"
-✅ DO: "📈 Revenue: $X.XB [DOC]" OR "**Revenue**: **$X.XB** [DOC]"
+2. __Bold Text__ (__...__):
+   - Key business concepts: __digital transformation__, __robust demand__
+   - Important conclusions: __exceeded expectations__, __strong execution__
+   - Strategic terms: __competitive advantage__, __market leadership__
 
-**Application**:
-- Section 1: Bold numbers ONLY (no emoji)
-- Section 2: 1 emoji at paragraph start + bold numbers inside
-- Bottom Line: Always start with 💡
+3. *Italic Text* (*...*):
+   - Cautionary language: *monitor closely*, *potential pressure*
+   - Risk indicators: *headwind*, *challenge*, *uncertainty*
+   - Tentative statements: *if conditions persist*, *subject to change*
 
-Keep it professional - quality over quantity.
+**Structural markup:**
+
+- Use `---` horizontal separators between major discussion points
+- Use `## Subheader` for thesis-driven paragraph headers (no emoji)
+- Example:
+  ```
+  ## Strong Revenue Growth Drives Performance
+  
+  Revenue reached **$14.883B**, driven by __robust demand__ in 
+  the Networking segment. However, *monitor closely* the margin pressure...
+  
+  ---
+  
+  ## Margin Pressures Require Attention
+  ```
+
+**Application guidelines:**
+
+- Section 1 (FACT CLARITY): Yellow highlights on numbers only
+- Section 2 (MARKET PERSPECTIVE): All three types as appropriate
+- Use sparingly - emphasis loses impact if overused
+- Most text should remain plain for professional appearance
 """
     
     def _build_beat_miss_context(self, context: Dict) -> str:
@@ -1129,7 +1154,7 @@ Annual reports are about understanding the BIG PICTURE, not quarter-to-quarter d
 ```
 
 Each section MUST start with the "### SECTION X:" header (exactly as shown).
-Within each section, use thesis-driven subheaders with emojis (📉 📈 🎯 ⚠️ 💡).
+Within each section, use thesis-driven subheaders: `## Header Text`
 
 ---
 
@@ -1140,7 +1165,7 @@ Within each section, use thesis-driven subheaders with emojis (📉 📈 🎯 �
 
 ---
 
-📉 **[Your Performance Conclusion Header]**
+## [Your Performance Conclusion Header]
 
 Write a header that captures the KEY PERFORMANCE STORY (5-9 words)
 
@@ -1162,7 +1187,7 @@ Cite [DOC: Consolidated Statements of Operations; MD&A]
 
 ---
 
-💰 **[Your Balance Sheet/Cash Flow Conclusion Header]**
+## [Your Balance Sheet/Cash Flow Conclusion Header]
 
 Write a header that captures FINANCIAL POSITION or CAPITAL ALLOCATION story (5-9 words)
 
@@ -1189,7 +1214,7 @@ Cite [DOC: Consolidated Balance Sheets; Statements of Cash Flows]
 
 ---
 
-🎯 **[Your Strategy Conclusion Header]**
+## [Your Strategy Conclusion Header]
 
 Write a header that captures STRATEGIC DIRECTION or KEY INITIATIVE (5-9 words)
 
@@ -1209,7 +1234,7 @@ Cite [DOC: MD&A; Item 1 - Business]
 
 ---
 
-⚠️ **[Your Risk Conclusion Header]**
+## [Your Risk Conclusion Header]
 
 Write a header that captures the TOP 2-3 RISKS (5-9 words)
 
@@ -1289,15 +1314,15 @@ Example:
 ## FORMATTING RULES (Readability First)
 
 **Header Format**:
-- Always: emoji + **bold header with YOUR insight**
+- Use: `## Header Text` for subheaders
 - Keep headers SHORT: 5-9 words
 - Headers = CONCLUSIONS (what you found), not labels (what section this is)
 - Include numbers or concrete terms when impactful
 
-**Visual Marking**:
-- **Bold** all financial numbers: **$4.09B** revenue, **12.2%** margin
-- Use emoji ONLY for major section headers
-- Apply Mutual Exclusion Rule: Don't bold words next to emoji
+**Visual Marking** (use the three inline emphasis types):
+- **Yellow highlight** for numbers: **$4.09B**, **12.2%**
+- __Bold text__ for key concepts: __strategic shift__, __competitive advantage__
+- *Italic text* for cautionary terms: *subject to approval*, *potential risk*
 
 **Narrative Flow**:
 - Write in paragraphs, not bullet lists (except for numbered risks)
@@ -1506,30 +1531,75 @@ and general corporate purposes."
 
 **Format**: Natural prose paragraphs (500-700 words)
 
-**Structure**: Flexible based on event complexity, but typically includes:
+**Structure**: Flexible and content-driven, but analyze from two key perspectives:
 
-**Paragraph 1 - Strategic Rationale**: Why did management do this? Why now?
-- What problem does this solve or opportunity does it capture?
-- How does this fit the company's stated strategy?
-- Based on [DOC: Item X.XX, Exhibit 99.1] and management commentary if available
+**Write 2-4 paragraphs with `## Subheader` format:**
 
-**Paragraph 2 - Financial Implications**: Impact on the business
-- How does this affect revenue, costs, cash flow, balance sheet?
-- Use specific numbers from the filing [DOC:]
-- Calculate if needed [CALC:] - e.g., impact on EPS, debt ratios
+Each subheader should state YOUR KEY FINDING or CONCLUSION about that dimension of impact.
 
-**Paragraph 3 - Market Context**: How does this compare? (Search when relevant)
-- For M&A: Search for comparable recent transactions in the sector
-- For executive changes: Search for successor's track record at prior companies
-- For debt: Search for current market rates and peer borrowing costs
-- For partnerships: Search for similar deals by competitors
-- Only search when external context materially enhances understanding
+---
 
-**Paragraph 4 - Forward Looking**: Risks, opportunities, what to watch
-- Execution risks or regulatory hurdles
-- Upside scenarios
-- Key milestones or triggers to monitor
-- Management credibility on similar past actions
+**Analysis Framework** (use these two dimensions to guide your thinking):
+
+**1. Internal Impact** (Impact on company operations, strategy, and financials)
+
+How does this event affect the company's business model, operations, or financial position?
+
+Key questions to address:
+- **Strategic rationale**: Why did management do this? What problem does it solve or opportunity does it capture?
+- **Financial implications**: How does this affect revenue, costs, cash flow, balance sheet? Use specific numbers [DOC:] and calculate impact if needed [CALC:]
+- **Execution considerations**: What are the risks, timeline, conditions, or integration challenges?
+- **Management credibility**: Track record on similar past actions
+
+Example insight-driven headers:
+- `## Deal Strengthens Core Business Model`
+- `## Debt Increase Constrains Financial Flexibility`
+- `## Leadership Change Creates Near-Term Uncertainty`
+- `## Partnership Diversifies Revenue Base`
+
+---
+
+**2. External/Competitive Impact** (Impact on market position and competitive dynamics)
+
+How does this event change the company's position in the competitive landscape?
+
+**IMPORTANT**: For this dimension, USE WEB SEARCH to provide context:
+- Search for comparable peer transactions or events
+- Search for industry trends and recent developments
+- Search for competitor reactions or similar moves
+- Search for market data (valuations, pricing, market share)
+
+Key questions to address:
+- **Competitive positioning**: Does this improve or weaken the company's market position?
+- **Industry context**: How does this compare to peer actions or industry trends?
+- **Market reaction**: What signals does this send about industry dynamics?
+- **Differentiation**: Does this create or erode competitive advantages?
+
+Example insight-driven headers:
+- `## Acquisition Closes Gap with Market Leader`
+- `## Partnership Follows Industry Consolidation Trend`
+- `## Deal Values Company Below Peer Multiples`
+- `## Move Lags Behind Competitor Actions`
+
+**Search examples**:
+✅ M&A → "recent [industry] acquisitions valuation multiples 2025"
+✅ Executive change → "[successor name] background track record"
+✅ Debt issuance → "corporate bond yields [industry] 2025"
+✅ Partnership → "[competitor name] similar partnerships"
+
+---
+
+**Application Guidelines**:
+
+- **For simple events** (routine agreements, minor financing): Focus primarily on internal impact, add competitive context only if material
+- **For major events** (M&A, large financing, CEO change): Cover both dimensions with roughly equal weight
+- **For strategic events** (major partnerships, market entry): Emphasize competitive context with web search
+- **Let event significance guide depth**: Not every 8-K needs extensive competitive analysis
+
+**Quality Bar**:
+Would a PM feel they understand both "what this means for the company" AND "what this means in the market"?
+
+---
 
 **WHEN TO SEARCH** (Use your judgment):
 ✅ M&A deal → search for "recent {{industry}} acquisitions valuation multiples"
@@ -1583,6 +1653,56 @@ Would a PM feel confident adjusting their position based on this analysis?
 
 ---
 
+## VISUAL ENHANCEMENT (Professional Readability)
+
+Apply these lightweight visual markings to improve scannability:
+
+**Three types of inline emphasis:**
+
+1. **Yellow Highlight** (**...**):
+   - Numbers and amounts: **$X.XB**, **X%**, **$X.XX**
+   - Dates and timelines: **Q4 2025**, **January 15**
+   - Key metrics: **Item 2.01**, **$500M transaction**
+
+2. __Bold Text__ (__...__):
+   - Key business terms: __definitive agreement__, __strategic rationale__
+   - Important parties: __Target Company__, __acquiring entity__
+   - Material conclusions: __significant impact__, __marks expansion__
+
+3. *Italic Text* (*...*):
+   - Cautionary language: *subject to approval*, *pending clearance*
+   - Risk factors: *regulatory risk*, *execution challenge*
+   - Conditional statements: *if conditions are met*, *may be adjusted*
+
+**Structural markup:**
+
+- Use `---` horizontal separators between major sections
+- Use `## Subheader` for key discussion points in Section 2
+- Example:
+  ```
+  ### SECTION 2: IMPACT ANALYSIS
+  
+  ---
+  
+  ## Strategic Rationale Behind the Deal
+  
+  The acquisition of __Target Company__ for **$2.5B** represents...
+  However, *regulatory approval remains pending*...
+  
+  ---
+  
+  ## Financial Implications
+  ```
+
+**Application guidelines:**
+
+- Section 1 (EVENT SNAPSHOT): Yellow highlights on key facts/numbers
+- Section 2 (IMPACT ANALYSIS): All three types as appropriate
+- Use sparingly - most text should remain plain
+- Maintain professional tone throughout
+
+---
+
 ## COMPANY CONTEXT
 
 - **Company**: {context['company_name']} ({context['ticker']})
@@ -1617,24 +1737,12 @@ Apply these lightweight visual markings to clarify event type and materiality:
 - Key dates: "effective **December 8, 2025**"
 - Material terms: "**40%** ownership retained"
 
-**Emoji Event Type** (minimal use - events are inherently urgent):
-- 💰 M&A, acquisitions, divestitures, financing
-- 👤 Executive changes (CEO, CFO, Board)
-- 📋 Material contracts, agreements, partnerships
-- ⚠️ Litigation, regulatory issues, compliance
-- 📊 Dividend announcements (if substantial)
-- 💡 Bottom Line summary (mandatory)
-
-**Mutual Exclusion Rule**:
-❌ NEVER: "💰 **Transaction value**: **$4B**"
-✅ DO: "💰 Transaction value: $4B in cash and stock" OR "Transaction value: **$4B** in cash and stock"
-
 **Application**:
-- Section 1: Use 1 event-type emoji at the very start to categorize; bold amounts inside
-- Section 2: Minimal emoji (only ⚠️ for risks, 💡 for Bottom Line)
+- Section 1: Bold key numbers and amounts
+- Section 2: Use all three inline emphasis types as appropriate
 - Keep professional - the event itself creates urgency
 
-Purpose: Help readers instantly identify event category.
+Purpose: Help readers instantly identify key facts and implications.
 """
     
     def _build_s1_unified_prompt_enhanced(self, filing: Filing, content: str, context: Dict) -> str:
@@ -1683,7 +1791,7 @@ Let the actual filing content guide what you emphasize. Each IPO tells a differe
 ```
 
 Each section MUST start with the "### SECTION X:" header (exactly as shown).
-Within each section, use thesis-driven subheaders with emojis (📈 📉 ⚠️ 💡 🏢 💰).
+Within each section, use thesis-driven subheaders: `## Header Text`
 
 ---
 
@@ -1693,7 +1801,7 @@ Within each section, use thesis-driven subheaders with emojis (📈 📉 ⚠️ 
 
 **Opening (MANDATORY - Always start with this)**:
 
-🏢 **IPO Type**: [Choose EXACTLY ONE from the list below - DO NOT leave blank]
+## IPO Type: [Choose EXACTLY ONE from the list below - DO NOT leave blank]
 
 **Required Categories** (choose the best match):
 - High-Growth Tech (fast-growing, unprofitable)
@@ -1707,7 +1815,7 @@ Within each section, use thesis-driven subheaders with emojis (📈 📉 ⚠️ 
 
 ---
 
-💰 **Institutional Backing**: [Choose EXACTLY ONE: Strong 🟢 | Neutral 🟡 | Weak 🔴]
+## Institutional Backing: [Choose EXACTLY ONE: Strong 🟢 | Neutral 🟡 | Weak 🔴]
 • Underwriters: [Top-tier banks (GS/MS/JPM) OR mid-tier OR none/resale only]
 • Pre-IPO investors: [Known VCs/PE with % OR strategic investors OR exiting PE]
 • Signal: [1-sentence interpretation, e.g., "Top-tier validation" OR "Insider exit - caution"]
@@ -1731,9 +1839,9 @@ Weak 🔴:
 
 **Example Output:**
 
-🏢 **IPO Type**: Profitable Value Play
+## IPO Type: Profitable Value Play
 
-💰 **Institutional Backing**: Strong 🟢
+## Institutional Backing: Strong 🟢
 • Underwriters: Goldman Sachs, Morgan Stanley
 • Pre-IPO investors: Digital Currency Group (DCG) controlling shareholder, Bain Capital Ventures, FirstMark Capital [DOC: Corporate Information]
 • Signal: Top-tier institutional validation with strategic backing from leading blockchain-focused investors
@@ -1767,7 +1875,7 @@ Include ONLY if compelling
 
 ---
 
-💰 **Deal Terms** (bullet format - clean and scannable):
+## Deal Terms (bullet format - clean and scannable):
 • Offering Size: [X shares at $Y-Z range] [DOC: Prospectus Summary]
 • Expected Proceeds: [Net proceeds amount] [DOC: Use of Proceeds]
 • Main Use: [Top 2 uses only, plain language] [DOC: Use of Proceeds]
@@ -1782,7 +1890,7 @@ Include ONLY if compelling
 
 ---
 
-📈 **[Your Growth Conclusion Header]**
+## [Your Growth Conclusion Header]
 
 Write a header that captures YOUR KEY FINDING about growth (3-7 words)
 
@@ -1796,7 +1904,7 @@ The header should state the growth story and financial health, not just "perform
 
 ---
 
-⚠️ **[Your Risk Conclusion Header]**
+## [Your Risk Conclusion Header]
 
 Write a header that captures YOUR KEY RISK FINDING (3-7 words)
 
@@ -1821,7 +1929,7 @@ What to SKIP:
 
 ---
 
-📊 **[Your Competitive Position Header - OPTIONAL]**
+## [Your Competitive Position Header - OPTIONAL]
 
 Include ONLY if there's something material to say:
 - Unique moat or clear differentiation
@@ -1835,7 +1943,7 @@ Include ONLY if there's something material to say:
 
 ---
 
-💡 **Bottom Line**
+## Bottom Line
 
 **Content**:
 Synthesize the key takeaway: IPO type, main strength, main weakness, and who should care.
@@ -1845,15 +1953,15 @@ Synthesize the key takeaway: IPO type, main strength, main weakness, and who sho
 ## FORMATTING RULES (Readability First)
 
 **Header Format**:
-- Always use: emoji + **bold header with YOUR insight**
+- Use: `## Header Text` for subheaders
 - Keep headers SHORT: 3-7 words
 - Headers must be CONCLUSIONS (what you found), not labels (what section this is)
 - Be specific: include numbers or concrete terms when possible
 
-**Visual Marking**:
-- **Bold** all financial numbers: **$500M** revenue, **45%** margins
-- Use emoji ONLY for major section headers (don't overuse)
-- Apply Mutual Exclusion Rule: Never bold a word already next to emoji
+**Visual Marking** (use the three inline emphasis types):
+- **Yellow highlight** for numbers: **$500M**, **45%**
+- __Bold text__ for key concepts: __unique moat__, __market leader__
+- *Italic text* for risks: *going concern*, *concentration risk*
 
 ---
 

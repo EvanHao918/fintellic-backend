@@ -941,25 +941,15 @@ Then write your bullets using these calculated results.
 
 3. **Length**: 600-800 words (strict max: 900 words)
 
-4. **External Context**:
-   - You have web search capability
-   - Use when industry/peer context adds material insight
-   
-   **WHEN to search** (Concrete Examples):
-   ✅ "Competitor's Q3 revenue growth for comparison"
-   ✅ "Industry-wide credit delinquency trends"
-   ✅ "Peer company's recent earnings results"
-   ❌ Don't search for generic statements like "industry is growing"
-   ❌ Don't search if filing already provides sufficient context
-   
-   **CITATION REQUIREMENTS** (CRITICAL):
-   - Every search result MUST be cited as [1], [2], [3]
-   - At bottom of Section 2, list full sources:
-     Example format:
-     [1] Competitor Name Q3 2025 Earnings Release, Month Year
-     [2] Federal Reserve Report Name, Month Year
-   - NO citations without full source details
-   - NO vague references like "according to industry data"
+4. **Broader Context**:
+
+Quarterly results reflect both company execution and the environment in which the company operates. 
+
+Use web search to understand whether this quarter's performance is remarkable given the circumstances, or simply riding industry momentum. Is revenue growth impressive because it outpaced a weak market, or merely kept pace with a rising tide? Are margin pressures company-specific missteps, or unavoidable cost inflation hitting the entire sector?
+
+Search for the context the filing can't provide: what's happening in the world outside this company's four walls.
+
+Integrate what you find into your narrative. External context should illuminate, not just decorate.
 
 Goal: Provide conviction for position sizing decisions.
 
@@ -1225,12 +1215,18 @@ Explain the company's strategic direction:
 - What are they focused on? (Markets, products, capabilities)
 - Any major initiatives? (M&A, partnerships, capex programs, restructuring)
 - What's the rationale? (Why this strategy makes sense)
-- Include relevant industry context if helpful [1], [2] from web search
 
-If there's a MAJOR strategic event (merger, spin-off, major acquisition), lead with that.
-If ongoing strategy, explain their market positioning and growth vectors.
+**Strategic Context Through Search**:
 
-Cite [DOC: MD&A; Item 1 - Business]
+Annual reports describe what management is doing, but rarely explain why now, or how this compares to what's happening across the industry.
+
+Use web search to understand the forces shaping strategic decisions. If the company is making a major acquisition, what's driving M&A activity in this sector? If they're pivoting to a new business model, are peers doing the same? If they're investing heavily in a technology, what's the competitive landscape?
+
+The filing tells you the strategy. Search tells you whether it's visionary or reactive, early or late, bold or necessary.
+
+If there's a MAJOR strategic event (merger, spin-off, major acquisition), lead with that and search for context that explains its significance.
+
+Cite [DOC: MD&A; Item 1 - Business] for the strategy itself, and [1], [2] for external context.
 
 ---
 
@@ -1263,7 +1259,7 @@ Cite [DOC: Risk Factors]
 
 ---
 
-🔮 **[Outlook/Future Direction Header - OPTIONAL]**
+## [Outlook/Future Direction Header - OPTIONAL]
 
 Include only if management provides specific guidance or forward-looking commentary
 
@@ -1282,30 +1278,17 @@ Examples:
 
 **Content** (MANDATORY):
 
-This is where you synthesize everything into actionable insight for investors.
+Synthesize everything into actionable perspective for investors.
 
-**Template**:
+Address the fundamental question: What kind of investment is this, and what do investors need to believe for it to work?
 
-{company_name} is [describe the phase: navigating transition / capitalizing on tailwinds / in restructuring mode / in growth acceleration] as it [key strategic initiative or challenge].
+Your analysis should help investors understand:
+- What phase is this company in? (turnaround, growth, maturity, distress)
+- What's the core investment debate or uncertainty?
+- What needs to happen for this to succeed?
+- What are the key watch items in coming quarters?
 
-**Near-term headwinds/considerations**: [List 2-4 items investors should watch]
-- Example: Margin pressure from elevated R&D
-- Example: Regulatory approval timeline for merger
-- Example: Customer contract renewal in Q2
-
-**Long-term question**: [Frame the key investment debate in one sentence]
-- Example: "Can diversification offset customer concentration before margins erode further?"
-- Example: "Will the AI strategy deliver revenue growth before cash runs out?"
-
-**Who should care**:
-- [Investor type 1]: [Why they might be interested]
-- [Investor type 2]: [Why they might be interested]  
-- [Investor type 3]: [What they should wait for]
-
-Example:
-"Growth investors betting on semiconductor consolidation and IoT/EV trends may find this compelling. Income investors should note the strong dividend and buyback track record. Value investors should wait for merger clarity and margin stabilization before committing capital."
-
-**Final thought**: [One sentence on what makes this a binary/compelling/wait-and-see situation]
+Write naturally. Don't force structure. Let the company's situation dictate what matters most.
 
 **Length**: 200-300 words
 
@@ -1506,23 +1489,6 @@ A material 8-K filing just hit the wire. Your institutional clients need:
 **Quality Bar**: 
 A trader can grasp the essential facts in 30 seconds while the market is open.
 
-**Examples of good Lede paragraphs**:
-
-For M&A:
-"Company signed a definitive agreement to acquire Target for $X.XB in cash 
-and stock, disclosed in an 8-K filing Monday [DOC: Item 1.01]. The transaction 
-marks Company's largest acquisition since 20XX."
-
-For Executive Change:
-"Company announced the resignation of CFO Name effective Date, disclosed 
-Tuesday [DOC: Item 5.02]. The board appointed Successor as interim CFO while 
-conducting a search for a permanent successor."
-
-For Debt Issuance:
-"Company priced $X.XB of senior unsecured notes in a two-tranche offering, 
-announced Friday [DOC: Item 2.03, Exhibit 99.1]. Proceeds will fund expansion 
-and general corporate purposes."
-
 ---
 
 ### SECTION 2: IMPACT ANALYSIS
@@ -1563,11 +1529,11 @@ Example insight-driven headers:
 
 How does this event change the company's position in the competitive landscape?
 
-**IMPORTANT**: For this dimension, USE WEB SEARCH to provide context:
-- Search for comparable peer transactions or events
-- Search for industry trends and recent developments
-- Search for competitor reactions or similar moves
-- Search for market data (valuations, pricing, market share)
+8-K filings announce events but rarely provide the context investors need to interpret them. Your job is to provide that missing context.
+
+Use web search to build understanding. If the filing mentions someone, find out who they are and what they've done. If it describes a transaction, understand what similar deals have looked like. If it announces an event, discover whether this is routine or remarkable in the industry.
+
+The filing tells you what happened. Search tells you why it matters.
 
 Key questions to address:
 - **Competitive positioning**: Does this improve or weaken the company's market position?
@@ -1581,12 +1547,6 @@ Example insight-driven headers:
 - `## Deal Values Company Below Peer Multiples`
 - `## Move Lags Behind Competitor Actions`
 
-**Search examples**:
-✅ M&A → "recent [industry] acquisitions valuation multiples 2025"
-✅ Executive change → "[successor name] background track record"
-✅ Debt issuance → "corporate bond yields [industry] 2025"
-✅ Partnership → "[competitor name] similar partnerships"
-
 ---
 
 **Application Guidelines**:
@@ -1598,16 +1558,6 @@ Example insight-driven headers:
 
 **Quality Bar**:
 Would a PM feel they understand both "what this means for the company" AND "what this means in the market"?
-
----
-
-**WHEN TO SEARCH** (Use your judgment):
-✅ M&A deal → search for "recent {{industry}} acquisitions valuation multiples"
-✅ Executive change → search for "{{successor name}} background track record"
-✅ Debt issuance → search for "corporate bond yields {{industry}} 2025"
-✅ Material agreement → search for "competitor similar partnerships"
-❌ Don't search if the 8-K filing itself provides comprehensive context
-❌ Don't search for generic background that doesn't add insight
 
 **CITATION REQUIREMENTS** (CRITICAL):
 - Every search result MUST be cited as [1], [2], [3]

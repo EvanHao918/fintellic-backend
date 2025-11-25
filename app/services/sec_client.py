@@ -82,6 +82,8 @@ class SECClient:
             params["type"] = "10-Q"
         elif form_type == "8-K":
             params["type"] = "8-K"
+        elif form_type == "S-1":
+            params["type"] = "S-1"
         elif form_type == "all":
             # Get multiple important form types
             # We'll need to make multiple requests
@@ -517,8 +519,8 @@ class SECClient:
                 filing_dates = recent.get("filingDate", [])
                 primary_documents = recent.get("primaryDocument", [])
                 
-                # Only process recent filings (first 20 entries are most recent)
-                for i in range(min(20, len(forms))):
+                # Only process most recent filings (3 entries for real-time detection)
+                for i in range(min(3, len(forms))):
                     form = forms[i] if i < len(forms) else ""
                     
                     # Only include supported form types (exact match, no /A variants)

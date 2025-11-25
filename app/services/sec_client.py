@@ -12,8 +12,13 @@ logger = logging.getLogger(__name__)
 
 class SECClient:
     """
-    Client for interacting with SEC EDGAR API and RSS feeds
-    Optimized for production use with RSS as primary discovery method
+    Client for interacting with SEC EDGAR API
+    
+    Data Source Strategy:
+    - JSON submissions API: Primary method for 8-K/10-Q/10-K (100% reliable)
+    - RSS feed: Only for S-1 (IPO filings from unknown CIKs)
+    
+    Rate Limit: 10 requests/second (SEC enforced)
     """
     
     def __init__(self):
@@ -27,6 +32,12 @@ class SECClient:
         self.rate_limit_delay = 0.1  # 100ms between requests
         self.last_request_time = datetime.min
         
+        # ETag cache for JSON submissions (reduces bandwidth)
+        self.etag_cache: Dict[str, str] = {}  # {cik: etag}
+        
+        # Supported form types for JSON scanning
+        self.json_supported_forms = {"10-K", "10-Q", "8-K"}
+        
     async def _rate_limit(self):
         """Ensure we don't exceed SEC rate limits"""
         now = datetime.now()
@@ -37,12 +48,15 @@ class SECClient:
         
         self.last_request_time = datetime.now()
     
-    async def get_rss_filings(self, form_type: str = "all", lookback_minutes: int = 60) -> List[Dict]:
+    async def get_rss_filings(self, form_type: str = "S-1", lookback_minutes: int = 60) -> List[Dict]:
         """
-        Get filings from SEC RSS feed - PRIMARY method for discovering new filings
+        Get filings from SEC RSS feed - NOW ONLY USED FOR S-1 (IPO) DISCOVERY
+        
+        Note: 8-K/10-Q/10-K now use JSON submissions API for reliability.
+        RSS is kept only for S-1 because IPO companies have unknown CIKs.
         
         Args:
-            form_type: "all", "10-K", "10-Q", "8-K", or "S-1"
+            form_type: "S-1" (primary use case) or "all" for backward compatibility
             lookback_minutes: How many minutes to look back (for filtering)
             
         Returns:
@@ -446,6 +460,143 @@ class SECClient:
             except httpx.HTTPError as e:
                 logger.error(f"Error searching companies: {e}")
                 return []
+
+
+    # ==================== JSON Submissions API Methods ====================
+    
+    async def get_company_submissions(self, cik: str) -> Optional[Dict]:
+        """
+        Get recent filings for a single company via JSON submissions API
+        
+        Args:
+            cik: Central Index Key (will be padded to 10 digits)
+            
+        Returns:
+            Dict with recent filings or None if failed
+        """
+        await self._rate_limit()
+        
+        cik_padded = str(cik).zfill(10)
+        url = f"{self.base_url}/submissions/CIK{cik_padded}.json"
+        
+        # Prepare headers with ETag if cached
+        headers = self.headers.copy()
+        cached_etag = self.etag_cache.get(cik_padded)
+        if cached_etag:
+            headers["If-None-Match"] = cached_etag
+        
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(url, headers=headers, timeout=30.0)
+                
+                # 304 Not Modified - no changes
+                if response.status_code == 304:
+                    return {"status": "not_modified", "cik": cik_padded, "filings": []}
+                
+                response.raise_for_status()
+                
+                # Update ETag cache
+                new_etag = response.headers.get("ETag")
+                if new_etag:
+                    self.etag_cache[cik_padded] = new_etag
+                
+                data = response.json()
+                
+                # Extract recent filings
+                recent = data.get("filings", {}).get("recent", {})
+                if not recent:
+                    return {"status": "ok", "cik": cik_padded, "filings": []}
+                
+                # Build filing list from parallel arrays
+                filings = []
+                forms = recent.get("form", [])
+                accession_numbers = recent.get("accessionNumber", [])
+                filing_dates = recent.get("filingDate", [])
+                primary_documents = recent.get("primaryDocument", [])
+                
+                # Only process recent filings (first 20 entries are most recent)
+                for i in range(min(20, len(forms))):
+                    form = forms[i] if i < len(forms) else ""
+                    
+                    # Only include supported form types (exact match, no /A variants)
+                    if form not in self.json_supported_forms:
+                        continue
+                    
+                    filings.append({
+                        "form": form,
+                        "accession_number": accession_numbers[i] if i < len(accession_numbers) else "",
+                        "filing_date": filing_dates[i] if i < len(filing_dates) else "",
+                        "primary_document": primary_documents[i] if i < len(primary_documents) else "",
+                        "cik": cik_padded,
+                        "company_name": data.get("name", ""),
+                    })
+                
+                return {"status": "ok", "cik": cik_padded, "filings": filings}
+                
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    logger.debug(f"CIK {cik_padded} not found")
+                else:
+                    logger.warning(f"HTTP error for CIK {cik_padded}: {e.response.status_code}")
+                return None
+            except Exception as e:
+                logger.warning(f"Error fetching submissions for CIK {cik_padded}: {e}")
+                return None
+    
+    async def get_batch_submissions(self, ciks: List[str], known_accessions: set) -> Dict:
+        """
+        Batch query submissions for multiple CIKs
+        
+        Args:
+            ciks: List of CIKs to query
+            known_accessions: Set of accession numbers already in database
+            
+        Returns:
+            Dict with new filings and scan statistics
+        """
+        scan_start = datetime.now(timezone.utc)
+        
+        new_filings = []
+        success_count = 0
+        cached_count = 0
+        error_count = 0
+        
+        for cik in ciks:
+            result = await self.get_company_submissions(cik)
+            
+            if result is None:
+                error_count += 1
+                continue
+            
+            if result.get("status") == "not_modified":
+                cached_count += 1
+                success_count += 1
+                continue
+            
+            success_count += 1
+            
+            # Check for new filings
+            for filing in result.get("filings", []):
+                accession = filing.get("accession_number", "")
+                if accession and accession not in known_accessions:
+                    new_filings.append(filing)
+        
+        scan_duration = (datetime.now(timezone.utc) - scan_start).total_seconds()
+        
+        # Log scan summary (single line)
+        logger.info(
+            f"JSON scan: {len(ciks)} CIKs in {scan_duration:.1f}s | "
+            f"success={success_count} cached={cached_count} errors={error_count} | "
+            f"new_filings={len(new_filings)}"
+        )
+        
+        return {
+            "new_filings": new_filings,
+            "scan_duration": scan_duration,
+            "success_count": success_count,
+            "cached_count": cached_count,
+            "error_count": error_count,
+        }
 
 
 # Create singleton instance

@@ -9,7 +9,7 @@ FIXED:
 ENHANCED: Record precise detection timestamps (detected_at field)
 ENHANCED: Consistent timezone handling and validation
 """
-from typing import List, Dict
+from typing import List, Dict, Optional
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 import logging
@@ -78,24 +78,44 @@ smart_logger = SmartLogger()
 
 class EDGARScanner:
     """
-    Scans SEC EDGAR for new filings using RSS feeds
-    ENHANCED: Better ticker management and validation, precise detection timestamps
+    Scans SEC EDGAR for new filings
+    
+    Data Source Strategy (v2):
+    - JSON submissions API: For 8-K/10-Q/10-K (known CIKs, 100% reliable)
+    - RSS feed: Only for S-1 (IPO filings from unknown CIKs)
+    
+    ENHANCED: Better ticker management, precise detection timestamps, hourly summary logs
     """
     
     def __init__(self):
-        self.scan_interval_minutes = 1  # Check RSS every minute
+        self.scan_interval_seconds = 70  # JSON scan interval (was 60s for RSS)
         self.supported_forms = ["10-K", "10-Q", "8-K", "S-1"]
+        self.json_forms = {"10-K", "10-Q", "8-K"}  # Forms using JSON API
+        self.rss_forms = {"S-1"}  # Forms using RSS (unknown CIKs)
         
         # Load S&P 500 companies from JSON file
         self.sp500_companies = self._load_sp500_companies()
         self.sp500_ciks = {company['cik'] for company in self.sp500_companies}
         
-        # Load all monitored CIKs from database (S&P 500 + NASDAQ 100)
-        self.monitored_ciks = self._load_monitored_ciks()
+        # Load NASDAQ 100 companies from JSON file
+        self.nasdaq100_companies = self._load_nasdaq100_companies()
+        self.nasdaq100_ciks = {company['cik'] for company in self.nasdaq100_companies}
         
-        # Debug output - only log summary on initialization
+        # Combined monitored CIKs (for JSON scanning)
+        self.monitored_ciks = self.sp500_ciks | self.nasdaq100_ciks
+        
+        # Hourly summary tracking
+        self.hourly_filings = []  # Filings found in current hour
+        self.last_hourly_summary = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+        
+        # Log initialization
         if self.monitored_ciks:
-            logger.info(f"📊 Scanner initialized: monitoring {len(self.monitored_ciks)} companies (S&P 500 + NASDAQ 100)")
+            logger.info(
+                f"📊 Scanner initialized (v2 JSON+RSS): "
+                f"{len(self.monitored_ciks)} CIKs | "
+                f"JSON: 8-K/10-Q/10-K | RSS: S-1 | "
+                f"Interval: {self.scan_interval_seconds}s"
+            )
         else:
             logger.error("❌ No companies loaded for monitoring!")
     
@@ -107,56 +127,74 @@ class EDGARScanner:
             with open(json_path, 'r') as f:
                 data = json.load(f)
                 companies = data.get('companies', [])
-                logger.info(f"Successfully loaded {len(companies)} S&P 500 companies from {json_path}")
+                logger.info(f"Loaded {len(companies)} S&P 500 companies")
                 return companies
         except FileNotFoundError:
             logger.error(f"S&P 500 companies file not found at {json_path}")
-            logger.info("Please run: python scripts/fetch_sp500.py")
             return []
         except Exception as e:
             logger.error(f"Error loading S&P 500 companies: {e}")
             return []
     
-    def _load_monitored_ciks(self) -> set:
-        """Load all CIKs we should monitor (S&P 500 + NASDAQ 100)"""
-        monitored = set()
+    def _load_nasdaq100_companies(self) -> list:
+        """Load NASDAQ 100 companies from JSON file"""
+        json_path = Path(__file__).parent.parent / "data" / "nasdaq100_companies.json"
         
-        # Add S&P 500 CIKs from JSON
-        monitored.update(self.sp500_ciks)
-        
-        # Add NASDAQ 100 CIKs from database
+        try:
+            with open(json_path, 'r') as f:
+                data = json.load(f)
+                companies = data.get('companies', [])
+                logger.info(f"Loaded {len(companies)} NASDAQ 100 companies")
+                return companies
+        except FileNotFoundError:
+            logger.error(f"NASDAQ 100 companies file not found at {json_path}")
+            return []
+        except Exception as e:
+            logger.error(f"Error loading NASDAQ 100 companies: {e}")
+            return []
+    
+    def _get_known_accessions(self) -> set:
+        """Get all accession numbers already in database"""
         db = SessionLocal()
         try:
-            # Get all companies that are either S&P 500 or NASDAQ 100
-            companies = db.query(Company).filter(
-                (Company.is_sp500 == True) | (Company.is_nasdaq100 == True)
-            ).all()
-            
-            for company in companies:
-                if company.cik and company.cik != '0000000000' and not company.cik.startswith('N'):
-                    # Only add valid CIKs (not placeholders)
-                    monitored.add(company.cik)
-            
-            logger.info(f"Loaded {len(companies)} companies from database (S&P 500 + NASDAQ 100)")
-            
-            # Show some NASDAQ 100 examples
-            nasdaq_only = db.query(Company).filter(
-                Company.is_sp500 == False,
-                Company.is_nasdaq100 == True
-            ).limit(5).all()
-            
-            if nasdaq_only:
-                logger.info("Sample NASDAQ 100 (non-S&P 500) companies:")
-                for company in nasdaq_only:
-                    logger.info(f"   - {company.ticker}: {company.name} (CIK: {company.cik})")
-            
+            accessions = db.query(Filing.accession_number).all()
+            return {a[0] for a in accessions if a[0]}
         except Exception as e:
-            logger.error(f"Error loading companies from database: {e}")
-            logger.info("Falling back to S&P 500 only")
+            logger.error(f"Error loading known accessions: {e}")
+            return set()
         finally:
             db.close()
+    
+    def _check_hourly_summary(self):
+        """Output hourly summary if hour has changed"""
+        now = datetime.now(timezone.utc)
+        current_hour = now.replace(minute=0, second=0, microsecond=0)
         
-        return monitored
+        if current_hour > self.last_hourly_summary:
+            # Hour changed, output summary
+            if self.hourly_filings:
+                summary_lines = [f"{f['ticker']} {f['form']} ({f['time']})" for f in self.hourly_filings]
+                logger.info(
+                    f"📊 Hourly Summary ({self.last_hourly_summary.strftime('%H:00')}-{current_hour.strftime('%H:00')} UTC): "
+                    f"{len(self.hourly_filings)} filings | {', '.join(summary_lines)}"
+                )
+            else:
+                logger.info(
+                    f"📊 Hourly Summary ({self.last_hourly_summary.strftime('%H:00')}-{current_hour.strftime('%H:00')} UTC): "
+                    f"No new filings"
+                )
+            
+            # Reset for new hour
+            self.hourly_filings = []
+            self.last_hourly_summary = current_hour
+    
+    def _add_to_hourly_summary(self, ticker: str, form: str, time_str: str):
+        """Add filing to hourly summary tracking"""
+        self.hourly_filings.append({
+            "ticker": ticker,
+            "form": form,
+            "time": time_str
+        })
     
     def _validate_filing_data(self, filing_data: Dict) -> bool:
         """
@@ -232,146 +270,165 @@ class EDGARScanner:
         
     async def scan_for_new_filings(self) -> List[Dict]:
         """
-        Main scanning method - uses RSS for efficiency
-        ENHANCED: Records precise detection timestamps with timezone handling
+        Main scanning method (v2)
+        
+        Data Source Strategy:
+        - JSON submissions API: For 8-K/10-Q/10-K (known CIKs, 100% reliable)
+        - RSS feed: Only for S-1 (IPO filings from unknown CIKs)
         
         Returns:
             List of new filings discovered
         """
-        # ENHANCED: Record the precise scan time in UTC - this will be our detection timestamp
         scan_start_time = datetime.now(timezone.utc)
         
-        # Get recent filings from RSS (last 60 minutes to ensure overlap)
-        all_rss_filings = await sec_client.get_rss_filings(
-            form_type="all",
+        # Check if we need to output hourly summary
+        self._check_hourly_summary()
+        
+        all_new_filings = []
+        
+        # ==================== PART 1: JSON Scan (8-K/10-Q/10-K) ====================
+        # Get known accession numbers to filter out duplicates
+        known_accessions = self._get_known_accessions()
+        
+        # Batch query all monitored CIKs
+        json_result = await sec_client.get_batch_submissions(
+            ciks=list(self.monitored_ciks),
+            known_accessions=known_accessions
+        )
+        
+        # Process new filings from JSON
+        for filing_data in json_result.get("new_filings", []):
+            new_filing = await self._process_new_filing(
+                filing_data=filing_data,
+                scan_start_time=scan_start_time,
+                discovery_method="JSON"
+            )
+            if new_filing:
+                all_new_filings.append(new_filing)
+        
+        # ==================== PART 2: RSS Scan (S-1 only) ====================
+        s1_filings = await sec_client.get_rss_filings(
+            form_type="S-1",
             lookback_minutes=60
         )
         
-        if not all_rss_filings:
-            smart_logger.log_scan_result(0, len(self.monitored_ciks))
-            return []
-        
-        # Filter for monitored companies (S&P 500 + NASDAQ 100)
-        relevant_filings = []
-        for f in all_rss_filings:
-            # Validate filing data first
-            if not self._validate_filing_data(f):
+        # Process S-1 filings
+        for rss_filing in s1_filings:
+            if not self._validate_filing_data(rss_filing):
                 continue
-                
-            # S-1 filings (IPOs) are not limited to our indices
-            if f['form'] == 'S-1':
-                relevant_filings.append(f)
-            # Check if CIK is in our monitored list
-            elif f['cik'] in self.monitored_ciks:
-                relevant_filings.append(f)
+            
+            # Check if already exists
+            if rss_filing.get("accession_number") in known_accessions:
+                continue
+            
+            new_filing = await self._process_new_filing(
+                filing_data=rss_filing,
+                scan_start_time=scan_start_time,
+                discovery_method="RSS"
+            )
+            if new_filing:
+                all_new_filings.append(new_filing)
         
-        # Process each filing
-        new_filings = []
+        # Log scan summary
+        smart_logger.log_scan_result(len(all_new_filings), len(self.monitored_ciks))
         
-        # Process each filing in its own transaction
-        for rss_filing in relevant_filings:
-            db = SessionLocal()
-            try:
-                # Check if we already have this filing
-                existing = db.query(Filing).filter(
-                    Filing.accession_number == rss_filing["accession_number"]
-                ).first()
-                
-                if existing:
-                    logger.debug(f"Filing {rss_filing['accession_number']} already exists")
-                    # ENHANCED: Ensure ticker is populated even for existing filings
-                    if existing and not existing.ticker and existing.company:
-                        existing.ticker = existing.company.ticker
-                        db.commit()
-                    # ENHANCED: Update detected_at if missing (for old records)
-                    if existing and not existing.detected_at:
-                        existing.detected_at = scan_start_time
-                        logger.debug(f"Updated detected_at for existing filing {existing.id}")
-                        db.commit()
-                    continue
-                
-                # Get or create company
-                company = await self._get_or_create_company(
-                    db, rss_filing["cik"], rss_filing.get("company_name", "")
-                )
-                
-                if not company:
-                    logger.warning(f"Could not find/create company for CIK {rss_filing['cik']}")
-                    continue
-                
-                # Additional validation before creating filing
-                if not self._validate_before_creation(rss_filing, company):
-                    logger.warning(f"Skipping filing creation for {company.ticker} - failed pre-creation validation")
-                    continue
-                
-                # ENHANCED: Create new filing record with precise detection time
-                filing = self._create_filing_record(company, rss_filing, scan_start_time)
-                db.add(filing)
-                
-                # Commit immediately to make filing available to other processes
-                db.commit()
-                
-                # Now the filing is persisted and has an ID
-                filing_id = filing.id
-                
-                new_filings.append({
-                    "id": filing_id,
-                    "company": company.name,
-                    "ticker": filing.ticker or company.ticker,  # Use filing ticker or company ticker
-                    "form_type": rss_filing["form"],
-                    "filing_date": rss_filing["filing_date"],
-                    "detected_at": scan_start_time.isoformat(),  # ENHANCED: Include detection time
-                    "accession_number": rss_filing["accession_number"],
-                    "discovery_method": "RSS",
-                    "indices": company.indices
-                })
-                
-                logger.info(
-                    f"New filing discovered: {filing.ticker or company.ticker} ({company.indices}) - {rss_filing['form']} "
-                    f"({rss_filing['filing_date']}) detected at {scan_start_time.strftime('%H:%M:%S')} UTC - Filing ID: {filing_id}"
-                )
-                
-                # Automatically trigger Celery task to process this filing
-                try:
-                    # Queue the filing for processing
-                    task = process_filing_task.delay(filing_id)
-                    
-                    logger.info(
-                        f"✅ Queued filing {filing_id} for processing. "
-                        f"Celery task ID: {task.id}"
-                    )
-                    
-                except Exception as e:
-                    logger.error(f"❌ Failed to queue filing {filing_id} for processing: {e}")
-                    # Continue even if queueing fails - filing is still saved
-                    
-            except Exception as e:
-                logger.error(f"Error processing filing {rss_filing.get('accession_number', 'unknown')}: {e}")
-                db.rollback()
-                # Continue with next filing
-            finally:
-                db.close()
-        
-        # Use smart logger to conditionally log scan results
-        smart_logger.log_scan_result(len(new_filings), len(self.monitored_ciks))
-        
-        # ENHANCED: Update any filings with missing tickers or timestamps
-        self._update_missing_data()
-        
-        return new_filings
+        return all_new_filings
     
-    def _validate_before_creation(self, rss_filing: Dict, company: Company) -> bool:
+    async def _process_new_filing(self, filing_data: Dict, scan_start_time: datetime, discovery_method: str) -> Optional[Dict]:
+        """
+        Process a single new filing - create record and queue for processing
+        
+        Args:
+            filing_data: Filing data from JSON or RSS
+            scan_start_time: When this scan started (for detected_at)
+            discovery_method: "JSON" or "RSS"
+            
+        Returns:
+            Filing info dict or None if failed
+        """
+        db = SessionLocal()
+        try:
+            # Check if already exists (double-check)
+            existing = db.query(Filing).filter(
+                Filing.accession_number == filing_data.get("accession_number")
+            ).first()
+            
+            if existing:
+                return None
+            
+            # Get or create company
+            cik = filing_data.get("cik", "")
+            company_name = filing_data.get("company_name", "")
+            company = await self._get_or_create_company(db, cik, company_name)
+            
+            if not company:
+                logger.warning(f"Could not find/create company for CIK {cik}")
+                return None
+            
+            # Validate before creation
+            if not self._validate_before_creation(filing_data, company):
+                return None
+            
+            # Create filing record
+            filing = self._create_filing_record(company, filing_data, scan_start_time)
+            db.add(filing)
+            db.commit()
+            
+            filing_id = filing.id
+            ticker = filing.ticker or company.ticker
+            form_type = filing_data.get("form", "")
+            
+            # Add to hourly summary
+            self._add_to_hourly_summary(
+                ticker=ticker,
+                form=form_type,
+                time_str=scan_start_time.strftime("%H:%M")
+            )
+            
+            # Log discovery
+            logger.info(
+                f"🎯 New {discovery_method}: {ticker} {form_type} "
+                f"({filing_data.get('filing_date', 'N/A')}) - ID: {filing_id}"
+            )
+            
+            # Queue for AI processing
+            try:
+                task = process_filing_task.delay(filing_id)
+                logger.info(f"✅ Queued {filing_id} for processing (task: {task.id[:8]}...)")
+            except Exception as e:
+                logger.error(f"❌ Failed to queue filing {filing_id}: {e}")
+            
+            return {
+                "id": filing_id,
+                "company": company.name,
+                "ticker": ticker,
+                "form_type": form_type,
+                "filing_date": filing_data.get("filing_date", ""),
+                "detected_at": scan_start_time.isoformat(),
+                "accession_number": filing_data.get("accession_number", ""),
+                "discovery_method": discovery_method,
+                "indices": getattr(company, 'indices', '')
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing filing {filing_data.get('accession_number', 'unknown')}: {e}")
+            db.rollback()
+            return None
+        finally:
+            db.close()
+    
+    def _validate_before_creation(self, filing_data: Dict, company: Company) -> bool:
         """
         Additional validation before creating filing record
-        ENHANCED: Timezone-aware validation
+        Works with both JSON and RSS data formats
         """
         # Don't create filings for inactive companies
         if not company.is_active:
             logger.warning(f"Company {company.ticker} is marked inactive")
             return False
         
-        # ENHANCED: Verify the filing date is reasonable (not too far in the future)
-        filing_date = datetime.strptime(rss_filing['filing_date'], '%Y-%m-%d')
+        # Verify the filing date is reasonable (not too far in the future)
+        filing_date = datetime.strptime(filing_data['filing_date'], '%Y-%m-%d')
         filing_date_utc = filing_date.replace(tzinfo=timezone.utc)
         current_time_utc = datetime.now(timezone.utc)
         
@@ -381,7 +438,7 @@ class EDGARScanner:
             return False
         
         # Check if we have a valid document URL or can construct one
-        if not rss_filing.get('rss_link') and not rss_filing.get('accession_number'):
+        if not filing_data.get('rss_link') and not filing_data.get('accession_number'):
             logger.warning("No valid document URL or accession number")
             return False
         
@@ -457,16 +514,13 @@ class EDGARScanner:
         
         return company
     
-    def _create_filing_record(self, company: Company, rss_filing: Dict, detection_time: datetime) -> Filing:
+    def _create_filing_record(self, company: Company, filing_data: Dict, detection_time: datetime) -> Filing:
         """
-        Create a new filing record from RSS data
-        ENHANCED: Records precise detection timestamp and ensures ticker is populated
-        ENHANCED: Consistent timezone handling
-        ENHANCED: Extract and store official SEC Item numbers for 8-K filings
+        Create a new filing record from JSON or RSS data
         
         Args:
             company: Company object
-            rss_filing: RSS filing data
+            filing_data: Filing data (from JSON submissions or RSS)
             detection_time: Precise UTC timestamp when filing was detected
         """
         # Map form type
@@ -477,44 +531,51 @@ class EDGARScanner:
             "S-1": FilingType.FORM_S1
         }
         
-        # ENHANCED: Parse filing date and make it timezone-aware (UTC)
+        # Parse filing date and make it timezone-aware (UTC)
         filing_date = datetime.strptime(
-            rss_filing["filing_date"], "%Y-%m-%d"
+            filing_data["filing_date"], "%Y-%m-%d"
         )
-        # Store as UTC timezone-aware datetime
         filing_date_utc = filing_date.replace(tzinfo=timezone.utc)
         
-        # ENHANCED: Ensure detection_time is timezone-aware UTC
+        # Ensure detection_time is timezone-aware UTC
         if detection_time.tzinfo is None:
             detection_time = detection_time.replace(tzinfo=timezone.utc)
         elif detection_time.tzinfo != timezone.utc:
             detection_time = detection_time.astimezone(timezone.utc)
         
-        # ENHANCED: Extract official SEC Item numbers for 8-K filings
+        # Extract official SEC Item numbers for 8-K filings (RSS only)
         official_items = []
-        if rss_filing["form"] == "8-K":
-            official_items = self._extract_items_from_rss(rss_filing)
+        if filing_data.get("form") == "8-K" and filing_data.get("rss_link"):
+            official_items = self._extract_items_from_rss(filing_data)
             if official_items:
-                logger.info(f"8-K filing has official Items: {official_items}")
+                logger.debug(f"8-K filing has official Items: {official_items}")
         
-        # ENHANCED: Create Filing with ticker from company and precise detection time
+        # Create Filing with ticker from company and precise detection time
         filing = Filing(
             company_id=company.id,
-            ticker=company.ticker,  # Set ticker from company
-            accession_number=rss_filing["accession_number"],
-            filing_type=form_mapping.get(rss_filing["form"], FilingType.FORM_10K),
-            form_type=rss_filing["form"],  # Store raw form type too
-            filing_date=filing_date_utc,  # Official SEC filing date (UTC)
-            detected_at=detection_time,  # ENHANCED: When we detected this filing (precise UTC timestamp)
-            status=ProcessingStatus.PENDING,  # Using enum value
-            event_items=official_items if official_items else None  # ENHANCED: Store official Items for 8-K
+            ticker=company.ticker,
+            accession_number=filing_data["accession_number"],
+            filing_type=form_mapping.get(filing_data.get("form", ""), FilingType.FORM_10K),
+            form_type=filing_data.get("form", ""),
+            filing_date=filing_date_utc,
+            detected_at=detection_time,
+            status=ProcessingStatus.PENDING,
+            event_items=official_items if official_items else None
         )
         
-        # Set URL fields as attributes after creation
-        if rss_filing.get('rss_link'):
-            filing.filing_url = rss_filing['rss_link']
-            filing.full_text_url = rss_filing['rss_link']
-            filing.primary_document_url = rss_filing['rss_link']
+        # Set URL fields - support both RSS (rss_link) and JSON (construct from accession)
+        if filing_data.get('rss_link'):
+            filing.filing_url = filing_data['rss_link']
+            filing.full_text_url = filing_data['rss_link']
+            filing.primary_document_url = filing_data['rss_link']
+        elif filing_data.get('accession_number') and filing_data.get('cik'):
+            # Construct URL for JSON-sourced filings
+            cik = filing_data['cik'].lstrip('0')
+            acc_no = filing_data['accession_number'].replace('-', '')
+            base_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{acc_no}"
+            filing.filing_url = base_url
+            if filing_data.get('primary_document'):
+                filing.primary_document_url = f"{base_url}/{filing_data['primary_document']}"
         
         # Ensure ticker is populated
         if not filing.ticker and company.ticker:

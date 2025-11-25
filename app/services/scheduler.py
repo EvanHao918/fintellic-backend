@@ -13,11 +13,15 @@ logger = logging.getLogger(__name__)
 class FilingScheduler:
     """
     Manages scheduled tasks for filing discovery and earnings calendar updates
-    Optimized for RSS-based scanning (every 1 minute) and daily calendar updates
+    
+    Scan Strategy (v2):
+    - JSON submissions API for 8-K/10-Q/10-K (every 70s)
+    - RSS for S-1 only (every 70s)
+    - Daily earnings calendar update at 6 AM
     """
     
     def __init__(self):
-        self.scan_interval = 60  # 1 minute in seconds (RSS is efficient)
+        self.scan_interval = 70  # 70 seconds (JSON scan needs ~51s for 513 CIKs)
         self.is_running = False
         self.task: Optional[asyncio.Task] = None
         self.scan_count = 0
@@ -33,7 +37,7 @@ class FilingScheduler:
         
         self.is_running = True
         self.task = asyncio.create_task(self._run_scheduler())
-        logger.info("Filing scheduler started (RSS mode - 1 minute intervals)")
+        logger.info(f"📡 Scheduler started (v2 JSON+RSS mode - {self.scan_interval}s intervals)")
         
     async def stop(self):
         """Stop the scheduler"""
@@ -47,8 +51,8 @@ class FilingScheduler:
         logger.info(f"Filing scheduler stopped. Total scans: {self.scan_count}, Filings found: {self.filings_found}")
         
     async def _run_scheduler(self):
-        """Main scheduler loop - optimized for RSS and daily tasks"""
-        logger.info("RSS-based scheduler loop started")
+        """Main scheduler loop"""
+        logger.info("Scheduler loop started (JSON+RSS mode)")
         
         # Run initial scan immediately
         await self._perform_scan()
@@ -82,34 +86,20 @@ class FilingScheduler:
         self.scan_count += 1
         scan_start = datetime.now()
         
-        logger.info(f"Starting scheduled scan #{self.scan_count} at {scan_start.strftime('%Y-%m-%d %H:%M:%S')}")
-        
         try:
-            # Run the scanner
+            # Run the scanner (logging handled by edgar_scanner)
             new_filings = await edgar_scanner.scan_for_new_filings()
             
             # Update statistics
             self.filings_found += len(new_filings)
             
-            # Log results
+            # Only log summary if new filings found (avoid duplicate logs)
             scan_duration = (datetime.now() - scan_start).total_seconds()
             
             if new_filings:
-                logger.info(
-                    f"Scan #{self.scan_count} completed in {scan_duration:.2f}s. "
-                    f"Found {len(new_filings)} new filings! Total found: {self.filings_found}"
-                )
-                
-                # Log each new filing
-                for filing in new_filings:
-                    logger.info(
-                        f"  → {filing['ticker']} {filing['form_type']} "
-                        f"({filing['filing_date']}) via {filing.get('discovery_method', 'RSS')}"
-                    )
-            else:
                 logger.debug(
-                    f"Scan #{self.scan_count} completed in {scan_duration:.2f}s. "
-                    f"No new filings found."
+                    f"Scan #{self.scan_count} completed in {scan_duration:.1f}s. "
+                    f"Found {len(new_filings)} new filings."
                 )
                 
         except Exception as e:
@@ -210,7 +200,7 @@ class FilingScheduler:
             "scan_interval_seconds": self.scan_interval,
             "total_scans": self.scan_count,
             "total_filings_found": self.filings_found,
-            "mode": "RSS (Efficient)",
+            "mode": "v2 JSON+RSS (70s)",
             "last_calendar_update": self.last_calendar_update.isoformat() if self.last_calendar_update else None,
             "calendar_update_hour": self.calendar_update_hour
         }

@@ -9,6 +9,9 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Reduce httpx log noise (513 requests per scan would flood logs)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 
 class SECClient:
     """

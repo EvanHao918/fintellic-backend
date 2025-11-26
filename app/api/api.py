@@ -16,7 +16,8 @@ from app.api.endpoints import (
     watchlist, 
     view_limits,
     subscriptions,  # Phase 2: 订阅端点
-    notifications   # Phase 4: 通知端点 (新增)
+    notifications,  # Phase 4: 通知端点 (新增)
+    external        # External API for third-party developers
 )
 
 api_router = APIRouter()
@@ -56,3 +57,6 @@ api_router.include_router(subscriptions.router, prefix="/subscriptions", tags=["
 
 # Notification endpoints (Phase 4) - 新增
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+
+# External API endpoints (for third-party developers)
+api_router.include_router(external.router, prefix="/external", tags=["external"])

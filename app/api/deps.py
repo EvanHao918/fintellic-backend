@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime, timedelta
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -295,3 +295,69 @@ async def check_subscription_validity(
             db.commit()
     
     return current_user
+
+
+# ==================== EXTERNAL API KEY AUTHENTICATION ====================
+
+# Redis key prefix for external API rate limiting
+EXTERNAL_API_RATE_LIMIT_PREFIX = "external_api_calls:"
+
+
+async def verify_external_api_key(
+    x_api_key: str = Header(..., description="External API Key")
+) -> str:
+    """
+    Verify external API key from request header
+    
+    Args:
+        x_api_key: API key from X-API-Key header
+        
+    Returns:
+        The validated API key
+        
+    Raises:
+        HTTPException: If API key is invalid or rate limit exceeded
+    """
+    # Check if external API keys are configured
+    if not settings.EXTERNAL_API_KEYS:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="External API is not configured"
+        )
+    
+    # Parse valid API keys
+    valid_keys = [key.strip() for key in settings.EXTERNAL_API_KEYS.split(",") if key.strip()]
+    
+    # Validate the provided key
+    if x_api_key not in valid_keys:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "X-API-Key"}
+        )
+    
+    # Check rate limit using Redis
+    from app.core.cache import cache
+    
+    # Create daily rate limit key
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    rate_limit_key = f"{EXTERNAL_API_RATE_LIMIT_PREFIX}{x_api_key}:{today}"
+    
+    # Get current call count
+    current_count = cache.get(rate_limit_key) or 0
+    
+    if current_count >= settings.EXTERNAL_API_DAILY_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Daily API limit of {settings.EXTERNAL_API_DAILY_LIMIT} calls exceeded",
+            headers={
+                "X-RateLimit-Limit": str(settings.EXTERNAL_API_DAILY_LIMIT),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": "midnight UTC"
+            }
+        )
+    
+    # Increment call count (expire at end of day)
+    cache.set(rate_limit_key, current_count + 1, ttl=86400)  # 24 hours TTL
+    
+    return x_api_key

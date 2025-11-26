@@ -211,6 +211,14 @@ class Settings(BaseSettings):
     # API settings
     API_RATE_LIMIT_PER_MINUTE: int = 60
     
+    # ==================== EXTERNAL API CONFIGURATION ====================
+    # External API Keys for third-party developers (comma-separated)
+    # Example: "milan_key_abc123,partner_key_xyz789"
+    EXTERNAL_API_KEYS: str = ""
+    
+    # External API rate limit (calls per day per key)
+    EXTERNAL_API_DAILY_LIMIT: int = 100
+    
     # ==================== ENVIRONMENT-SPECIFIC CONFIGURATIONS ====================
     
     @property

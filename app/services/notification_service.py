@@ -2,6 +2,7 @@
 Firebase Cloud Messaging Notification Service
 Phase 4: HermeSpeed Push Notification System
 OPTIMIZED: Simplified Firebase initialization, unified token management, core features only
+UPDATED: Added Expo Push API support for Expo tokens
 """
 import logging
 from typing import List, Dict, Optional, Any
@@ -9,6 +10,7 @@ from datetime import datetime, time
 import json
 import os
 from pathlib import Path
+import requests
 
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -23,11 +25,15 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Expo Push API endpoint
+EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
+
 
 class NotificationService:
     """
     Firebase notification service
     OPTIMIZED: Simplified initialization, core features only, unified token management
+    UPDATED: Supports both FCM tokens and Expo Push Tokens
     """
     
     def __init__(self):
@@ -84,6 +90,77 @@ class NotificationService:
         """Check if Firebase is ready"""
         return self.initialized and self.app is not None
     
+    def _is_expo_token(self, token: str) -> bool:
+        """Check if token is an Expo Push Token"""
+        return token.startswith('ExponentPushToken[') or token.startswith('ExpoPushToken[')
+    
+    def _send_expo_notifications(self, tokens: List[str], title: str, body: str, data: Dict) -> Dict[str, Any]:
+        """
+        Send notifications via Expo Push API
+        Returns dict with success_count and failure_count
+        """
+        if not tokens:
+            return {"success_count": 0, "failure_count": 0, "responses": []}
+        
+        # Build Expo push messages
+        messages = []
+        for token in tokens:
+            messages.append({
+                "to": token,
+                "sound": "default",
+                "title": title,
+                "body": body,
+                "data": data,
+                "priority": "high",
+                "channelId": "default"
+            })
+        
+        try:
+            response = requests.post(
+                EXPO_PUSH_URL,
+                json=messages,
+                headers={
+                    "Accept": "application/json",
+                    "Accept-Encoding": "gzip, deflate",
+                    "Content-Type": "application/json"
+                },
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            data_list = result.get("data", [])
+            
+            success_count = 0
+            failure_count = 0
+            responses = []
+            
+            for item in data_list:
+                if item.get("status") == "ok":
+                    success_count += 1
+                    responses.append({"success": True})
+                else:
+                    failure_count += 1
+                    responses.append({
+                        "success": False, 
+                        "error": item.get("message", "Unknown error")
+                    })
+            
+            logger.info(f"Expo push result: {success_count} success, {failure_count} failed")
+            return {
+                "success_count": success_count,
+                "failure_count": failure_count,
+                "responses": responses
+            }
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Expo push request failed: {e}")
+            return {
+                "success_count": 0,
+                "failure_count": len(tokens),
+                "responses": [{"success": False, "error": str(e)} for _ in tokens]
+            }
+    
     def send_filing_notification(
         self, 
         db: Session, 
@@ -94,9 +171,10 @@ class NotificationService:
         Send filing release notification for core filing types only
         OPTIMIZED: Simplified content generation, unified token retrieval
         """
-        if not self.is_firebase_ready():
-            logger.warning("Firebase not ready - skipping filing notification")
-            return 0
+        # For Expo tokens, we don't need Firebase to be ready
+        # if not self.is_firebase_ready():
+        #     logger.warning("Firebase not ready - skipping filing notification")
+        #     return 0
         
         try:
             # Build notification content - SIMPLIFIED
@@ -172,6 +250,7 @@ class NotificationService:
         """
         Send notification to a single user
         OPTIMIZED: Unified token retrieval from users table only
+        UPDATED: Supports both Expo and FCM tokens
         """
         try:
             # Get user's notification settings
@@ -186,57 +265,92 @@ class NotificationService:
                 logger.debug(f"User {user.id} has no active tokens")
                 return 0
             
-            # Build and send message
-            message = messaging.MulticastMessage(
-                tokens=tokens,
-                notification=messaging.Notification(title=title, body=body),
-                data={
-                    **data,
-                    'type': notification_type,
-                    'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-                    'timestamp': datetime.utcnow().isoformat()
-                },
-                android=messaging.AndroidConfig(
-                    priority='high',
-                    notification=messaging.AndroidNotification(
-                        icon=getattr(settings, 'NOTIFICATION_DEFAULT_ICON', 'ic_notification'),
-                        color=getattr(settings, 'NOTIFICATION_DEFAULT_COLOR', '#E88B00'),
-                        sound=getattr(settings, 'NOTIFICATION_DEFAULT_SOUND', 'default'),
-                        channel_id='hermespeed_filings'
-                    ),
-                ),
-                apns=messaging.APNSConfig(
-                    payload=messaging.APNSPayload(
-                        aps=messaging.Aps(
-                            badge=1,
+            # Separate Expo tokens and FCM tokens
+            expo_tokens = [t for t in tokens if self._is_expo_token(t)]
+            fcm_tokens = [t for t in tokens if not self._is_expo_token(t)]
+            
+            total_success = 0
+            notification_data = {
+                **data,
+                'type': notification_type,
+                'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+            # Send via Expo Push API for Expo tokens
+            if expo_tokens:
+                expo_result = self._send_expo_notifications(
+                    tokens=expo_tokens,
+                    title=title,
+                    body=body,
+                    data=notification_data
+                )
+                total_success += expo_result["success_count"]
+                
+                # Record history for Expo notifications
+                if expo_result["success_count"] > 0:
+                    self._record_notification_history_simple(
+                        db=db,
+                        user_id=user.id,
+                        notification_type=notification_type,
+                        title=title,
+                        body=body,
+                        data=data,
+                        success_count=expo_result["success_count"]
+                    )
+                
+                logger.info(f"Expo notification to user {user.id}: {expo_result['success_count']} success, {expo_result['failure_count']} failed")
+            
+            # Send via FCM for Firebase tokens (only if Firebase is ready)
+            if fcm_tokens and self.is_firebase_ready():
+                # Build and send message
+                message = messaging.MulticastMessage(
+                    tokens=fcm_tokens,
+                    notification=messaging.Notification(title=title, body=body),
+                    data={k: str(v) for k, v in notification_data.items()},  # FCM requires string values
+                    android=messaging.AndroidConfig(
+                        priority='high',
+                        notification=messaging.AndroidNotification(
+                            icon=getattr(settings, 'NOTIFICATION_DEFAULT_ICON', 'ic_notification'),
+                            color=getattr(settings, 'NOTIFICATION_DEFAULT_COLOR', '#E88B00'),
                             sound=getattr(settings, 'NOTIFICATION_DEFAULT_SOUND', 'default'),
-                            alert=messaging.ApsAlert(title=title, body=body),
+                            channel_id='hermespeed_filings'
                         ),
                     ),
-                ),
-            )
+                    apns=messaging.APNSConfig(
+                        payload=messaging.APNSPayload(
+                            aps=messaging.Aps(
+                                alert=messaging.ApsAlert(title=title, body=body),
+                                sound='default',
+                                badge=1,
+                            )
+                        )
+                    ),
+                )
+                
+                # Send multicast message
+                response = messaging.send_multicast(message)
+                total_success += response.success_count
+                
+                # Record history
+                self._record_notification_history(
+                    db=db,
+                    user_id=user.id,
+                    notification_type=notification_type,
+                    title=title,
+                    body=body,
+                    data=data,
+                    tokens=fcm_tokens,
+                    response=response
+                )
+                
+                # Handle failed tokens
+                if response.failure_count > 0:
+                    self._handle_failed_tokens(db, user, fcm_tokens, response)
+                
+                logger.info(f"FCM notification to user {user.id}: {response.success_count} success, {response.failure_count} failed")
             
-            # Send multicast message
-            response = messaging.send_multicast(message)
-            
-            # Record history
-            self._record_notification_history(
-                db=db,
-                user_id=user.id,
-                notification_type=notification_type,
-                title=title,
-                body=body,
-                data=data,
-                tokens=tokens,
-                response=response
-            )
-            
-            # Handle failed tokens
-            if response.failure_count > 0:
-                self._handle_failed_tokens(db, user, tokens, response)
-            
-            logger.info(f"Sent notification to user {user.id}: {response.success_count} success, {response.failure_count} failed")
-            return response.success_count
+            return total_success
             
         except Exception as e:
             logger.error(f"Error sending notification to user {user.id}: {e}")
@@ -255,6 +369,33 @@ class NotificationService:
         except Exception as e:
             logger.warning(f"Error parsing device tokens for user {user.id}: {e}")
             return []
+    
+    def _record_notification_history_simple(
+        self,
+        db: Session,
+        user_id: int,
+        notification_type: str,
+        title: str,
+        body: str,
+        data: Dict,
+        success_count: int
+    ):
+        """Record notification history for Expo notifications"""
+        try:
+            if success_count > 0:
+                history = NotificationHistory(
+                    user_id=user_id,
+                    notification_type=notification_type,
+                    title=title,
+                    body=body,
+                    data=data,
+                    status='sent',
+                    sent_at=datetime.utcnow()
+                )
+                db.add(history)
+                
+        except Exception as e:
+            logger.warning(f"Error recording notification history: {e}")
     
     def _record_notification_history(
         self,
@@ -392,17 +533,19 @@ class NotificationService:
         """
         Send test notification
         SIMPLIFIED: Clean test notification logic
+        UPDATED: Supports Expo tokens
         """
         if not body:
             body = f"Test notification sent at {datetime.utcnow().strftime('%H:%M:%S UTC')}"
         
         try:
-            if not self.is_firebase_ready():
-                logger.info("Firebase not configured, returning simulation message")
+            # Check if user has any tokens
+            tokens = self._get_user_device_tokens(user)
+            if not tokens:
                 return {
                     "success": False,
-                    "message": "Push notification service is not configured",
-                    "firebase_configured": False
+                    "message": "No active device tokens found",
+                    "firebase_configured": self.is_firebase_ready()
                 }
             
             # Send real test notification
@@ -426,8 +569,8 @@ class NotificationService:
             else:
                 return {
                     "success": False,
-                    "message": "No active device tokens found",
-                    "firebase_configured": True
+                    "message": "Failed to send notification",
+                    "firebase_configured": self.is_firebase_ready()
                 }
                 
         except Exception as e:

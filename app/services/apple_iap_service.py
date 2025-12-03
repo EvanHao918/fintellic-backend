@@ -438,9 +438,11 @@ class AppleIAPService:
         Returns:
             Whether product ID is valid
         """
+        # Monthly only - no yearly subscription
         valid_product_ids = [
             settings.APPLE_MONTHLY_PRODUCT_ID,
-            settings.APPLE_YEARLY_PRODUCT_ID
+            settings.APPLE_MONTHLY_PRODUCT_ID_DISCOUNTED,
+            settings.APPLE_MONTHLY_PRODUCT_ID_STANDARD
         ]
         return product_id in valid_product_ids
 

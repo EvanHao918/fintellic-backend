@@ -348,16 +348,11 @@ class Settings(BaseSettings):
             "standard": self.APPLE_MONTHLY_PRODUCT_ID_STANDARD,
             "active": self.APPLE_MONTHLY_PRODUCT_ID  # Current active based on flag
         }
-        return {
-            "monthly": self.APPLE_MONTHLY_PRODUCT_ID,
-            "yearly": self.APPLE_YEARLY_PRODUCT_ID
-        }
     
     def get_google_product_ids(self) -> dict:
-        """Get Google product IDs"""
+        """Get Google product IDs - disabled, iOS only"""
         return {
-            "monthly": self.GOOGLE_MONTHLY_PRODUCT_ID,
-            "yearly": self.GOOGLE_YEARLY_PRODUCT_ID
+            "monthly": self.GOOGLE_MONTHLY_PRODUCT_ID
         }
     
     def get_webhook_urls(self) -> dict:

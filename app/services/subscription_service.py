@@ -235,7 +235,7 @@ class SubscriptionService:
             
             # Set pricing tier
             user.pricing_tier = pricing_info.pricing_tier
-            user.monthly_price = pricing_info.monthly_price
+            user.subscription_price = pricing_info.monthly_price  # Use subscription_price instead of monthly_price
             user.is_early_bird = pricing_info.is_early_bird
             
             db.commit()
@@ -444,7 +444,7 @@ class SubscriptionService:
             
             # Set pricing tier
             user.pricing_tier = PricingTier.EARLY_BIRD if settings.is_discounted_pricing else PricingTier.STANDARD
-            user.monthly_price = settings.current_monthly_price
+            user.subscription_price = settings.current_monthly_price  # Use subscription_price instead of monthly_price
             user.is_early_bird = settings.is_discounted_pricing
             
             # Record transaction ID

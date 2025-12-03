@@ -276,15 +276,11 @@ class Settings(BaseSettings):
         if not self.APPLE_SHARED_SECRET:
             missing_configs.append("APPLE_SHARED_SECRET")
         
-        if not any([
-            self.GOOGLE_SERVICE_ACCOUNT_KEY_PATH,
-            self.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64,
-            self.GOOGLE_SERVICE_ACCOUNT_KEY_JSON
-        ]):
-            missing_configs.append("GOOGLE_SERVICE_ACCOUNT_KEY")
+        # Google Play check removed - iOS only app
         
-        if not self.WEBHOOK_BASE_URL:
-            missing_configs.append("WEBHOOK_BASE_URL")
+        # Webhook URL is optional for now
+        # if not self.WEBHOOK_BASE_URL:
+        #     missing_configs.append("WEBHOOK_BASE_URL")
         
         if missing_configs:
             import logging

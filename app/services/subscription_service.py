@@ -231,7 +231,7 @@ class SubscriptionService:
             user.payment_method = subscription_data.payment_method.value if subscription_data.payment_method else None
             user.last_payment_date = current_time
             user.last_payment_amount = price
-            user.total_payment_amount = (user.total_payment_amount or 0) + price
+            user.total_payment_amount = (user.total_payment_amount or Decimal('0')) + Decimal(str(price))
             
             # Set pricing tier
             user.pricing_tier = pricing_info.pricing_tier
@@ -440,7 +440,7 @@ class SubscriptionService:
             user.apple_subscription_id = receipt_info.get("original_transaction_id")
             user.last_payment_date = current_time
             user.last_payment_amount = price
-            user.total_payment_amount = (user.total_payment_amount or 0) + price
+            user.total_payment_amount = (user.total_payment_amount or Decimal('0')) + Decimal(str(price))
             
             # Set pricing tier
             user.pricing_tier = PricingTier.EARLY_BIRD if settings.is_discounted_pricing else PricingTier.STANDARD
@@ -567,7 +567,7 @@ class SubscriptionService:
             current_time = SubscriptionService._get_utc_now()
             user.last_payment_date = current_time
             user.last_payment_amount = user.subscription_price
-            user.total_payment_amount = (user.total_payment_amount or 0) + user.subscription_price
+            user.total_payment_amount = (user.total_payment_amount or Decimal('0')) + Decimal(str(user.subscription_price or 0))
             
             db.commit()
             logger.info(f"Apple subscription renewed for user {user.id}")

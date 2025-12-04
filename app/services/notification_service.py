@@ -170,6 +170,7 @@ class NotificationService:
         """
         Send filing release notification for core filing types only
         OPTIMIZED: Simplified content generation, unified token retrieval
+        UPDATED: Deduplicate by device token to avoid duplicate notifications on same device
         """
         # For Expo tokens, we don't need Firebase to be ready
         # if not self.is_firebase_ready():
@@ -182,12 +183,15 @@ class NotificationService:
             ticker = filing.company.ticker
             filing_type = filing.filing_type.value if hasattr(filing.filing_type, 'value') else str(filing.filing_type)
             
+            # Handle None ticker for IPO companies - use company name abbreviation or "IPO"
+            display_ticker = ticker if ticker else (company_name.split()[0][:6].upper() if company_name else "IPO")
+            
             # SIMPLIFIED: Core filing types only
             title_map = {
-                '10-K': f"📊 {ticker} Annual Report Filed",
-                '10-Q': f"📈 {ticker} Quarterly Report Filed",
-                '8-K': f"📢 {ticker} Major Event Filed",
-                'S-1': f"🚀 {ticker} IPO Filing Submitted"
+                '10-K': f"📊 {display_ticker} Annual Report Filed",
+                '10-Q': f"📈 {display_ticker} Quarterly Report Filed",
+                '8-K': f"📢 {display_ticker} Major Event Filed",
+                'S-1': f"🚀 {display_ticker} IPO Filing Submitted"
             }
             
             body_map = {
@@ -197,7 +201,7 @@ class NotificationService:
                 'S-1': f"{company_name} submitted IPO registration documents"
             }
             
-            title = title_map.get(filing_type, f"📰 {ticker} Filed {filing_type}")
+            title = title_map.get(filing_type, f"📰 {display_ticker} Filed {filing_type}")
             body = body_map.get(filing_type, f"{company_name} published new SEC filing")
             
             # Get users who need notification
@@ -207,22 +211,43 @@ class NotificationService:
                 logger.info(f"No users to notify for filing {filing.id}")
                 return 0
             
-            # Send notifications
-            success_count = 0
+            # OPTIMIZATION: Deduplicate by device token
+            # Collect all tokens and map them to one user (first user found with that token)
+            token_to_user = {}  # token -> user
             for user in users_to_notify:
+                tokens = self._get_user_device_tokens(user)
+                for token in tokens:
+                    if token not in token_to_user:
+                        token_to_user[token] = user
+            
+            logger.info(f"Deduplication: {len(users_to_notify)} users -> {len(token_to_user)} unique device tokens")
+            
+            # Group tokens back by user (use first user for each unique token)
+            unique_users_with_tokens = {}  # user_id -> (user, [tokens])
+            for token, user in token_to_user.items():
+                if user.id not in unique_users_with_tokens:
+                    unique_users_with_tokens[user.id] = (user, [])
+                unique_users_with_tokens[user.id][1].append(token)
+            
+            # Send notifications (one per unique device)
+            success_count = 0
+            notification_data = {
+                'filing_id': str(filing.id),
+                'ticker': display_ticker,
+                'filing_type': filing_type,
+                'company_id': str(filing.company_id)
+            }
+            
+            for user_id, (user, tokens) in unique_users_with_tokens.items():
                 try:
-                    notifications_sent = self._send_notification_to_user(
+                    notifications_sent = self._send_notification_to_tokens(
                         db=db,
                         user=user,
+                        tokens=tokens,
                         title=title,
                         body=body,
                         notification_type=notification_type,
-                        data={
-                            'filing_id': str(filing.id),
-                            'ticker': ticker,
-                            'filing_type': filing_type,
-                            'company_id': str(filing.company_id)
-                        }
+                        data=notification_data
                     )
                     success_count += notifications_sent
                     
@@ -236,6 +261,110 @@ class NotificationService:
             
         except Exception as e:
             logger.error(f"Error sending filing notification: {e}")
+            return 0
+    
+    def _send_notification_to_tokens(
+        self,
+        db: Session,
+        user: User,
+        tokens: List[str],
+        title: str,
+        body: str,
+        notification_type: str,
+        data: Dict
+    ) -> int:
+        """
+        Send notification to specific tokens (used for deduplicated sending)
+        """
+        try:
+            # Separate Expo tokens and FCM tokens
+            expo_tokens = [t for t in tokens if self._is_expo_token(t)]
+            fcm_tokens = [t for t in tokens if not self._is_expo_token(t)]
+            
+            total_success = 0
+            notification_data = {
+                **data,
+                'type': notification_type,
+                'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+            # Send via Expo Push API for Expo tokens
+            if expo_tokens:
+                expo_result = self._send_expo_notifications(
+                    tokens=expo_tokens,
+                    title=title,
+                    body=body,
+                    data=notification_data
+                )
+                total_success += expo_result["success_count"]
+                
+                # Record history for Expo notifications
+                if expo_result["success_count"] > 0:
+                    self._record_notification_history_simple(
+                        db=db,
+                        user_id=user.id,
+                        notification_type=notification_type,
+                        title=title,
+                        body=body,
+                        data=data,
+                        success_count=expo_result["success_count"]
+                    )
+                
+                logger.info(f"Expo notification to user {user.id}: {expo_result['success_count']} success, {expo_result['failure_count']} failed")
+            
+            # Send via FCM for Firebase tokens (only if Firebase is ready)
+            if fcm_tokens and self.is_firebase_ready():
+                # Build and send message
+                message = messaging.MulticastMessage(
+                    tokens=fcm_tokens,
+                    notification=messaging.Notification(title=title, body=body),
+                    data={k: str(v) for k, v in notification_data.items()},
+                    android=messaging.AndroidConfig(
+                        priority='high',
+                        notification=messaging.AndroidNotification(
+                            icon=getattr(settings, 'NOTIFICATION_DEFAULT_ICON', 'ic_notification'),
+                            color=getattr(settings, 'NOTIFICATION_DEFAULT_COLOR', '#E88B00'),
+                            sound=getattr(settings, 'NOTIFICATION_DEFAULT_SOUND', 'default'),
+                            channel_id='hermespeed_filings'
+                        ),
+                    ),
+                    apns=messaging.APNSConfig(
+                        payload=messaging.APNSPayload(
+                            aps=messaging.Aps(
+                                alert=messaging.ApsAlert(title=title, body=body),
+                                sound='default',
+                                badge=1,
+                            )
+                        )
+                    ),
+                )
+                
+                response = messaging.send_multicast(message)
+                total_success += response.success_count
+                
+                # Record history
+                self._record_notification_history(
+                    db=db,
+                    user_id=user.id,
+                    notification_type=notification_type,
+                    title=title,
+                    body=body,
+                    data=data,
+                    tokens=fcm_tokens,
+                    response=response
+                )
+                
+                # Handle failed tokens
+                if response.failure_count > 0:
+                    self._handle_failed_tokens(db, user, fcm_tokens, response)
+                
+                logger.info(f"FCM notification to user {user.id}: {response.success_count} success, {response.failure_count} failed")
+            
+            return total_success
+            
+        except Exception as e:
+            logger.error(f"Error sending notification to tokens: {e}")
             return 0
     
     def _send_notification_to_user(

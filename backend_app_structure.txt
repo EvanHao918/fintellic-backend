@@ -1,20 +1,18 @@
 app/
 ├── __init__.py
-├── __pycache__ 2
 ├── api
 │   ├── __init__.py
-│   ├── __pycache__ 2
 │   ├── api.py
 │   ├── dependencies
 │   │   └── __init__.py
 │   ├── deps.py
 │   └── endpoints
 │       ├── __init__.py
-│       ├── __pycache__ 2
 │       ├── auth.py
 │       ├── comments.py
 │       ├── companies.py
 │       ├── earnings.py
+│       ├── external.py
 │       ├── filings.py
 │       ├── filings.py.backup
 │       ├── interactions.py
@@ -26,7 +24,6 @@ app/
 │       └── watchlist.py
 ├── core
 │   ├── __init__.py
-│   ├── __pycache__ 2
 │   ├── cache.py
 │   ├── celery_app.py
 │   ├── config.py
@@ -34,7 +31,6 @@ app/
 │   └── security.py
 ├── crud
 │   ├── __init__.py
-│   ├── __pycache__ 2
 │   └── user.py
 ├── data
 │   ├── fetch_nasdaq100.py
@@ -43,7 +39,6 @@ app/
 ├── main.py
 ├── models
 │   ├── __init__.py
-│   ├── __pycache__ 2
 │   ├── base.py
 │   ├── comment.py
 │   ├── comment_vote.py
@@ -61,7 +56,6 @@ app/
 │   └── watchlist.py
 ├── schemas
 │   ├── __init__.py
-│   ├── __pycache__ 2
 │   ├── auth.py
 │   ├── comment.py
 │   ├── company.py
@@ -73,7 +67,6 @@ app/
 │   └── watchlist.py
 ├── services
 │   ├── __init__.py
-│   ├── __pycache__ 2
 │   ├── ai_processor.py
 │   ├── ai_processor.py.backup
 │   ├── apple_iap_service.py
@@ -93,9 +86,8 @@ app/
 │   └── view_tracking.py
 ├── tasks
 │   ├── __init__.py
-│   ├── __pycache__ 2
 │   └── filing_tasks.py
 └── utils
     └── __init__.py
 
-21 directories, 78 files
+12 directories, 79 files

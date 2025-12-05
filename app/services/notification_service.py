@@ -202,7 +202,15 @@ class NotificationService:
             }
             
             title = title_map.get(filing_type, f"📰 {display_ticker} Filed {filing_type}")
-            body = body_map.get(filing_type, f"{company_name} published new SEC filing")
+            
+            # Use AI-generated summary as notification body if available
+            # This gives users a preview of the actual content, creating natural interest
+            default_body = body_map.get(filing_type, f"{company_name} published new SEC filing")
+            
+            if filing.unified_feed_summary:
+                body = filing.unified_feed_summary
+            else:
+                body = default_body
             
             # Get users who need notification
             users_to_notify = self._get_users_for_filing_notification(db, filing)

@@ -107,7 +107,16 @@ class Settings(BaseSettings):
     ENABLE_PASSWORD_RESET: bool = True
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24  # Verification link expiry
     
-    # SMTP Configuration
+    # ==================== RESEND EMAIL SERVICE (Recommended) ====================
+    # Resend API - Modern email API service (https://resend.com)
+    RESEND_API_KEY: Optional[str] = None  # re_xxxxxxxxxxxx
+    RESEND_FROM_EMAIL: str = "onboarding@resend.dev"  # Verified sender email
+    RESEND_FROM_NAME: str = "AllSight"  # Sender display name
+    
+    # Email provider selection: "resend" (recommended) or "smtp" (legacy)
+    EMAIL_PROVIDER: str = "resend"
+    
+    # ==================== SMTP Configuration (Legacy/Backup) ====================
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = None
@@ -115,7 +124,7 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     
     # Email settings
-    EMAIL_FROM_NAME: str = "HermeSpeed"
+    EMAIL_FROM_NAME: str = "AllSight"
     EMAIL_FROM_ADDRESS: Optional[str] = None
     PASSWORD_RESET_EXPIRE_HOURS: int = 1
     
@@ -319,8 +328,21 @@ class Settings(BaseSettings):
     
     @property
     def email_from_address(self) -> str:
-        """Get email sender address"""
-        return self.EMAIL_FROM_ADDRESS or self.SMTP_USER or "noreply@hermespeed.com"
+        """Get email sender address based on provider"""
+        if self.EMAIL_PROVIDER == "resend" and self.RESEND_FROM_EMAIL:
+            return self.RESEND_FROM_EMAIL
+        return self.EMAIL_FROM_ADDRESS or self.SMTP_USER or "noreply@allsight.com"
+    
+    @property
+    def email_from_display(self) -> str:
+        """Get formatted email sender with display name"""
+        name = self.RESEND_FROM_NAME if self.EMAIL_PROVIDER == "resend" else self.EMAIL_FROM_NAME
+        return f"{name} <{self.email_from_address}>"
+    
+    @property
+    def is_resend_configured(self) -> bool:
+        """Check if Resend is properly configured"""
+        return bool(self.RESEND_API_KEY and self.RESEND_FROM_EMAIL)
     
     def get_pricing_info(self) -> dict:
         """Get current pricing information - Monthly only"""

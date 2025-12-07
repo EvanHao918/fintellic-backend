@@ -100,6 +100,79 @@ class PasswordResetResponse(BaseModel):
 # ================================================================
 
 
+# ==================== SOCIAL AUTH SCHEMAS ====================
+class AppleSignInRequest(BaseModel):
+    """Apple Sign In 请求"""
+    identity_token: str = Field(..., description="Apple identityToken (JWT)")
+    authorization_code: Optional[str] = Field(None, description="Apple authorization code")
+    full_name: Optional[str] = Field(None, description="用户全名（仅首次登录时提供）")
+    given_name: Optional[str] = Field(None, description="名")
+    family_name: Optional[str] = Field(None, description="姓")
+    device_id: Optional[str] = None
+    device_type: Optional[str] = "ios"
+
+
+class GoogleSignInRequest(BaseModel):
+    """Google Sign In 请求"""
+    id_token: str = Field(..., description="Google idToken (JWT)")
+    access_token: Optional[str] = Field(None, description="Google access token")
+    device_id: Optional[str] = None
+    device_type: Optional[str] = None  # ios, android, web
+
+
+class SocialAuthResponse(BaseModel):
+    """社交登录统一响应"""
+    # 用户信息
+    id: int
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    username: Optional[str] = None
+    
+    # Token
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    
+    # 账户状态
+    is_new_user: bool = False  # 是否新注册用户
+    email_verified: bool = True  # 社交登录默认已验证
+    
+    # 订阅信息（与 RegisterResponse 一致）
+    tier: str
+    is_early_bird: bool
+    pricing_tier: Optional[str] = None
+    user_sequence_number: Optional[int] = None
+    monthly_price: float
+    yearly_price: float
+    early_bird_slots_remaining: Optional[int] = None
+    
+    # 社交账号绑定状态
+    linked_providers: List[str] = []  # ["apple", "google"]
+    
+    class Config:
+        from_attributes = True
+
+
+class LinkSocialAccountRequest(BaseModel):
+    """绑定社交账号请求（已登录用户添加社交登录方式）"""
+    provider: str = Field(..., pattern="^(apple|google|linkedin)$")
+    token: str = Field(..., description="对应平台的 token")
+    
+
+class UnlinkSocialAccountRequest(BaseModel):
+    """解绑社交账号请求"""
+    provider: str = Field(..., pattern="^(apple|google|linkedin)$")
+
+
+class SocialAccountStatus(BaseModel):
+    """社交账号绑定状态"""
+    apple_linked: bool = False
+    google_linked: bool = False
+    linkedin_linked: bool = False
+    can_unlink: bool = True  # 如果只有社交登录且无密码，不能解绑最后一个
+# ================================================================
+
+
 # Refresh token
 class RefreshTokenRequest(BaseModel):
     refresh_token: str

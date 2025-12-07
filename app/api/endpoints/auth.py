@@ -16,6 +16,13 @@ from app.core.security import (
     verify_token
 )
 from app.crud.user import crud_user
+from app.crud.social_auth import (
+    get_user_by_social_id,
+    get_or_create_social_user,
+    get_linked_providers,
+    link_social_account,
+    unlink_social_account,
+)
 from app.schemas.auth import (
     Token, 
     RegisterRequest, 
@@ -25,11 +32,19 @@ from app.schemas.auth import (
     PasswordResetConfirm,
     PasswordResetResponse,
     SecurityInfoResponse,
-    AuthErrorResponse
+    AuthErrorResponse,
+    # Social auth schemas
+    AppleSignInRequest,
+    GoogleSignInRequest,
+    SocialAuthResponse,
+    LinkSocialAccountRequest,
+    UnlinkSocialAccountRequest,
+    SocialAccountStatus,
 )
 from app.schemas.user import UserCreate, UserDetailResponse
 from app.models.user import User, PricingTier
 from app.services.email_service import email_service
+from app.services.social_auth_service import social_auth_service
 
 router = APIRouter()
 
@@ -437,3 +452,273 @@ def get_early_bird_status(db: Session = Depends(get_db)) -> Any:
         "standard_monthly_price": settings.STANDARD_MONTHLY_PRICE,
         "standard_yearly_price": settings.STANDARD_YEARLY_PRICE
     }
+
+
+# ==================== SOCIAL AUTH ENDPOINTS ====================
+
+def build_social_auth_response(
+    user: User, 
+    tokens: dict, 
+    is_new_user: bool = False
+) -> SocialAuthResponse:
+    """构建社交登录响应"""
+    return SocialAuthResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        username=user.username,
+        access_token=tokens["access_token"],
+        refresh_token=tokens["refresh_token"],
+        token_type="bearer",
+        is_new_user=is_new_user,
+        email_verified=user.is_verified,
+        tier=user.tier.value if hasattr(user.tier, 'value') else str(user.tier),
+        is_early_bird=user.is_early_bird or False,
+        pricing_tier=user.pricing_tier.value if user.pricing_tier and hasattr(user.pricing_tier, 'value') else user.pricing_tier,
+        user_sequence_number=user.user_sequence_number,
+        monthly_price=user.monthly_price,
+        yearly_price=user.yearly_price,
+        early_bird_slots_remaining=0,
+        linked_providers=get_linked_providers(user),
+    )
+
+
+@router.post("/apple", response_model=SocialAuthResponse)
+async def apple_sign_in(
+    *,
+    db: Session = Depends(get_db),
+    sign_in_request: AppleSignInRequest
+) -> Any:
+    """
+    Apple Sign In
+    
+    Flow:
+    1. 前端使用 expo-apple-authentication 获取 identityToken
+    2. 后端验证 token 并提取用户信息
+    3. 查找或创建用户
+    4. 返回 access_token 和用户信息
+    """
+    # 1. 验证 Apple identity token
+    full_name = None
+    if sign_in_request.full_name:
+        full_name = sign_in_request.full_name
+    elif sign_in_request.given_name or sign_in_request.family_name:
+        parts = [sign_in_request.given_name, sign_in_request.family_name]
+        full_name = " ".join(filter(None, parts))
+    
+    success, user_info, error = await social_auth_service.verify_apple_token(
+        identity_token=sign_in_request.identity_token,
+        full_name=full_name
+    )
+    
+    if not success or not user_info:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Apple authentication failed: {error}"
+        )
+    
+    # 2. 获取或创建用户
+    user, is_new_user = get_or_create_social_user(
+        db=db,
+        provider="apple",
+        social_id=user_info.user_id,
+        email=user_info.email,
+        full_name=user_info.full_name or full_name,
+        email_verified=user_info.email_verified,
+    )
+    
+    # 3. 检查用户是否被禁用
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled"
+        )
+    
+    # 4. 更新最后登录时间
+    crud_user.update_last_login(db, user=user)
+    
+    # 5. 创建 tokens
+    tokens = create_tokens(user.id, sign_in_request.device_id)
+    
+    # 6. 返回响应
+    return build_social_auth_response(user, tokens, is_new_user)
+
+
+@router.post("/google", response_model=SocialAuthResponse)
+async def google_sign_in(
+    *,
+    db: Session = Depends(get_db),
+    sign_in_request: GoogleSignInRequest
+) -> Any:
+    """
+    Google Sign In
+    
+    Flow:
+    1. 前端使用 expo-auth-session 或 @react-native-google-signin 获取 idToken
+    2. 后端验证 token 并提取用户信息
+    3. 查找或创建用户
+    4. 返回 access_token 和用户信息
+    """
+    # 1. 验证 Google id token
+    success, user_info, error = await social_auth_service.verify_google_token(
+        id_token=sign_in_request.id_token
+    )
+    
+    if not success or not user_info:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Google authentication failed: {error}"
+        )
+    
+    # 2. 获取或创建用户
+    user, is_new_user = get_or_create_social_user(
+        db=db,
+        provider="google",
+        social_id=user_info.user_id,
+        email=user_info.email,
+        full_name=user_info.full_name,
+        email_verified=user_info.email_verified,
+    )
+    
+    # 3. 检查用户是否被禁用
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled"
+        )
+    
+    # 4. 更新最后登录时间
+    crud_user.update_last_login(db, user=user)
+    
+    # 5. 创建 tokens
+    tokens = create_tokens(user.id, sign_in_request.device_id)
+    
+    # 6. 返回响应
+    return build_social_auth_response(user, tokens, is_new_user)
+
+
+@router.get("/social-accounts", response_model=SocialAccountStatus)
+def get_social_account_status(
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    获取当前用户的社交账号绑定状态
+    """
+    linked = get_linked_providers(current_user)
+    has_password = bool(current_user.hashed_password)
+    
+    # 如果只有一个登录方式且没有密码，不能解绑
+    can_unlink = len(linked) > 1 or has_password
+    
+    return SocialAccountStatus(
+        apple_linked="apple" in linked,
+        google_linked="google" in linked,
+        linkedin_linked="linkedin" in linked,
+        can_unlink=can_unlink,
+    )
+
+
+@router.post("/link-social", response_model=SocialAccountStatus)
+async def link_social_account_endpoint(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    link_request: LinkSocialAccountRequest
+) -> Any:
+    """
+    为已登录用户绑定社交账号
+    
+    场景：用户用邮箱注册后，想添加 Apple/Google 登录方式
+    """
+    provider = link_request.provider
+    token = link_request.token
+    
+    # 验证 token 并获取社交账号 ID
+    if provider == "apple":
+        success, user_info, error = await social_auth_service.verify_apple_token(token)
+    elif provider == "google":
+        success, user_info, error = await social_auth_service.verify_google_token(token)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported provider: {provider}"
+        )
+    
+    if not success or not user_info:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Token verification failed: {error}"
+        )
+    
+    # 检查该社交账号是否已被其他用户绑定
+    existing_user = get_user_by_social_id(db, provider, user_info.user_id)
+    if existing_user and existing_user.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"This {provider} account is already linked to another user"
+        )
+    
+    # 绑定社交账号
+    link_social_account(db, current_user, provider, user_info.user_id)
+    
+    # 返回更新后的状态
+    linked = get_linked_providers(current_user)
+    has_password = bool(current_user.hashed_password)
+    
+    return SocialAccountStatus(
+        apple_linked="apple" in linked,
+        google_linked="google" in linked,
+        linkedin_linked="linkedin" in linked,
+        can_unlink=len(linked) > 1 or has_password,
+    )
+
+
+@router.post("/unlink-social", response_model=SocialAccountStatus)
+def unlink_social_account_endpoint(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    unlink_request: UnlinkSocialAccountRequest
+) -> Any:
+    """
+    解绑社交账号
+    
+    注意：如果用户没有密码且只有一个社交登录方式，不能解绑
+    """
+    provider = unlink_request.provider
+    
+    # 检查是否可以解绑
+    linked = get_linked_providers(current_user)
+    has_password = bool(current_user.hashed_password)
+    
+    if provider not in linked:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{provider} account is not linked"
+        )
+    
+    if len(linked) <= 1 and not has_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot unlink the only login method. Please set a password first."
+        )
+    
+    # 解绑
+    success = unlink_social_account(db, current_user, provider)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to unlink account"
+        )
+    
+    # 返回更新后的状态
+    linked = get_linked_providers(current_user)
+    
+    return SocialAccountStatus(
+        apple_linked="apple" in linked,
+        google_linked="google" in linked,
+        linkedin_linked="linkedin" in linked,
+        can_unlink=len(linked) > 1 or has_password,
+    )
+
+# ================================================================

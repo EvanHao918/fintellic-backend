@@ -76,9 +76,34 @@ def create_user_from_social(
     import secrets
     placeholder_password = secrets.token_urlsafe(32)
     
+    # 生成 username
+    username = None
+    if full_name:
+        # 从全名生成 username (如 "John Doe" -> "john_doe")
+        username = full_name.lower().replace(' ', '_')
+        # 移除非法字符，只保留字母、数字、下划线
+        import re
+        username = re.sub(r'[^a-z0-9_]', '', username)
+    
+    # 如果没有 full_name，从邮箱生成 username
+    if not username and email:
+        username = email.split('@')[0]
+        import re
+        username = re.sub(r'[^a-z0-9_]', '', username.lower())
+    
+    # 确保 username 唯一
+    if username:
+        from app.crud.user import crud_user
+        base_username = username
+        counter = 1
+        while crud_user.get_by_username(db, username):
+            username = f"{base_username}_{counter}"
+            counter += 1
+    
     user = User(
         email=email,
-        full_name=full_name,
+        full_name=full_name if full_name else "User",
+        username=username,
         hashed_password=get_password_hash(placeholder_password),
         is_verified=email_verified,
         tier="FREE",

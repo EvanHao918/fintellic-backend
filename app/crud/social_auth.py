@@ -197,8 +197,8 @@ def get_or_create_social_user(
     
     # 2. 如果有邮箱，通过邮箱查找
     if email:
-        from app.crud.user import get_user_by_email  # 假设这个方法已存在
-        user = get_user_by_email(db, email)
+        from app.crud.user import crud_user
+        user = crud_user.get_by_email(db, email)
         if user:
             # 用户存在但未绑定此社交账号，自动绑定
             link_social_account(db, user, provider, social_id)

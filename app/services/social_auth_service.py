@@ -370,6 +370,43 @@ class GoogleAuthService:
         except Exception as e:
             logger.error(f"❌ Google token verification (simple) error: {e}")
             return False, None, f"Verification failed: {str(e)}"
+    
+    @classmethod
+    async def verify_access_token(cls, access_token: str) -> Tuple[bool, Optional[SocialUserInfo], Optional[str]]:
+        """
+        通过 accessToken 获取用户信息（用于 expo-auth-session）
+        
+        这个方法使用 Google UserInfo API 获取用户信息
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://www.googleapis.com/userinfo/v2/me",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=10.0
+                )
+                
+                if response.status_code != 200:
+                    return False, None, f"Failed to get user info: {response.text}"
+                
+                data = response.json()
+                
+                user_info = SocialUserInfo(
+                    provider="google",
+                    user_id=data.get("id"),
+                    email=data.get("email"),
+                    email_verified=data.get("verified_email", False),
+                    full_name=data.get("name"),
+                    given_name=data.get("given_name"),
+                    family_name=data.get("family_name"),
+                )
+                
+                logger.info(f"✅ Google access token verified for user: {user_info.user_id[:8]}...")
+                return True, user_info, None
+                
+        except Exception as e:
+            logger.error(f"❌ Google access token verification error: {e}")
+            return False, None, f"Verification failed: {str(e)}"
 
 
 # ==================== 统一入口 ====================
@@ -389,8 +426,15 @@ class SocialAuthService:
     async def verify_google_token(
         id_token: str
     ) -> Tuple[bool, Optional[SocialUserInfo], Optional[str]]:
-        """验证 Google Sign In token"""
+        """验证 Google Sign In id_token (JWT)"""
         return await GoogleAuthService.verify_id_token(id_token)
+    
+    @staticmethod
+    async def verify_google_access_token(
+        access_token: str
+    ) -> Tuple[bool, Optional[SocialUserInfo], Optional[str]]:
+        """验证 Google Sign In access_token（用于 expo-auth-session）"""
+        return await GoogleAuthService.verify_access_token(access_token)
 
 
 # 创建全局实例

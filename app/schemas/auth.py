@@ -114,8 +114,8 @@ class AppleSignInRequest(BaseModel):
 
 class GoogleSignInRequest(BaseModel):
     """Google Sign In 请求"""
-    id_token: str = Field(..., description="Google idToken (JWT)")
-    access_token: Optional[str] = Field(None, description="Google access token")
+    id_token: Optional[str] = Field(None, description="Google idToken (JWT) - from @react-native-google-signin")
+    access_token: Optional[str] = Field(None, description="Google access token - from expo-auth-session")
     device_id: Optional[str] = None
     device_type: Optional[str] = None  # ios, android, web
 

@@ -554,15 +554,33 @@ async def google_sign_in(
     Google Sign In
     
     Flow:
-    1. 前端使用 expo-auth-session 或 @react-native-google-signin 获取 idToken
+    1. 前端使用 expo-auth-session 或 @react-native-google-signin 获取 token
     2. 后端验证 token 并提取用户信息
     3. 查找或创建用户
     4. 返回 access_token 和用户信息
+    
+    支持两种验证方式：
+    - id_token: JWT token (from @react-native-google-signin)
+    - access_token: OAuth access token (from expo-auth-session)
     """
-    # 1. 验证 Google id token
-    success, user_info, error = await social_auth_service.verify_google_token(
-        id_token=sign_in_request.id_token
-    )
+    success = False
+    user_info = None
+    error = None
+    
+    # 1. 验证 Google token（优先使用 id_token，否则使用 access_token）
+    if sign_in_request.id_token:
+        success, user_info, error = await social_auth_service.verify_google_token(
+            id_token=sign_in_request.id_token
+        )
+    elif sign_in_request.access_token:
+        success, user_info, error = await social_auth_service.verify_google_access_token(
+            access_token=sign_in_request.access_token
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either id_token or access_token is required"
+        )
     
     if not success or not user_info:
         raise HTTPException(

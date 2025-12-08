@@ -134,8 +134,10 @@ class AppleAuthService:
             # 4. 验证并解码 token
             # 允许的 audience 包括 Bundle ID
             valid_audiences = [settings.APPLE_BUNDLE_ID]
-            if settings.APPLE_SERVICE_ID:
-                valid_audiences.append(settings.APPLE_SERVICE_ID)
+            # APPLE_SERVICE_ID 是可选的（用于 web 登录）
+            apple_service_id = getattr(settings, 'APPLE_SERVICE_ID', None)
+            if apple_service_id:
+                valid_audiences.append(apple_service_id)
             
             decoded = jwt.decode(
                 identity_token,

@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # ==================== APPLE IN-APP PURCHASE ====================
     # Apple IAP Production Configuration
     APPLE_SHARED_SECRET: Optional[str] = None
-    APPLE_BUNDLE_ID: str = "com.allsight.app"
+    APPLE_BUNDLE_ID: str = "com.hermespeed.app"
     APPLE_USE_SANDBOX: bool = True  # Auto-detect based on environment
     
     # Apple IAP URLs

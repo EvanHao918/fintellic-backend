@@ -117,27 +117,29 @@ class TextExtractor:
         }
         
         # Key sections for each filing type
+        # NOTE: max_chars set to None to avoid truncation issues with large filings (e.g., ORCL iXBRL)
+        # The AI processor will handle token limits at the model level (GPT-4.1 supports 1M context)
         self.key_sections = {
             '10-K': {
-                'Item 1': {'pattern': r'Item\s*1[.\s]+Business', 'max_chars': 30000},
-                'Item 1A': {'pattern': r'Item\s*1A[.\s]+Risk\s+Factors', 'max_chars': 30000},
-                'Item 7': {'pattern': r'Item\s*7[.\s]+Management.{0,50}Discussion', 'max_chars': 40000},
-                'Item 8': {'pattern': r'Item\s*8[.\s]+Financial\s+Statements', 'max_chars': 50000},
+                'Item 1': {'pattern': r'Item\s*1[.\s]+Business', 'max_chars': None},
+                'Item 1A': {'pattern': r'Item\s*1A[.\s]+Risk\s+Factors', 'max_chars': None},
+                'Item 7': {'pattern': r'Item\s*7[.\s]+Management.{0,50}Discussion', 'max_chars': None},
+                'Item 8': {'pattern': r'Item\s*8[.\s]+Financial\s+Statements', 'max_chars': None},
             },
             '10-Q': {
-                'Financial Statements': {'pattern': r'(?:Condensed\s+)?(?:Consolidated\s+)?Financial\s+Statements', 'max_chars': 40000},
-                'MD&A': {'pattern': r'Management.{0,50}Discussion\s+and\s+Analysis', 'max_chars': 35000},
+                'Financial Statements': {'pattern': r'(?:Condensed\s+)?(?:Consolidated\s+)?Financial\s+Statements', 'max_chars': None},
+                'MD&A': {'pattern': r'Management.{0,50}Discussion\s+and\s+Analysis', 'max_chars': None},
             },
             '8-K': {
-                'Items': {'pattern': r'Item\s+\d+\.\d+', 'max_chars': 10000},
+                'Items': {'pattern': r'Item\s+\d+\.\d+', 'max_chars': None},
             },
             'S-1': {
-                'Prospectus Summary': {'pattern': r'(?:PROSPECTUS\s+)?SUMMARY', 'max_chars': 20000},
-                'Risk Factors': {'pattern': r'RISK\s+FACTORS', 'max_chars': 30000},
-                'Business': {'pattern': r'(?:OUR\s+)?BUSINESS|BUSINESS\s+OVERVIEW', 'max_chars': 25000},
-                'Use of Proceeds': {'pattern': r'USE\s+OF\s+PROCEEDS', 'max_chars': 10000},
-                'Management': {'pattern': r'MANAGEMENT|DIRECTORS\s+AND\s+EXECUTIVE', 'max_chars': 15000},
-                'Financial Statements': {'pattern': r'FINANCIAL\s+STATEMENTS', 'max_chars': 40000},
+                'Prospectus Summary': {'pattern': r'(?:PROSPECTUS\s+)?SUMMARY', 'max_chars': None},
+                'Risk Factors': {'pattern': r'RISK\s+FACTORS', 'max_chars': None},
+                'Business': {'pattern': r'(?:OUR\s+)?BUSINESS|BUSINESS\s+OVERVIEW', 'max_chars': None},
+                'Use of Proceeds': {'pattern': r'USE\s+OF\s+PROCEEDS', 'max_chars': None},
+                'Management': {'pattern': r'MANAGEMENT|DIRECTORS\s+AND\s+EXECUTIVE', 'max_chars': None},
+                'Financial Statements': {'pattern': r'FINANCIAL\s+STATEMENTS', 'max_chars': None},
             }
         }
         
@@ -1096,7 +1098,11 @@ class TextExtractor:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 start = match.start()
-                end = min(start + max_chars, len(text))
+                # If max_chars is None, use the full remaining text
+                if max_chars is None:
+                    end = len(text)
+                else:
+                    end = min(start + max_chars, len(text))
                 
                 # Find the next major section to avoid overrun
                 next_section = re.search(r'Item\s+\d+[A-Z]?[.\s]', text[start + 100:end])
@@ -1137,7 +1143,11 @@ class TextExtractor:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 start = match.start()
-                end = min(start + max_chars, len(text))
+                # If max_chars is None, use the full remaining text
+                if max_chars is None:
+                    end = len(text)
+                else:
+                    end = min(start + max_chars, len(text))
                 
                 # Find the next major section
                 next_section = re.search(r'(?:Part|PART|Item|ITEM)\s+[IVX\d]+', text[start + 100:end])

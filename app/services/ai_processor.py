@@ -224,8 +224,10 @@ class AIProcessor:
         
         self.encoding = self._initialize_tokenizer()
         
-        self.max_input_tokens = 100000
-        self.target_output_tokens = 3000
+        # GPT-4.1 supports 1M context window, set generous limit
+        # This ensures large filings (e.g., ORCL 3.77MB iXBRL) are not truncated
+        self.max_input_tokens = 500000
+        self.target_output_tokens = 4000
     
     def _initialize_tokenizer(self):
         """Robust tokenizer initialization with graceful fallbacks"""

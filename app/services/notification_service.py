@@ -90,6 +90,63 @@ class NotificationService:
         """Check if Firebase is ready"""
         return self.initialized and self.app is not None
     
+    def _get_8k_notification_title(self, filing, display_ticker: str) -> str:
+        """
+        Determine 8-K notification title based on event type
+        Breaking News: Unexpected/urgent events (executive changes, M&A, material contracts)
+        Major Announcement: Scheduled disclosures (Reg FD, financial updates, other items)
+        """
+        # Items that indicate Breaking News (突发性事件)
+        breaking_news_items = {
+            '1.01',  # Entry into Material Definitive Agreement
+            '1.02',  # Termination of Material Definitive Agreement
+            '1.03',  # Bankruptcy or Receivership
+            '2.01',  # Completion of Acquisition or Disposition of Assets
+            '2.04',  # Triggering Events That Accelerate or Increase Direct Financial Obligation
+            '2.05',  # Costs Associated with Exit or Disposal Activities
+            '2.06',  # Material Impairments
+            '4.01',  # Changes in Registrant's Certifying Accountant
+            '4.02',  # Non-Reliance on Previously Issued Financial Statements
+            '5.01',  # Changes in Control of Registrant
+            '5.02',  # Departure/Election of Directors or Principal Officers
+            '5.03',  # Amendments to Articles of Incorporation or Bylaws
+        }
+        
+        # Check event_items field
+        is_breaking_news = False
+        
+        if filing.event_items:
+            event_items = filing.event_items
+            if isinstance(event_items, str):
+                try:
+                    event_items = json.loads(event_items)
+                except:
+                    event_items = []
+            
+            if isinstance(event_items, list):
+                for item in event_items:
+                    # Extract item number (e.g., "Item 5.02" -> "5.02")
+                    item_str = str(item).replace('Item ', '').strip()
+                    if item_str in breaking_news_items:
+                        is_breaking_news = True
+                        break
+        
+        # Also check event_type as fallback
+        if not is_breaking_news and filing.event_type:
+            event_type_lower = filing.event_type.lower()
+            breaking_keywords = [
+                'acquisition', 'merger', 'executive', 'ceo', 'cfo', 
+                'director', 'departure', 'resignation', 'termination',
+                'bankruptcy', 'impairment', 'auditor'
+            ]
+            if any(keyword in event_type_lower for keyword in breaking_keywords):
+                is_breaking_news = True
+        
+        if is_breaking_news:
+            return f"⚡ {display_ticker} Breaking News"
+        else:
+            return f"⚡ {display_ticker} Major Announcement"
+    
     def _is_expo_token(self, token: str) -> bool:
         """Check if token is an Expo Push Token"""
         return token.startswith('ExponentPushToken[') or token.startswith('ExpoPushToken[')
@@ -186,13 +243,17 @@ class NotificationService:
             # Handle None ticker for IPO companies - use company name abbreviation or "IPO"
             display_ticker = ticker if ticker else (company_name.split()[0][:6].upper() if company_name else "IPO")
             
-            # SIMPLIFIED: Core filing types only
-            title_map = {
-                '10-K': f"📊 {display_ticker} Annual Report Filed",
-                '10-Q': f"📈 {display_ticker} Quarterly Report Filed",
-                '8-K': f"📢 {display_ticker} Major Event Filed",
-                'S-1': f"🚀 {display_ticker} IPO Filing Submitted"
-            }
+            # UPDATED: User-friendly titles with urgency
+            # 8-K: Determine if Breaking News or Major Announcement based on event_items
+            if filing_type == '8-K':
+                title = self._get_8k_notification_title(filing, display_ticker)
+            else:
+                title_map = {
+                    '10-K': f"📈 {display_ticker} Annual Report Just Dropped",
+                    '10-Q': f"📊 {display_ticker} Quarterly Results Just Dropped",
+                    'S-1': f"🚀 {display_ticker} IPO Filing Submitted"
+                }
+                title = title_map.get(filing_type, f"📰 {display_ticker} Filed {filing_type}")
             
             body_map = {
                 '10-K': f"{company_name} published their latest annual report",
@@ -200,8 +261,6 @@ class NotificationService:
                 '8-K': f"{company_name} filed a major event disclosure",
                 'S-1': f"{company_name} submitted IPO registration documents"
             }
-            
-            title = title_map.get(filing_type, f"📰 {display_ticker} Filed {filing_type}")
             
             # Use AI-generated summary as notification body if available
             # This gives users a preview of the actual content, creating natural interest

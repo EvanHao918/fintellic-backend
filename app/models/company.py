@@ -3,7 +3,7 @@
 Company model - Represents companies tracked in the system
 ENHANCED: Added IPO support, better categorization, and more company metadata
 FIXED: Added update_filings_ticker method to fix edgar_scanner error
-UPDATED: Added pe_ratio field for FMP API optimization project
+UPDATED: Replaced pe_ratio with analyst_consensus field for FMP API optimization project
 """
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float
 from sqlalchemy.sql import func
@@ -48,7 +48,7 @@ class Company(Base):
     
     # Financial metrics (可选，用于成熟公司)
     market_cap = Column(Float)  # 市值（百万美元）
-    pe_ratio = Column(Float)  # 新增：PE比率 - FMP API优化项目
+    analyst_consensus = Column(String(20))  # 分析师共识评级 (Strong Buy/Buy/Hold/Sell/Strong Sell)
     
     # Contact
     business_phone = Column(String(50))
@@ -136,17 +136,6 @@ class Company(Base):
         else:
             return "Enterprise (10K+)"
     
-    # 新增：格式化PE比率显示
-    @property
-    def pe_ratio_formatted(self):
-        """Format PE ratio for display"""
-        if self.pe_ratio is None:
-            return "N/A"
-        elif self.pe_ratio < 0:
-            return "N/A"  # 负PE通常不显示
-        else:
-            return f"{self.pe_ratio:.1f}"
-    
     # 新增：格式化市值显示
     @property
     def market_cap_formatted(self):
@@ -214,9 +203,9 @@ class Company(Base):
         if fmp_data.get('market_cap'):
             self.market_cap = fmp_data['market_cap'] / 1e6  # 转换为百万美元
         
-        # 更新PE比率
-        if fmp_data.get('pe_ratio') and fmp_data['pe_ratio'] > 0:
-            self.pe_ratio = fmp_data['pe_ratio']
+        # 更新分析师共识评级
+        if fmp_data.get('analyst_consensus'):
+            self.analyst_consensus = fmp_data['analyst_consensus']
         
         # 更新网站
         if fmp_data.get('website'):
@@ -266,9 +255,8 @@ class Company(Base):
             "employees": self.employees,
             "employee_size": self.employee_size_category,
             "market_cap": self.market_cap,
-            "market_cap_formatted": self.market_cap_formatted,  # 新增
-            "pe_ratio": self.pe_ratio,  # 新增
-            "pe_ratio_formatted": self.pe_ratio_formatted,  # 新增
+            "market_cap_formatted": self.market_cap_formatted,
+            "analyst_consensus": self.analyst_consensus,
             "exchange": self.exchange,
             "is_sp500": self.is_sp500,
             "is_nasdaq100": self.is_nasdaq100,

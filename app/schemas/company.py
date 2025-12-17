@@ -1,7 +1,7 @@
 # app/schemas/company.py
 """
 Company schemas for API requests and responses
-UPDATED: Added FMP data fields for the FMP API optimization project
+UPDATED: Replaced pe_ratio with analyst_consensus for FMP API optimization project
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -35,10 +35,9 @@ class CompanyDetail(CompanyBase):
     
     # UPDATED: Enhanced FMP data fields (core optimization)
     market_cap: Optional[float] = None
-    market_cap_formatted: Optional[str] = None  # NEW: Formatted display value
-    pe_ratio: Optional[float] = None            # NEW: PE ratio from FMP
-    pe_ratio_formatted: Optional[str] = None    # NEW: Formatted PE ratio
-    website: Optional[str] = None               # UPDATED: Now properly included
+    market_cap_formatted: Optional[str] = None  # Formatted display value
+    analyst_consensus: Optional[str] = None     # Analyst consensus rating (Strong Buy/Buy/Hold/Sell/Strong Sell)
+    website: Optional[str] = None               # Company website
     
     employees: Optional[int] = None
     description: Optional[str] = None
@@ -88,8 +87,7 @@ class CompanyProfile(BaseModel):
     # CORE OPTIMIZATION: FMP data now served from database
     market_cap: Optional[float] = None
     market_cap_formatted: Optional[str] = None
-    pe_ratio: Optional[float] = None
-    pe_ratio_formatted: Optional[str] = None
+    analyst_consensus: Optional[str] = None
     website: Optional[str] = None
     
     # Location and basic info
@@ -145,7 +143,7 @@ class CompanyFMPData(BaseModel):
     # Market data
     market_cap: Optional[float] = None
     market_cap_formatted: Optional[str] = None
-    pe_ratio: Optional[float] = None
+    analyst_consensus: Optional[str] = None
     price: Optional[float] = None
     beta: Optional[float] = None
     volume_avg: Optional[int] = None

@@ -369,6 +369,72 @@ class FMPService:
         logger.info(f"[FMP] No analyst estimates found for {ticker}")
         return None
     
+    def get_analyst_consensus(self, ticker: str) -> Optional[str]:
+        """
+        获取分析师共识评级
+        
+        调用 FMP Grades Summary API 获取评级分布，返回票数最多的共识评级
+        
+        Args:
+            ticker: Stock ticker
+            
+        Returns:
+            共识评级字符串: "Strong Buy", "Buy", "Hold", "Sell", "Strong Sell" 或 None
+        """
+        cache_key = f"fmp:analyst_consensus:{ticker}"
+        cached = cache.get(cache_key)
+        if cached:
+            logger.info(f"[FMP] Using cached analyst consensus for {ticker}")
+            return cached
+        
+        # 使用 stable API 版本的 grades-summary endpoint
+        url = f"https://financialmodelingprep.com/stable/grades-summary"
+        params = {
+            'symbol': ticker,
+            'apikey': self.api_key
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data and len(data) > 0:
+                    grades = data[0]
+                    
+                    # 提取各评级数量
+                    rating_counts = {
+                        'Strong Buy': grades.get('strongBuy', 0) or 0,
+                        'Buy': grades.get('buy', 0) or 0,
+                        'Hold': grades.get('hold', 0) or 0,
+                        'Sell': grades.get('sell', 0) or 0,
+                        'Strong Sell': grades.get('strongSell', 0) or 0
+                    }
+                    
+                    # 找出票数最多的评级
+                    max_rating = max(rating_counts, key=rating_counts.get)
+                    max_count = rating_counts[max_rating]
+                    
+                    if max_count > 0:
+                        # 缓存 24 小时（评级不会频繁变动）
+                        cache.set(cache_key, max_rating, ttl=86400)
+                        logger.info(f"[FMP] Analyst consensus for {ticker}: {max_rating} (from {sum(rating_counts.values())} ratings)")
+                        return max_rating
+                    
+                logger.warning(f"[FMP] No analyst ratings found for {ticker}")
+                return None
+            else:
+                logger.error(f"[FMP] Analyst consensus API error: {response.status_code}")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"[FMP] Analyst consensus request failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[FMP] Unexpected error in analyst consensus request: {e}")
+            return None
+    
     def get_earnings_calendar(self, from_date: str, to_date: str) -> List[Dict]:
         """获取财报日历 - UNCHANGED"""
         from app.core.cache import FMPCache

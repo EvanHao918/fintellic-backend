@@ -492,7 +492,7 @@ class AIProcessor:
         
         needs_fmp_data = (
             not company.market_cap or 
-            not company.pe_ratio or 
+            not company.analyst_consensus or 
             not company.website
         )
         
@@ -513,14 +513,10 @@ class AIProcessor:
                 if fmp_data.get('website'):
                     company_updates['website'] = fmp_data['website']
                 
-                pe_ratio = fmp_data.get('pe_ratio')
-                if not pe_ratio:
-                    key_metrics = fmp_service.get_company_key_metrics(ticker)
-                    if key_metrics and key_metrics.get('pe_ratio'):
-                        pe_ratio = key_metrics['pe_ratio']
-                
-                if pe_ratio and pe_ratio > 0:
-                    company_updates['pe_ratio'] = pe_ratio
+                # 获取分析师共识评级
+                analyst_consensus = fmp_service.get_analyst_consensus(ticker)
+                if analyst_consensus:
+                    company_updates['analyst_consensus'] = analyst_consensus
                 
                 for field, value in company_updates.items():
                     setattr(company, field, value)

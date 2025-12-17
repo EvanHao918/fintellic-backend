@@ -142,8 +142,7 @@ async def get_company_detail(
             # UPDATED: Include FMP data from database (optimization key point)
             "market_cap": getattr(company, 'market_cap', None),
             "market_cap_formatted": getattr(company, 'market_cap_formatted', None),
-            "pe_ratio": getattr(company, 'pe_ratio', None),
-            "pe_ratio_formatted": getattr(company, 'pe_ratio_formatted', None),
+            "analyst_consensus": getattr(company, 'analyst_consensus', None),
             "website": getattr(company, 'website', None),
             "employees": getattr(company, 'employees', None),
             "headquarters": getattr(company, 'headquarters', None),
@@ -156,7 +155,7 @@ async def get_company_detail(
             # Check if we need to fetch from FMP (database data incomplete)
             needs_fmp_fetch = (
                 not company.market_cap or 
-                not company.pe_ratio or 
+                not company.analyst_consensus or 
                 not company.website
             )
             
@@ -269,8 +268,7 @@ async def get_company_profile(
                 # Basic fields for compatibility
                 "market_cap": None,
                 "market_cap_formatted": "Pre-IPO",
-                "pe_ratio": None,
-                "pe_ratio_formatted": "N/A",
+                "analyst_consensus": None,
                 "website": None,
                 "employees": None,
                 "headquarters": None,
@@ -309,8 +307,7 @@ async def get_company_profile(
             "employees": getattr(company, 'employees', None),
             "market_cap": getattr(company, 'market_cap', None),
             "market_cap_formatted": getattr(company, 'market_cap_formatted', None),
-            "pe_ratio": getattr(company, 'pe_ratio', None),
-            "pe_ratio_formatted": getattr(company, 'pe_ratio_formatted', None),
+            "analyst_consensus": getattr(company, 'analyst_consensus', None),
             "website": getattr(company, 'website', None),
             "exchange": company.exchange,
             "founded_year": getattr(company, 'founded_year', None),
@@ -319,7 +316,7 @@ async def get_company_profile(
         }
         
         # FALLBACK: Only call FMP API if critical database data is missing
-        has_critical_data = company.market_cap or company.pe_ratio or company.website
+        has_critical_data = company.market_cap or company.analyst_consensus or company.website
         
         if not has_critical_data:
             logger.info(f"[API] Critical data missing for {ticker}, falling back to FMP API")
@@ -354,10 +351,12 @@ async def get_company_profile(
                         key_metrics = fmp_service.get_company_key_metrics(ticker.upper())
                         if key_metrics:
                             profile["key_metrics"] = key_metrics
-                            # Update PE ratio if we got it from key metrics
-                            if key_metrics.get('pe_ratio') and not company.pe_ratio:
-                                company.pe_ratio = key_metrics['pe_ratio']
-                                db.commit()
+                            # Update analyst consensus if missing
+                            if not company.analyst_consensus:
+                                analyst_consensus = fmp_service.get_analyst_consensus(ticker.upper())
+                                if analyst_consensus:
+                                    company.analyst_consensus = analyst_consensus
+                                    db.commit()
                     except Exception as metrics_error:
                         logger.warning(f"[API] Could not fetch key metrics for {ticker}: {str(metrics_error)}")
                         

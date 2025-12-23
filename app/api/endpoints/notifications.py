@@ -124,8 +124,32 @@ def register_device_token(
     """
     Register a device token for push notifications
     FIXED: Unified token storage in users table only
+    FIXED: Remove token from other users to prevent duplicate notifications
     """
     try:
+        # CRITICAL FIX: Remove this token from all other users first
+        # This prevents the same device from receiving notifications for multiple accounts
+        all_users_with_tokens = db.query(User).filter(
+            User.id != current_user.id,
+            User.device_tokens.isnot(None),
+            User.device_tokens != '[]'
+        ).all()
+        
+        for other_user in all_users_with_tokens:
+            try:
+                other_tokens = json.loads(other_user.device_tokens) if other_user.device_tokens else []
+                original_count = len(other_tokens)
+                
+                # Remove the token if it exists
+                other_tokens = [t for t in other_tokens if t.get('token') != token_data.token]
+                
+                if len(other_tokens) < original_count:
+                    other_user.device_tokens = json.dumps(other_tokens)
+                    logger.info(f"Removed duplicate token from user {other_user.id} (now belongs to user {current_user.id})")
+            except (json.JSONDecodeError, Exception) as e:
+                logger.warning(f"Error processing tokens for user {other_user.id}: {e}")
+                continue
+        
         # UNIFIED: Store tokens only in users table
         if not current_user.device_tokens:
             current_user.device_tokens = "[]"
